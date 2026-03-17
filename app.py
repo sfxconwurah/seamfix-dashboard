@@ -185,20 +185,34 @@ def fetch_drive_folder_files(folder_id):
         )
         service = build("drive", "v3", credentials=creds)
 
-        # List xlsx files in folder
-        query = f"'{folder_id}' in parents and mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' and trashed=false"
-        results = service.files().list(
-            q=query, fields="files(id, name)", pageSize=50
+        # First, find all subfolders inside the main folder
+        folder_ids = [folder_id]
+        subfolder_query = f"'{folder_id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false"
+        subfolder_results = service.files().list(
+            q=subfolder_query, fields="files(id, name)", pageSize=50
         ).execute()
-        files = results.get("files", [])
+        for sf in subfolder_results.get("files", []):
+            folder_ids.append(sf["id"])
 
-        if not files:
-            st.session_state["_gdrive_errors"] = ["No xlsx files found in folder (folder may not be shared with service account)"]
+        # Search for xlsx files in the main folder AND all subfolders
+        all_files = []
+        for fid in folder_ids:
+            query = f"'{fid}' in parents and mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' and trashed=false"
+            results = service.files().list(
+                q=query, fields="files(id, name)", pageSize=50
+            ).execute()
+            all_files.extend(results.get("files", []))
+
+        if not all_files:
+            st.session_state["_gdrive_errors"] = [
+                f"No xlsx files found in folder or subfolders ({len(folder_ids)} folders scanned). "
+                "Check that the folder is shared with the service account."
+            ]
             return None
 
         # Download each file
         downloaded = {}
-        for f in files:
+        for f in all_files:
             request = service.files().get_media(fileId=f["id"])
             buf = io.BytesIO()
             downloader = MediaIoBaseDownload(buf, request)
