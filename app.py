@@ -70,48 +70,54 @@ def check_auth():
     if os.getenv("DISABLE_AUTH", "false").lower() == "true":
         return True
 
-    # Check if OAuth is configured in secrets
+    # Check if OAuth is fully configured in secrets
     auth_conf = st.secrets.get("auth", {})
     has_oauth = all(
-        k in auth_conf for k in ["client_id", "client_secret", "redirect_uri"]
+        k in auth_conf
+        for k in ["client_id", "client_secret", "redirect_uri", "cookie_secret", "server_metadata_url"]
     )
 
     if has_oauth:
-        # OAuth is configured — require login
-        user = st.user
-        if not user.is_logged_in:
-            # Show login page
-            st.markdown(
-                """
-                <div style="text-align:center;padding:80px 20px">
-                    <h1 style="color:#00D4AA;margin-bottom:8px">Seamfix Financial Intelligence</h1>
-                    <p style="color:#94a3b8;margin-bottom:40px">Sign in with your authorized Google account to access the dashboards.</p>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-            st.login("google")
-            st.stop()
-            return False
+        try:
+            # OAuth is configured — require login
+            user = st.user
+            if not user.is_logged_in:
+                # Show login page
+                st.markdown(
+                    """
+                    <div style="text-align:center;padding:80px 20px">
+                        <h1 style="color:#00D4AA;margin-bottom:8px">Seamfix Financial Intelligence</h1>
+                        <p style="color:#94a3b8;margin-bottom:40px">Sign in with your authorized Google account to access the dashboards.</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                st.login("google")
+                st.stop()
+                return False
 
-        # User is logged in — check against allowlist
-        email = user.email.lower().strip()
-        allowed_emails = [
-            e.lower().strip()
-            for e in auth_conf.get("allowed_emails", [])
-        ]
+            # User is logged in — check against allowlist
+            email = user.email.lower().strip()
+            allowed_emails = [
+                e.lower().strip()
+                for e in auth_conf.get("allowed_emails", [])
+            ]
 
-        if allowed_emails and email not in allowed_emails:
-            st.error(
-                f"Access denied. **{email}** is not on the authorized users list.\n\n"
-                "Contact the dashboard administrator to request access."
-            )
-            if st.button("Sign out"):
-                st.logout()
-            st.stop()
-            return False
+            if allowed_emails and email not in allowed_emails:
+                st.error(
+                    f"Access denied. **{email}** is not on the authorized users list.\n\n"
+                    "Contact the dashboard administrator to request access."
+                )
+                if st.button("Sign out"):
+                    st.logout()
+                st.stop()
+                return False
 
-        return True
+            return True
+        except Exception as e:
+            # OAuth misconfigured — show warning and allow access for now
+            st.sidebar.warning(f"OAuth not fully configured: {e}")
+            return True
 
     # No OAuth configured — allow access (development mode)
     return True
