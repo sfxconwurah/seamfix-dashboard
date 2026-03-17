@@ -218,34 +218,68 @@ def fetch_drive_folder_files(folder_id):
                 folder_ids.append(nsf["id"])
                 debug_log.append(f"Found nested subfolder: {sf['name']}/{nsf['name']}")
 
-        # Search for xlsx files in the main folder AND all subfolders
-        all_files = []
+        # Search for BOTH uploaded xlsx files AND native Google Sheets
+        XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        GSHEET_MIME = "application/vnd.google-apps.spreadsheet"
+
+        xlsx_files = []
+        gsheet_files = []
         for fid in folder_ids:
-            query = f"'{fid}' in parents and mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' and trashed=false"
+            # Uploaded xlsx files
+            query = f"'{fid}' in parents and mimeType='{XLSX_MIME}' and trashed=false"
             results = service.files().list(
-                q=query, fields="files(id, name)", pageSize=50
+                q=query, fields="files(id, name, mimeType)", pageSize=50
             ).execute()
             found = results.get("files", [])
-            all_files.extend(found)
+            xlsx_files.extend(found)
             if found:
                 debug_log.append(f"Found {len(found)} xlsx files in folder {fid}")
 
-        debug_log.append(f"Total: {len(all_files)} xlsx files across {len(folder_ids)} folders")
+            # Native Google Sheets
+            query = f"'{fid}' in parents and mimeType='{GSHEET_MIME}' and trashed=false"
+            results = service.files().list(
+                q=query, fields="files(id, name, mimeType)", pageSize=50
+            ).execute()
+            found = results.get("files", [])
+            gsheet_files.extend(found)
+            if found:
+                debug_log.append(f"Found {len(found)} Google Sheets in folder {fid}")
+
+        all_files = xlsx_files + gsheet_files
+        debug_log.append(f"Total: {len(xlsx_files)} xlsx + {len(gsheet_files)} Google Sheets across {len(folder_ids)} folders")
 
         if not all_files:
-            debug_log.append("No xlsx files found. Check folder structure and sharing permissions.")
+            debug_log.append("No files found. Check folder structure and sharing permissions.")
             return None, debug_log
 
         # Download each file
         downloaded = {}
         for f in all_files:
-            request = service.files().get_media(fileId=f["id"])
-            buf = io.BytesIO()
-            downloader = MediaIoBaseDownload(buf, request)
-            done = False
-            while not done:
-                _, done = downloader.next_chunk()
-            downloaded[f["name"]] = buf.getvalue()
+            fname = f["name"]
+            if f["mimeType"] == GSHEET_MIME:
+                # Export Google Sheet as xlsx
+                buf = io.BytesIO()
+                request = service.files().export_media(
+                    fileId=f["id"],
+                    mimeType=XLSX_MIME,
+                )
+                downloader = MediaIoBaseDownload(buf, request)
+                done = False
+                while not done:
+                    _, done = downloader.next_chunk()
+                # Add .xlsx extension if not present
+                if not fname.endswith(".xlsx"):
+                    fname = fname + ".xlsx"
+                downloaded[fname] = buf.getvalue()
+            else:
+                # Download uploaded xlsx directly
+                request = service.files().get_media(fileId=f["id"])
+                buf = io.BytesIO()
+                downloader = MediaIoBaseDownload(buf, request)
+                done = False
+                while not done:
+                    _, done = downloader.next_chunk()
+                downloaded[fname] = buf.getvalue()
 
         debug_log.append(f"Successfully downloaded {len(downloaded)} files")
         return downloaded, debug_log
