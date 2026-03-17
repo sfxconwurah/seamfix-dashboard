@@ -63,70 +63,57 @@ DASHBOARDS = {
 # ── Helper: Google OAuth check ───────────────────────────────────────
 def check_auth():
     """
-    Check if user is authenticated.
-    On Streamlit Community Cloud with Google OAuth configured,
-    st.experimental_user contains the user's email.
-    Falls back to secrets-based password if OAuth not available.
+    Check if user is authenticated via Google OAuth using st.login().
+    Falls back to open access if OAuth is not configured.
     """
     # If running locally or auth disabled, allow access
     if os.getenv("DISABLE_AUTH", "false").lower() == "true":
         return True
 
-    # Try Streamlit Cloud's built-in OAuth
-    try:
-        user = st.experimental_user
-        if user and hasattr(user, "email") and user.email:
-            email = user.email.lower().strip()
-            # Check against explicit allowlist of emails
-            allowed_emails = [
-                e.lower().strip()
-                for e in st.secrets.get("auth", {}).get("allowed_emails", [])
-            ]
-            if allowed_emails:
-                if email in allowed_emails:
-                    return True
-                else:
-                    st.error(
-                        f"Access denied. **{email}** is not on the authorized users list.\n\n"
-                        "Contact the dashboard administrator to request access."
-                    )
-                    st.stop()
-                    return False
-            else:
-                # No allowlist configured — fall back to domain check
-                allowed_domains = st.secrets.get("auth", {}).get(
-                    "allowed_domains", ["seamfix.com"]
-                )
-                domain = email.split("@")[-1]
-                if domain in allowed_domains:
-                    return True
-                else:
-                    st.error(f"Access denied. {email} is not in an authorized domain.")
-                    st.stop()
-                    return False
-    except Exception:
-        pass  # OAuth not configured
+    # Check if OAuth is configured in secrets
+    auth_conf = st.secrets.get("auth", {})
+    has_oauth = all(
+        k in auth_conf for k in ["client_id", "client_secret", "redirect_uri"]
+    )
 
-    # Fallback: password auth from secrets
-    try:
-        correct_pw = st.secrets["auth"]["password"]
-        if "authenticated" not in st.session_state:
-            st.session_state.authenticated = False
-        if not st.session_state.authenticated:
-            pw = st.text_input("Enter dashboard password:", type="password")
-            if pw:
-                if pw == correct_pw:
-                    st.session_state.authenticated = True
-                    st.rerun()
-                else:
-                    st.error("Incorrect password")
+    if has_oauth:
+        # OAuth is configured — require login
+        user = st.user
+        if not user.is_logged_in:
+            # Show login page
+            st.markdown(
+                """
+                <div style="text-align:center;padding:80px 20px">
+                    <h1 style="color:#00D4AA;margin-bottom:8px">Seamfix Financial Intelligence</h1>
+                    <p style="color:#94a3b8;margin-bottom:40px">Sign in with your authorized Google account to access the dashboards.</p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            st.login("google")
             st.stop()
             return False
-        return True
-    except Exception:
-        pass  # No auth configured
 
-    # No auth configured — allow access (development mode)
+        # User is logged in — check against allowlist
+        email = user.email.lower().strip()
+        allowed_emails = [
+            e.lower().strip()
+            for e in auth_conf.get("allowed_emails", [])
+        ]
+
+        if allowed_emails and email not in allowed_emails:
+            st.error(
+                f"Access denied. **{email}** is not on the authorized users list.\n\n"
+                "Contact the dashboard administrator to request access."
+            )
+            if st.button("Sign out"):
+                st.logout()
+            st.stop()
+            return False
+
+        return True
+
+    # No OAuth configured — allow access (development mode)
     return True
 
 
@@ -135,14 +122,16 @@ def check_auth():
 def fetch_google_sheet_xlsx(sheet_id):
     """Download Google Sheet as xlsx. Requires sheet to be shared
     with 'Anyone with the link' (Viewer) or a service account."""
+    errors = []
+
     try:
         # Try public export
         url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx"
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         resp = urllib.request.urlopen(req, timeout=30)
         return resp.read()
-    except Exception:
-        pass
+    except Exception as e:
+        errors.append(f"Public access: {e}")
 
     # Try with service account (if configured in secrets)
     try:
@@ -160,8 +149,14 @@ def fetch_google_sheet_xlsx(sheet_id):
         gc = gspread.authorize(creds)
         spreadsheet = gc.open_by_key(sheet_id)
         return spreadsheet.export(format=gspread.utils.ExportFormat.EXCEL)
-    except Exception:
-        return None
+    except KeyError:
+        errors.append("Service account: No gcp_service_account in secrets")
+    except Exception as e:
+        errors.append(f"Service account: {e}")
+
+    # Store errors for debugging display
+    st.session_state["_gsheet_errors"] = errors
+    return None
 
 
 # ── Helper: fetch cash reports from Google Drive folder ──────────────
@@ -192,6 +187,7 @@ def fetch_drive_folder_files(folder_id):
         files = results.get("files", [])
 
         if not files:
+            st.session_state["_gdrive_errors"] = ["No xlsx files found in folder (folder may not be shared with service account)"]
             return None
 
         # Download each file
@@ -206,7 +202,11 @@ def fetch_drive_folder_files(folder_id):
             downloaded[f["name"]] = buf.getvalue()
 
         return downloaded
-    except Exception:
+    except KeyError:
+        st.session_state["_gdrive_errors"] = ["No gcp_service_account in secrets"]
+        return None
+    except Exception as e:
+        st.session_state["_gdrive_errors"] = [str(e)]
         return None
 
 
@@ -383,6 +383,30 @@ def main():
         st.caption(f"📈 Revenue: {rev_source}")
         st.caption(f"💵 Cash reports: {cash_source}" + (f" + {upload_count} uploaded" if upload_count else ""))
         st.caption(f"📋 Budget: {'Available' if (DATA_DIR / BUDGET_FILENAME).exists() else 'Missing'}")
+
+        # Debug info for connection issues
+        gsheet_errs = st.session_state.get("_gsheet_errors", [])
+        gdrive_errs = st.session_state.get("_gdrive_errors", [])
+        if gsheet_errs or gdrive_errs:
+            with st.expander("Connection issues"):
+                if gsheet_errs:
+                    st.caption("Google Sheet:")
+                    for e in gsheet_errs:
+                        st.caption(f"  {e}")
+                if gdrive_errs:
+                    st.caption("Google Drive:")
+                    for e in gdrive_errs:
+                        st.caption(f"  {e}")
+
+        # Show logged-in user and logout button
+        try:
+            user = st.user
+            if user.is_logged_in:
+                st.divider()
+                st.caption(f"Signed in as **{user.email}**")
+                st.logout("Sign out")
+        except Exception:
+            pass
 
     # ── Main content ─────────────────────────────────────────────────
     dash = DASHBOARDS[selected]
