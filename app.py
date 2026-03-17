@@ -173,12 +173,12 @@ def fetch_google_sheet_xlsx(sheet_id):
 
 
 # ── Helper: fetch cash reports from Google Drive folder ──────────────
-@st.cache_data(ttl=300, show_spinner="Fetching cash reports from Google Drive...")
 def fetch_drive_folder_files(folder_id):
     """
     List and download xlsx files from a Google Drive folder.
     Searches recursively through subfolders (e.g. Jan/, Feb/, March/).
-    Returns dict of {filename: bytes} or None.
+    Returns tuple of (dict of {filename: bytes} or None, list of debug messages).
+    NOT cached — caller handles caching via session state.
     """
     debug_log = []
     try:
@@ -233,10 +233,8 @@ def fetch_drive_folder_files(folder_id):
         debug_log.append(f"Total: {len(all_files)} xlsx files across {len(folder_ids)} folders")
 
         if not all_files:
-            st.session_state["_gdrive_errors"] = debug_log + [
-                "No xlsx files found. Check folder structure and sharing permissions."
-            ]
-            return None
+            debug_log.append("No xlsx files found. Check folder structure and sharing permissions.")
+            return None, debug_log
 
         # Download each file
         downloaded = {}
@@ -249,15 +247,13 @@ def fetch_drive_folder_files(folder_id):
                 _, done = downloader.next_chunk()
             downloaded[f["name"]] = buf.getvalue()
 
-        # Clear any previous errors on success
-        st.session_state.pop("_gdrive_errors", None)
-        return downloaded
+        debug_log.append(f"Successfully downloaded {len(downloaded)} files")
+        return downloaded, debug_log
     except KeyError:
-        st.session_state["_gdrive_errors"] = ["No gcp_service_account in secrets"]
-        return None
+        return None, ["No gcp_service_account in secrets"]
     except Exception as e:
-        st.session_state["_gdrive_errors"] = debug_log + [f"Error: {str(e)}"]
-        return None
+        debug_log.append(f"Error: {str(e)}")
+        return None, debug_log
 
 
 # ── Helper: prepare data folder ─────────────────────────────────────
@@ -279,14 +275,17 @@ def prepare_data_folder():
 
     # 2. Fetch cash reports from Google Drive folder (overwrites bundled)
     if GOOGLE_DRIVE_FOLDER_ID:
-        drive_files = fetch_drive_folder_files(GOOGLE_DRIVE_FOLDER_ID)
+        drive_files, drive_debug = fetch_drive_folder_files(GOOGLE_DRIVE_FOLDER_ID)
+        st.session_state["_gdrive_debug"] = drive_debug
         if drive_files:
             for fname, fbytes in drive_files.items():
                 (data_path / fname).write_bytes(fbytes)
             st.session_state["cash_source"] = f"Google Drive ({len(drive_files)} files)"
+            st.session_state.pop("_gdrive_errors", None)
         else:
             bundled = len(list(data_path.glob("Cash Report*.xlsx")))
             st.session_state["cash_source"] = f"Local files ({bundled} bundled)" if bundled else "Not available"
+            st.session_state["_gdrive_errors"] = drive_debug
 
     # 3. Try fetching live revenue data from Google Sheet
     if GOOGLE_SHEET_ID:
