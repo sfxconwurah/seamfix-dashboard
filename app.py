@@ -413,7 +413,7 @@ def main():
     check_auth()
 
     # ── Auto-refresh every hour ──────────────────────────────────────
-    REFRESH_INTERVAL = 3600  # seconds (1 hour)
+    REFRESH_INTERVAL = 86400  # seconds (24 hours)
     if "last_refresh" not in st.session_state:
         st.session_state.last_refresh = time.time()
 
@@ -474,7 +474,7 @@ def main():
         last_ref = st.session_state.get("last_refresh")
         if last_ref:
             st.caption(f"Last refreshed: {datetime.fromtimestamp(last_ref).strftime('%H:%M %d %b')}")
-        st.caption("Auto-refreshes every hour")
+        st.caption("Auto-refreshes daily")
 
         st.divider()
 
