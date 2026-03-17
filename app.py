@@ -19,7 +19,7 @@ st.set_page_config(
     page_title="Seamfix Financial Intelligence",
     page_icon="💰",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
 # ── Constants ────────────────────────────────────────────────────────
@@ -426,6 +426,16 @@ def main():
         st.session_state.last_refresh = time.time()
         st.rerun()
 
+    # ── Top navigation tabs ──────────────────────────────────────────
+    dash_names = list(DASHBOARDS.keys())
+    dash_labels = [f"{DASHBOARDS[d]['icon']}  {d}" for d in dash_names]
+    tab_objects = st.tabs(dash_labels)
+
+    # Determine which tab is selected (Streamlit tabs are positional)
+    # We store selection in session state for sidebar sync
+    if "selected_dash" not in st.session_state:
+        st.session_state.selected_dash = dash_names[0]
+
     # ── Sidebar ──────────────────────────────────────────────────────
     with st.sidebar:
         st.markdown(
@@ -438,18 +448,11 @@ def main():
             unsafe_allow_html=True,
         )
 
-        # Dashboard selector
-        selected = st.radio(
-            "Dashboard",
-            list(DASHBOARDS.keys()),
-            format_func=lambda x: f"{DASHBOARDS[x]['icon']}  {x}",
-            label_visibility="collapsed",
-        )
-
         st.divider()
 
         # Data management section
         st.markdown("##### Data Management")
+        st.caption("⚠️ Only upload files if you are authorized by the finance team. Incorrect files may corrupt the dashboard data.")
 
         # File uploader for new cash reports
         uploaded = st.file_uploader(
@@ -512,40 +515,49 @@ def main():
         except Exception:
             pass
 
-    # ── Main content ─────────────────────────────────────────────────
-    dash = DASHBOARDS[selected]
-
-    # Prepare data
+    # ── Main content — render each dashboard in its tab ─────────────
     data_folder = prepare_data_folder()
 
-    # Generate or use cached HTML
-    cache_key = f"html_{selected}"
-    if cache_key not in st.session_state:
-        with st.spinner(f"Generating {selected} dashboard..."):
-            html = generate_dashboard(
-                dash["script"], data_folder, dash["output"]
-            )
-            if html:
-                html = fix_html_for_streamlit(html)
-                st.session_state[cache_key] = html
+    for i, dash_name in enumerate(dash_names):
+        with tab_objects[i]:
+            dash = DASHBOARDS[dash_name]
+
+            # Generate or use cached HTML
+            cache_key = f"html_{dash_name}"
+            if cache_key not in st.session_state:
+                with st.spinner(f"Generating {dash_name} dashboard..."):
+                    html = generate_dashboard(
+                        dash["script"], data_folder, dash["output"]
+                    )
+                    if html:
+                        html = fix_html_for_streamlit(html)
+                        st.session_state[cache_key] = html
+                    else:
+                        st.session_state[cache_key] = None
+
+            html_content = st.session_state.get(cache_key)
+
+            if html_content:
+                # Inject auto-resize script so iframe matches content height (no inner scroll)
+                resize_script = """
+<script>
+window.addEventListener('load', function() {
+    const height = document.body.scrollHeight + 50;
+    window.parent.postMessage({type: 'streamlit:setFrameHeight', height: height}, '*');
+});
+setTimeout(function() {
+    const height = document.body.scrollHeight + 50;
+    window.parent.postMessage({type: 'streamlit:setFrameHeight', height: height}, '*');
+}, 2000);
+</script>
+"""
+                html_content = html_content.replace("</body>", resize_script + "</body>")
+                components.html(html_content, height=8000, scrolling=False)
             else:
-                st.session_state[cache_key] = None
-
-    html_content = st.session_state.get(cache_key)
-
-    if html_content:
-        # Render the dashboard
-        components.html(html_content, height=4000, scrolling=True)
-    else:
-        st.warning(
-            f"Could not generate the {selected} dashboard. "
-            "Check that all required data files are available."
-        )
-        st.info(
-            f"This dashboard needs: "
-            + ("Cash Report xlsx files" if "Cash" in selected or "Expense" in selected else "")
-            + ("Revenue xlsx + Budget xlsx" if "Revenue" in selected or "Budget" in selected else "")
-        )
+                st.warning(
+                    f"Could not generate the {dash_name} dashboard. "
+                    "Check that all required data files are available."
+                )
 
 
 if __name__ == "__main__":
