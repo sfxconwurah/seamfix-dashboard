@@ -72,10 +72,15 @@ def check_auth():
         return True
 
     # Check if OAuth is fully configured in secrets
+    # Streamlit expects: [auth] has redirect_uri + cookie_secret,
+    # [auth.google] has client_id + client_secret + server_metadata_url
     auth_conf = st.secrets.get("auth", {})
-    has_oauth = all(
-        k in auth_conf
-        for k in ["client_id", "client_secret", "redirect_uri", "cookie_secret", "server_metadata_url"]
+    google_conf = auth_conf.get("google", {})
+    has_oauth = (
+        "redirect_uri" in auth_conf
+        and "cookie_secret" in auth_conf
+        and "client_id" in google_conf
+        and "client_secret" in google_conf
     )
 
     if has_oauth:
@@ -99,9 +104,10 @@ def check_auth():
 
             # User is logged in — check against allowlist
             email = user.email.lower().strip()
+            allowed_conf = auth_conf.get("allowed", {})
             allowed_emails = [
                 e.lower().strip()
-                for e in auth_conf.get("allowed_emails", [])
+                for e in allowed_conf.get("emails", [])
             ]
 
             if allowed_emails and email not in allowed_emails:
