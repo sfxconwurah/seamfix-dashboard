@@ -10,8 +10,9 @@ Data sources:
 
 import streamlit as st
 import streamlit.components.v1 as components
-import os, sys, shutil, tempfile, glob, io, urllib.request
+import os, sys, shutil, tempfile, glob, io, urllib.request, time
 from pathlib import Path
+from datetime import datetime
 
 # ── Page config ──────────────────────────────────────────────────────
 st.set_page_config(
@@ -170,9 +171,10 @@ def fetch_google_sheet_xlsx(sheet_id):
 def fetch_drive_folder_files(folder_id):
     """
     List and download xlsx files from a Google Drive folder.
-    Requires a service account with access to the folder.
+    Searches recursively through subfolders (e.g. Jan/, Feb/, March/).
     Returns dict of {filename: bytes} or None.
     """
+    debug_log = []
     try:
         from google.oauth2.service_account import Credentials
         from googleapiclient.discovery import build
@@ -184,6 +186,7 @@ def fetch_drive_folder_files(folder_id):
             scopes=["https://www.googleapis.com/auth/drive.readonly"],
         )
         service = build("drive", "v3", credentials=creds)
+        debug_log.append("Service account authenticated OK")
 
         # First, find all subfolders inside the main folder
         folder_ids = [folder_id]
@@ -191,8 +194,23 @@ def fetch_drive_folder_files(folder_id):
         subfolder_results = service.files().list(
             q=subfolder_query, fields="files(id, name)", pageSize=50
         ).execute()
-        for sf in subfolder_results.get("files", []):
+        subfolders = subfolder_results.get("files", [])
+        for sf in subfolders:
             folder_ids.append(sf["id"])
+            debug_log.append(f"Found subfolder: {sf['name']}")
+
+        if not subfolders:
+            debug_log.append("No subfolders found in root folder")
+
+        # Also check for nested subfolders (e.g. Month/Week1/)
+        for sf in subfolders:
+            nested_query = f"'{sf['id']}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false"
+            nested_results = service.files().list(
+                q=nested_query, fields="files(id, name)", pageSize=50
+            ).execute()
+            for nsf in nested_results.get("files", []):
+                folder_ids.append(nsf["id"])
+                debug_log.append(f"Found nested subfolder: {sf['name']}/{nsf['name']}")
 
         # Search for xlsx files in the main folder AND all subfolders
         all_files = []
@@ -201,12 +219,16 @@ def fetch_drive_folder_files(folder_id):
             results = service.files().list(
                 q=query, fields="files(id, name)", pageSize=50
             ).execute()
-            all_files.extend(results.get("files", []))
+            found = results.get("files", [])
+            all_files.extend(found)
+            if found:
+                debug_log.append(f"Found {len(found)} xlsx files in folder {fid}")
+
+        debug_log.append(f"Total: {len(all_files)} xlsx files across {len(folder_ids)} folders")
 
         if not all_files:
-            st.session_state["_gdrive_errors"] = [
-                f"No xlsx files found in folder or subfolders ({len(folder_ids)} folders scanned). "
-                "Check that the folder is shared with the service account."
+            st.session_state["_gdrive_errors"] = debug_log + [
+                "No xlsx files found. Check folder structure and sharing permissions."
             ]
             return None
 
@@ -221,12 +243,14 @@ def fetch_drive_folder_files(folder_id):
                 _, done = downloader.next_chunk()
             downloaded[f["name"]] = buf.getvalue()
 
+        # Clear any previous errors on success
+        st.session_state.pop("_gdrive_errors", None)
         return downloaded
     except KeyError:
         st.session_state["_gdrive_errors"] = ["No gcp_service_account in secrets"]
         return None
     except Exception as e:
-        st.session_state["_gdrive_errors"] = [str(e)]
+        st.session_state["_gdrive_errors"] = debug_log + [f"Error: {str(e)}"]
         return None
 
 
@@ -349,6 +373,20 @@ def main():
     # Auth check
     check_auth()
 
+    # ── Auto-refresh every hour ──────────────────────────────────────
+    REFRESH_INTERVAL = 3600  # seconds (1 hour)
+    if "last_refresh" not in st.session_state:
+        st.session_state.last_refresh = time.time()
+
+    elapsed = time.time() - st.session_state.last_refresh
+    if elapsed > REFRESH_INTERVAL:
+        st.cache_data.clear()
+        for key in list(st.session_state.keys()):
+            if key.startswith("html_"):
+                del st.session_state[key]
+        st.session_state.last_refresh = time.time()
+        st.rerun()
+
     # ── Sidebar ──────────────────────────────────────────────────────
     with st.sidebar:
         st.markdown(
@@ -388,9 +426,16 @@ def main():
             # Clear cached data
             st.cache_data.clear()
             for key in list(st.session_state.keys()):
-                if key.startswith("html_"):
+                if key.startswith("html_") or key.startswith("_g"):
                     del st.session_state[key]
+            st.session_state.last_refresh = time.time()
             st.rerun()
+
+        # Show last refresh time
+        last_ref = st.session_state.get("last_refresh")
+        if last_ref:
+            st.caption(f"Last refreshed: {datetime.fromtimestamp(last_ref).strftime('%H:%M %d %b')}")
+        st.caption("Auto-refreshes every hour")
 
         st.divider()
 
