@@ -367,7 +367,8 @@ def generate_html(budget_items, reports, output_path):
 
     # Generate HTML
     generated_at = datetime.now().strftime('%d %b %Y %H:%M')
-    latest_date = reports[-1]['date_str'] if reports else 'N/A'
+    latest_date        = reports[-1]['date_str'] if reports else 'N/A'
+    first_report_date  = reports[0]['date_str']  if reports else 'N/A'
 
     # Build category metrics table rows
     category_table_rows = ""
@@ -487,16 +488,18 @@ def generate_html(budget_items, reports, output_path):
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}
-body{{font-family:'Inter',sans-serif;background:linear-gradient(135deg,#0f172a,#1e293b);color:#e2e8f0;padding:24px;min-height:100vh}}
-.container{{max-width:1600px;margin:0 auto}}
+body{{font-family:'Inter',sans-serif;background:linear-gradient(135deg,#0f172a,#1e293b);color:#e2e8f0;padding:0;min-height:100vh}}
+.container{{max-width:1600px;margin:0 auto;padding:0 28px 28px}}
 .header{{margin-bottom:32px;padding-bottom:20px;border-bottom:2px solid rgba(0,212,170,0.2)}}
 .header h1{{font-size:2.4em;font-weight:700;background:linear-gradient(135deg,#00D4AA,#4ECDC4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}}
 .header .sub{{color:#94a3b8;font-size:0.95em}}
 .header .meta{{color:#64748b;font-size:0.8em;margin-top:6px}}
-.nav-tabs{{display:flex;gap:16px;margin-bottom:24px;border-bottom:1px solid rgba(0,212,170,0.1);padding-bottom:12px}}
-.nav-tab{{padding:8px 0;border-bottom:2px solid transparent;color:#94a3b8;cursor:pointer;text-decoration:none;font-size:0.9em;font-weight:500;transition:all 0.2s}}
-.nav-tab:hover{{color:#00D4AA}}
-.nav-tab.active{{color:#00D4AA;border-bottom-color:#00D4AA}}
+.nav-tabs{{display:none!important}}
+.top-nav{{background:#0a0f1e;border-bottom:1px solid #334155;padding:0 24px;display:flex;align-items:center;height:48px;overflow-x:auto;position:sticky;top:0;z-index:200}}
+.top-nav-brand{{color:#e2e8f0;font-weight:700;font-size:15px;margin-right:24px;white-space:nowrap;text-decoration:none}}
+.top-nav-link{{color:#94a3b8;text-decoration:none;padding:0 14px;height:48px;display:flex;align-items:center;font-size:13px;border-bottom:2px solid transparent;white-space:nowrap;transition:color .2s}}
+.top-nav-link:hover{{color:#e2e8f0}}
+.top-nav-link.active{{color:#fff;border-bottom-color:#00D4AA;font-weight:500}}
 .kpi-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-bottom:36px}}
 .kpi-card{{background:linear-gradient(135deg,rgba(30,41,59,0.9),rgba(15,23,42,0.9));border:1px solid rgba(0,212,170,0.15);border-radius:12px;padding:22px;transition:all 0.3s ease}}
 .kpi-card:hover{{border-color:rgba(0,212,170,0.4);transform:translateY(-3px);box-shadow:0 8px 30px rgba(0,212,170,0.1)}}
@@ -541,9 +544,7 @@ tbody tr:hover{{background:rgba(0,212,170,0.04)}}
 .tw-body li{{margin-bottom:4px}}
 @media(max-width:1024px){{.charts-grid{{grid-template-columns:1fr}}.kpi-grid{{grid-template-columns:repeat(2,1fr)}}.takeaways-grid{{grid-template-columns:1fr}}}}
 @media(max-width:640px){{.kpi-grid{{grid-template-columns:1fr}}.header h1{{font-size:1.6em}}.nav-tabs{{flex-wrap:wrap}}}}
-.pdf-btn{{position:fixed;top:20px;right:24px;z-index:100;padding:10px 22px;background:linear-gradient(135deg,#00D4AA,#4ECDC4);color:#0f172a;border:none;border-radius:8px;font-family:inherit;font-size:0.85em;font-weight:700;cursor:pointer;letter-spacing:0.5px;box-shadow:0 4px 16px rgba(0,212,170,0.3);transition:all 0.2s}}
-.pdf-btn:hover{{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,212,170,0.4)}}
-.pdf-btn svg{{vertical-align:middle;margin-right:6px}}
+.pdf-btn{{display:none!important}}
 th.sortable{{cursor:pointer;user-select:none}}
 th.sortable:hover{{color:#FFE66D}}
 th.sort-asc::after{{content:' ▲';font-size:0.7em}}
@@ -590,24 +591,27 @@ td{{color:#334155!important;border-bottom-color:#e2e8f0!important}}
 .search-box{{display:none!important}}
 tbody tr:hover{{background:transparent!important}}
 }}
+.dashboard-footer{{margin-top:48px;padding:20px 28px;border-top:1px solid #334155;color:#94a3b8;font-size:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}}
+.dashboard-footer span{{color:#94a3b8}}
+/* ── HEADER: match Pipeline Intelligence style ── */
+.header{{padding:24px 28px 16px!important;border-bottom:1px solid #334155!important;margin-bottom:24px!important;background:none!important}}
+.header h1{{font-size:22px!important;font-weight:700!important;background:none!important;-webkit-background-clip:unset!important;-webkit-text-fill-color:#e2e8f0!important;color:#e2e8f0!important;margin-bottom:4px!important}}
+.header .sub{{font-size:13px!important;color:#94a3b8!important}}
+.header .meta{{font-size:12px!important;color:#94a3b8!important;margin-top:4px!important}}
+.header p{{font-size:13px!important;color:#94a3b8!important;margin-top:4px!important}}
 </style>
 </head>
 <body>
-<button class="pdf-btn" onclick="window.print()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Save as PDF</button>
+<nav class="top-nav"><span class="top-nav-brand">⚡ Seamfix</span><a href="dashboard.html" class="top-nav-link ">Cash Overview</a><a href="expense_dashboard.html" class="top-nav-link ">Expense &amp; Vendor</a><a href="budget_dashboard.html" class="top-nav-link active">Budget vs Actual</a><a href="revenue_dashboard.html" class="top-nav-link ">Revenue &amp; Fundability</a><a href="pipeline_dashboard.html" class="top-nav-link ">Pipeline Intelligence</a></nav>
+<!-- PDF button hidden per user request -->
 
 <div class="container">
 <div class="header">
 <h1>Seamfix Budget vs Actual</h1>
 <div class="sub">Budget Performance Dashboard &mdash; 2026</div>
-<div class="meta">Latest report: {latest_date} &bull; Generated: {generated_at} &bull; {weeks_elapsed} weeks analyzed &bull; Powered by Claude Cowork</div>
 </div>
 
-<div class="nav-tabs">
-<a href="dashboard.html" class="nav-tab">💰 Cash Overview</a>
-<a href="expense_dashboard.html" class="nav-tab">📊 Expense & Vendor</a>
-<a href="budget_dashboard.html" class="nav-tab active">📈 Budget vs Actual</a>
-<a href="revenue_dashboard.html" class="nav-tab">💎 Revenue & Fundability</a>
-</div>
+<!-- old nav-tabs replaced by top-nav -->
 
 <div class="kpi-grid">
 <div class="kpi-card">
@@ -770,6 +774,10 @@ new Chart(document.getElementById('trendChart'),{{
 }});
 
 </script>
+<div class="dashboard-footer">
+<span>Seamfix Financial Intelligence &nbsp;·&nbsp; Powered by Claude Cowork</span>
+<span>Available Data Range: {first_report_date} &ndash; {latest_date} &nbsp;&bull;&nbsp; Generated: {generated_at} &nbsp;&bull;&nbsp; $1 = ₦1,450</span>
+</div>
 </body>
 </html>"""
 

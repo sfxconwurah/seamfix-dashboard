@@ -408,12 +408,13 @@ def generate_html(all_weekly_data, all_vendors, all_categories_by_week, kpis, ou
             background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
             color: #e2e8f0;
             min-height: 100vh;
-            padding: 20px;
+            padding: 0;
         }}
 
         .container {{
             max-width: 1600px;
             margin: 0 auto;
+            padding: 0 28px 28px;
         }}
 
         .header {{
@@ -603,7 +604,7 @@ def generate_html(all_weekly_data, all_vendors, all_categories_by_week, kpis, ou
             background: rgba(30, 41, 59, 0.8);
             border: 1px solid rgba(100, 116, 139, 0.3);
             border-radius: 12px;
-            padding: 20px;
+            padding: 0;
             backdrop-filter: blur(10px);
         }}
 
@@ -652,28 +653,12 @@ def generate_html(all_weekly_data, all_vendors, all_categories_by_week, kpis, ou
             border-top: 1px solid rgba(100, 116, 139, 0.2);
         }}
 
-        .print-button {{
-            position: fixed;
-            top: 20px;
-            right: 24px;
-            z-index: 100;
-            padding: 10px 22px;
-            background: linear-gradient(135deg, #00D4AA, #4ECDC4);
-            color: #0f172a;
-            border: none;
-            border-radius: 8px;
-            font-family: inherit;
-            font-size: 0.85em;
-            font-weight: 700;
-            cursor: pointer;
-            letter-spacing: 0.5px;
-            box-shadow: 0 4px 16px rgba(0,212,170,0.3);
-            transition: all 0.2s;
-        }}
-        .print-button:hover {{
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0,212,170,0.4);
-        }}
+        .print-button{{display:none!important}}
+        .top-nav{{background:#0a0f1e;border-bottom:1px solid #334155;padding:0 24px;display:flex;align-items:center;height:48px;overflow-x:auto;position:sticky;top:0;z-index:200}}
+.top-nav-brand{{color:#e2e8f0;font-weight:700;font-size:15px;margin-right:24px;white-space:nowrap;text-decoration:none}}
+.top-nav-link{{color:#94a3b8;text-decoration:none;padding:0 14px;height:48px;display:flex;align-items:center;font-size:13px;border-bottom:2px solid transparent;white-space:nowrap;transition:color .2s}}
+.top-nav-link:hover{{color:#e2e8f0}}
+        .top-nav-link.active{{color:#fff;border-bottom-color:#00D4AA;font-weight:500}}
 
         @media (max-width: 768px) {{
             .charts-grid {{
@@ -697,45 +682,7 @@ def generate_html(all_weekly_data, all_vendors, all_categories_by_week, kpis, ou
             }}
         }}
 
-        .nav-bar {{
-            display: flex;
-            gap: 12px;
-            margin-bottom: 32px;
-            padding: 16px;
-            background: rgba(30, 41, 59, 0.5);
-            border-radius: 10px;
-            border: 1px solid rgba(0, 212, 170, 0.1);
-        }}
-
-        .nav-link {{
-            padding: 8px 18px;
-            border-radius: 6px;
-            background: transparent;
-            border: 1px solid rgba(0, 212, 170, 0.2);
-            color: #94a3b8;
-            text-decoration: none;
-            font-size: 0.85em;
-            font-weight: 500;
-            transition: all 0.2s;
-            cursor: pointer;
-        }}
-
-        .nav-link.active {{
-            background: rgba(0, 212, 170, 0.15);
-            color: #00D4AA;
-            border-color: rgba(0, 212, 170, 0.4);
-        }}
-
-        .nav-link:hover {{
-            border-color: rgba(0, 212, 170, 0.4);
-            color: #cbd5e1;
-        }}
-
-        @media(max-width: 640px) {{
-            .nav-bar {{
-                flex-wrap: wrap;
-            }}
-        }}
+        .nav-bar{{display:none!important}}
 
         th.sortable {{
             cursor: pointer;
@@ -964,24 +911,25 @@ def generate_html(all_weekly_data, all_vendors, all_categories_by_week, kpis, ou
                 border-top-color: #e2e8f0 !important;
             }}
         }}
-    </style>
+    /* ── HEADER: match Pipeline Intelligence style ── */
+.header{{padding:24px 28px 16px!important;border-bottom:1px solid #334155!important;margin-bottom:24px!important;background:none!important}}
+.header h1{{font-size:22px!important;font-weight:700!important;background:none!important;-webkit-background-clip:unset!important;-webkit-text-fill-color:#e2e8f0!important;color:#e2e8f0!important;margin-bottom:4px!important}}
+.header .sub{{font-size:13px!important;color:#94a3b8!important}}
+.header .meta{{font-size:12px!important;color:#94a3b8!important;margin-top:4px!important}}
+.header p{{font-size:13px!important;color:#94a3b8!important;margin-top:4px!important}}
+</style>
 </head>
 <body>
+<nav class="top-nav"><span class="top-nav-brand">⚡ Seamfix</span><a href="dashboard.html" class="top-nav-link ">Cash Overview</a><a href="expense_dashboard.html" class="top-nav-link active">Expense &amp; Vendor</a><a href="budget_dashboard.html" class="top-nav-link ">Budget vs Actual</a><a href="revenue_dashboard.html" class="top-nav-link ">Revenue &amp; Fundability</a><a href="pipeline_dashboard.html" class="top-nav-link ">Pipeline Intelligence</a></nav>
     <div class="container">
         <div class="header">
             <h1>Seamfix Expense & Vendor Analysis</h1>
             <p class="sub">Detailed Outflow & Vendor Tracking &mdash; Weekly Cash Reports 2026</p>
-            <p class="meta" style="margin-top:6px;color:#64748b;font-size:0.85rem;">{earliest_date} &ndash; {latest_date} &bull; {kpis['weeks']} weeks analyzed &bull; Generated: {generated_at} &bull; Powered by Claude Cowork</p>
         </div>
 
-        <div class="nav-bar">
-            <a href="dashboard.html" class="nav-link">💰 Cash Overview</a>
-            <a href="expense_dashboard.html" class="nav-link active">📊 Expense & Vendor</a>
-            <a href="budget_dashboard.html" class="nav-link">📈 Budget vs Actual</a>
-            <a href="revenue_dashboard.html" class="nav-link">💎 Revenue & Fundability</a>
-        </div>
+        <!-- old nav-bar replaced -->
 
-        <button class="print-button" onclick="window.print()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:6px"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Save as PDF</button>
+        <!-- PDF button hidden per user request -->
 
         <!-- KPI Cards -->
         <div class="kpi-grid">
@@ -1173,8 +1121,9 @@ def generate_html(all_weekly_data, all_vendors, all_categories_by_week, kpis, ou
             </table>
         </div>
 
-        <div class="footer">
-            <p>Seamfix Expense & Vendor Analysis Dashboard &bull; Powered by Claude Cowork</p>
+        <div class="footer" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;color:#94a3b8;font-size:12px">
+            <span>Seamfix Expense & Vendor Analysis &nbsp;·&nbsp; Powered by Claude Cowork</span>
+            <span>Available Data Range: {earliest_date} &ndash; {latest_date} &nbsp;&bull;&nbsp; Generated: {generated_at} &nbsp;&bull;&nbsp; $1 = ₦1,450</span>
         </div>
     </div>
 

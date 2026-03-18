@@ -535,17 +535,14 @@ def generate_html(revenues, budget_ngn, revenue_file_path, budget_file_path, out
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}
-body{{font-family:'Inter',sans-serif;background:linear-gradient(135deg,#0f172a,#1e293b);color:#e2e8f0;padding:24px;min-height:100vh}}
-.container{{max-width:1600px;margin:0 auto}}
+body{{font-family:'Inter',sans-serif;background:linear-gradient(135deg,#0f172a,#1e293b);color:#e2e8f0;padding:0;min-height:100vh}}
+.container{{max-width:1600px;margin:0 auto;padding:0 28px 28px}}
 .header{{margin-bottom:32px;padding-bottom:20px;border-bottom:2px solid rgba(0,212,170,0.2)}}
 .header h1{{font-size:2.4em;font-weight:700;background:linear-gradient(135deg,#00D4AA,#4ECDC4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}}
 .header .sub{{color:#94a3b8;font-size:0.95em}}
 .header .meta{{color:#64748b;font-size:0.8em;margin-top:6px}}
 
-.nav-bar{{display:flex;gap:12px;margin-bottom:32px;padding:16px;background:rgba(30,41,59,0.5);border-radius:10px;border:1px solid rgba(0,212,170,0.1)}}
-.nav-link{{padding:8px 18px;border-radius:6px;background:transparent;border:1px solid rgba(0,212,170,0.2);color:#94a3b8;text-decoration:none;font-size:0.85em;font-weight:500;transition:all 0.2s;cursor:pointer}}
-.nav-link.active{{background:rgba(0,212,170,0.15);color:#00D4AA;border-color:rgba(0,212,170,0.4)}}
-.nav-link:hover{{border-color:rgba(0,212,170,0.4);color:#cbd5e1}}
+.nav-bar{{display:none!important}}
 
 .kpi-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:36px}}
 .kpi-card{{background:linear-gradient(135deg,rgba(30,41,59,0.9),rgba(15,23,42,0.9));border:1px solid rgba(0,212,170,0.15);border-radius:12px;padding:22px;transition:all 0.3s ease}}
@@ -566,8 +563,8 @@ body{{font-family:'Inter',sans-serif;background:linear-gradient(135deg,#0f172a,#
 .fundability-section{{border-color:rgba(78,205,196,0.2)}}
 .fundability-section h2{{color:#4ECDC4}}
 
-.scenarios-grid{{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px}}
-.scenario-card{{background:rgba(30,41,59,0.7);border:1px solid rgba(0,212,170,0.15);border-radius:10px;padding:16px}}
+
+
 .scenario-label{{font-size:0.8em;color:#94a3b8;text-transform:uppercase;margin-bottom:10px;font-weight:600}}
 .scenario-value{{font-size:1.2em;font-weight:700;color:#00D4AA;margin-bottom:4px}}
 .scenario-secondary{{font-size:0.75em;color:#64748b;margin-bottom:6px}}
@@ -609,11 +606,15 @@ th.sortable:hover{{color:#FFE66D}}
 th.sort-asc::after{{content:' ▲';font-size:0.7em}}
 th.sort-desc::after{{content:' ▼';font-size:0.7em}}
 
-.pdf-btn{{position:fixed;top:20px;right:24px;z-index:100;padding:10px 22px;background:linear-gradient(135deg,#00D4AA,#4ECDC4);color:#0f172a;border:none;border-radius:8px;font-family:inherit;font-size:0.85em;font-weight:700;cursor:pointer;letter-spacing:0.5px;box-shadow:0 4px 16px rgba(0,212,170,0.3);transition:all 0.2s}}
-.pdf-btn:hover{{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,212,170,0.4)}}
+.top-nav{{background:#0a0f1e;border-bottom:1px solid #334155;padding:0 24px;display:flex;align-items:center;height:48px;overflow-x:auto;position:sticky;top:0;z-index:200}}
+.top-nav-brand{{color:#e2e8f0;font-weight:700;font-size:15px;margin-right:24px;white-space:nowrap;text-decoration:none}}
+.top-nav-link{{color:#94a3b8;text-decoration:none;padding:0 14px;height:48px;display:flex;align-items:center;font-size:13px;border-bottom:2px solid transparent;white-space:nowrap;transition:color .2s}}
+.top-nav-link:hover{{color:#e2e8f0}}
+.top-nav-link.active{{color:#fff;border-bottom-color:#00D4AA;font-weight:500}}
+.pdf-btn{{display:none!important}}
 
-@media(max-width:1024px){{.charts-grid{{grid-template-columns:1fr}}.kpi-grid{{grid-template-columns:repeat(2,1fr)}}.scenarios-grid{{grid-template-columns:repeat(2,1fr)}}.takeaways-grid{{grid-template-columns:1fr}}}}
-@media(max-width:640px){{.kpi-grid{{grid-template-columns:1fr}}.header h1{{font-size:1.6em}}.scenarios-grid{{grid-template-columns:1fr}}.nav-bar{{flex-wrap:wrap}}}}
+@media(max-width:1024px){{.charts-grid{{grid-template-columns:1fr}}.kpi-grid{{grid-template-columns:repeat(2,1fr)}}.takeaways-grid{{grid-template-columns:1fr}}}}
+@media(max-width:640px){{.kpi-grid{{grid-template-columns:1fr}}.header h1{{font-size:1.6em}}.nav-bar{{flex-wrap:wrap}}}}
 
 @media print{{
 .pdf-btn{{display:none!important}}
@@ -642,8 +643,8 @@ body{{background:#fff!important;color:#1e293b!important;padding:12px!important;f
 .section{{background:#f8fafc!important;border:1px solid #e2e8f0!important;padding:16px!important;page-break-inside:avoid}}
 .section h2{{color:#0f172a!important}}
 .fundability-section{{border-color:#b3e5fc!important}}
-.scenarios-grid{{grid-template-columns:repeat(3,1fr)!important}}
-.scenario-card{{background:#f1f5f9!important;border-color:#e2e8f0!important}}
+
+
 .scenario-label{{color:#475569!important}}
 .scenario-value{{color:#0f172a!important}}
 .scenario-secondary{{color:#64748b!important}}
@@ -658,24 +659,27 @@ th{{color:#0f172a!important;border-bottom-color:#cbd5e1!important}}
 td{{color:#334155!important;border-bottom-color:#e2e8f0!important}}
 tbody tr:hover{{background:transparent!important}}
 }}
+.dashboard-footer{{margin-top:48px;padding:20px 28px;border-top:1px solid #334155;color:#94a3b8;font-size:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}}
+.dashboard-footer span{{color:#94a3b8}}
+/* ── HEADER: match Pipeline Intelligence style ── */
+.header{{padding:24px 28px 16px!important;border-bottom:1px solid #334155!important;margin-bottom:24px!important;background:none!important}}
+.header h1{{font-size:22px!important;font-weight:700!important;background:none!important;-webkit-background-clip:unset!important;-webkit-text-fill-color:#e2e8f0!important;color:#e2e8f0!important;margin-bottom:4px!important}}
+.header .sub{{font-size:13px!important;color:#94a3b8!important}}
+.header .meta{{font-size:12px!important;color:#94a3b8!important;margin-top:4px!important}}
+.header p{{font-size:13px!important;color:#94a3b8!important;margin-top:4px!important}}
 </style>
 </head>
 <body>
-<button class="pdf-btn" onclick="window.print()"><span style="font-size:1.2em;margin-right:6px">📄</span>Save as PDF</button>
+<nav class="top-nav"><span class="top-nav-brand">⚡ Seamfix</span><a href="dashboard.html" class="top-nav-link ">Cash Overview</a><a href="expense_dashboard.html" class="top-nav-link ">Expense &amp; Vendor</a><a href="budget_dashboard.html" class="top-nav-link ">Budget vs Actual</a><a href="revenue_dashboard.html" class="top-nav-link active">Revenue &amp; Fundability</a><a href="pipeline_dashboard.html" class="top-nav-link ">Pipeline Intelligence</a></nav>
+<!-- PDF button hidden per user request -->
 
 <div class="container">
 <div class="header">
 <h1>Seamfix Revenue & Fundability Dashboard</h1>
 <div class="sub">2026 Budget Coverage Analysis &mdash; Path to Revenue (All amounts in USD with Naira equivalents)</div>
-<div class="meta">Generated: {generated_at} &bull; Exchange Rate: $1 = ₦1,450 &bull; Powered by Claude Cowork</div>
 </div>
 
-<div class="nav-bar">
-<a href="dashboard.html" class="nav-link">💰 Cash Overview</a>
-<a href="expense_dashboard.html" class="nav-link">📊 Expense & Vendor</a>
-<a href="budget_dashboard.html" class="nav-link">📈 Budget vs Actual</a>
-<a href="revenue_dashboard.html" class="nav-link active">💎 Revenue & Fundability</a>
-</div>
+<!-- old nav-bar replaced by top-nav -->
 
 <div class="kpi-grid">
 <div class="kpi-card">
@@ -724,33 +728,14 @@ tbody tr:hover{{background:transparent!important}}
 </div>
 
 <div class="section fundability-section">
-<h2>💼 Fundability Analysis</h2>
-<p style="color:#94a3b8;margin-bottom:20px">Three scenarios based on pipeline conversion rates. The "Realistic" scenario (70% conversion) balances optimism with pragmatism. Budget: {fmt_naira(budget_ngn)} ({fmt_usd(budget_usd)})</p>
-<div class="scenarios-grid">
-<div class="scenario-card">
-<div class="scenario-label">Optimistic (100% conversion)</div>
-<div class="scenario-value">{fmt_usd(optimistic_revenue_usd)}</div>
-<div class="scenario-secondary">{fmt_naira(optimistic_revenue_usd * FX_RATE)}</div>
-<div class="scenario-coverage">Budget Coverage: {optimistic_coverage:.0f}%</div>
-<div class="scenario-gap">Gap: {fmt_usd(optimistic_gap_usd)}</div>
-<div class="gauge"><div class="gauge-fill" style="width:{min(100, optimistic_coverage)}%;background:{'#00D4AA' if optimistic_coverage >= 100 else '#FFE66D' if optimistic_coverage >= 80 else '#FF6B6B'}"></div></div>
-</div>
-<div class="scenario-card">
-<div class="scenario-label">Realistic (70% conversion)</div>
-<div class="scenario-value">{fmt_usd(realistic_revenue_usd)}</div>
-<div class="scenario-secondary">{fmt_naira(realistic_revenue_usd * FX_RATE)}</div>
-<div class="scenario-coverage">Budget Coverage: {realistic_coverage:.0f}%</div>
-<div class="scenario-gap">Gap: {fmt_usd(realistic_gap_usd)}</div>
-<div class="gauge"><div class="gauge-fill" style="width:{min(100, realistic_coverage)}%;background:{'#00D4AA' if realistic_coverage >= 100 else '#FFE66D' if realistic_coverage >= 80 else '#FF6B6B'}"></div></div>
-</div>
-<div class="scenario-card">
-<div class="scenario-label">Conservative (40% conversion)</div>
-<div class="scenario-value">{fmt_usd(conservative_revenue_usd)}</div>
-<div class="scenario-secondary">{fmt_naira(conservative_revenue_usd * FX_RATE)}</div>
-<div class="scenario-coverage">Budget Coverage: {conservative_coverage:.0f}%</div>
-<div class="scenario-gap">Gap: {fmt_usd(conservative_gap_usd)}</div>
-<div class="gauge"><div class="gauge-fill" style="width:{min(100, conservative_coverage)}%;background:{'#00D4AA' if conservative_coverage >= 100 else '#FFE66D' if conservative_coverage >= 80 else '#FF6B6B'}"></div></div>
-</div>
+<h2>💼 Revenue Projection</h2>
+<p style="color:#94a3b8;margin-bottom:16px">Status-weighted projections are on <a href="pipeline_dashboard.html" style="color:#00D4AA;text-decoration:none">Pipeline Intelligence</a> — deal-level scenarios built from actual On Track / At Risk / Off Track weights are more accurate than flat conversion rates.</p>
+<div style="background:rgba(0,212,170,0.06);border:1px solid rgba(0,212,170,0.2);border-radius:10px;padding:16px 20px">
+  <div style="display:flex;gap:32px;flex-wrap:wrap">
+    <div><div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Annual Target</div><div style="font-size:1.4em;font-weight:700;color:#00D4AA">{fmt_usd(annual_revenue_target_usd)}</div></div>
+    <div><div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Budget</div><div style="font-size:1.4em;font-weight:700;color:#e2e8f0">{fmt_naira(budget_ngn)}</div></div>
+    <div><div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Full-conversion Coverage</div><div style="font-size:1.4em;font-weight:700;color:#{'00D4AA' if optimistic_coverage >= 100 else 'FFE66D'}">{optimistic_coverage:.0f}%</div></div>
+  </div>
 </div>
 </div>
 
@@ -910,6 +895,10 @@ function filterRevenueTable() {{
     }}
 }}
 </script>
+<div class="dashboard-footer">
+<span>Seamfix Financial Intelligence &nbsp;·&nbsp; Powered by Claude Cowork</span>
+<span>Generated: {generated_at} &nbsp;&bull;&nbsp; $1 = ₦1,450</span>
+</div>
 </body>
 </html>"""
 

@@ -56,7 +56,13 @@ DASHBOARDS = {
         "icon": "🚀",
         "script": "generate_revenue_dashboard.py",
         "output": "revenue_dashboard.html",
-        "description": "$10M revenue pipeline, fundability analysis, critical actions"
+        "description": "$10M revenue target, critical actions, pipeline cross-reference"
+    },
+    "Pipeline Intelligence": {
+        "icon": "🎯",
+        "script": "generate_pipeline_dashboard.py",
+        "output": "pipeline_dashboard.html",
+        "description": "Deal-level momentum, status vs trend signals, On Track / At Risk / Off Track breakdown"
     },
 }
 
