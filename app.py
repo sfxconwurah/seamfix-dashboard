@@ -385,6 +385,17 @@ def generate_dashboard(script_name, data_folder, output_name):
     return None
 
 
+# ── App-level HTML cache (shared across all user sessions) ───────────
+@st.cache_resource(show_spinner=False)
+def _get_app_html_cache():
+    """
+    Returns a mutable dict shared across every user session on this server.
+    First visitor populates it; all subsequent visitors read from it instantly.
+    Cleared by the Regenerate button or daily auto-refresh.
+    """
+    return {}
+
+
 # ── Helper: fix nav links for embedded view ──────────────────────────
 def fix_html_for_streamlit(html_content):
     """
@@ -420,10 +431,8 @@ def main():
 
     elapsed = time.time() - st.session_state.last_refresh
     if elapsed > REFRESH_INTERVAL:
+        _get_app_html_cache().clear()
         st.cache_data.clear()
-        for key in list(st.session_state.keys()):
-            if key.startswith("html_"):
-                del st.session_state[key]
         st.session_state.last_refresh = time.time()
         st.rerun()
 
@@ -466,10 +475,11 @@ def main():
 
         # Regenerate button
         if st.button("🔄 Regenerate Dashboards", use_container_width=True):
-            # Clear cached data
+            # Clear app-level cache (shared across all sessions) and data cache
+            _get_app_html_cache().clear()
             st.cache_data.clear()
             for key in list(st.session_state.keys()):
-                if key.startswith("html_") or key.startswith("_g"):
+                if key.startswith("_g"):
                     del st.session_state[key]
             st.session_state.last_refresh = time.time()
             st.rerun()
@@ -517,17 +527,16 @@ def main():
             pass
 
     # ── Prepare data ─────────────────────────────────────────────────
+    app_cache = _get_app_html_cache()
+
+    # Always prepare data folder so sidebar status indicators stay accurate
     data_folder = prepare_data_folder()
 
-    # ── Generate all dashboards in parallel on first load ────────────
-    # All 5 run as simultaneous subprocesses — total wait ~10s instead of ~10s × 5.
-    # Auto-regenerate (button or daily refresh) clears html_* keys then reruns,
-    # which triggers this block again with the same parallel behaviour.
-    needs_generation = any(
-        f"html_{name}" not in st.session_state for name in DASHBOARDS
-    )
-
-    if needs_generation:
+    # ── Generate all dashboards in parallel (once, shared across all users) ──
+    # app_cache is shared across every session on this server instance.
+    # First visitor triggers parallel generation (~10s). All subsequent visitors
+    # read from the cache instantly. Regenerate button and daily refresh clear it.
+    if any(name not in app_cache for name in DASHBOARDS):
         import concurrent.futures
 
         def _generate_one(dash_name):
@@ -540,9 +549,9 @@ def main():
         with st.spinner("Loading dashboards — this takes about 10 seconds on first visit..."):
             with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
                 for dash_name, html in executor.map(_generate_one, list(DASHBOARDS.keys())):
-                    st.session_state[f"html_{dash_name}"] = html
+                    app_cache[dash_name] = html
 
-    # ── Render each tab from pre-generated cache ──────────────────────
+    # ── Render each tab from shared cache ────────────────────────────
     resize_script = """
 <script>
 function sendHeight() {
@@ -560,7 +569,7 @@ setTimeout(sendHeight, 5000);
 
     for i, dash_name in enumerate(dash_names):
         with tab_objects[i]:
-            html_content = st.session_state.get(f"html_{dash_name}")
+            html_content = app_cache.get(dash_name)
 
             if html_content:
                 display_html = html_content.replace("</body>", resize_script + "</body>")

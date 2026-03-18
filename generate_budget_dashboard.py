@@ -413,18 +413,20 @@ def generate_html(budget_items, reports, output_path):
     takeaway_html = ""
 
     # Budget Health
-    if variance_pct < -10:
+    # variance_pct = (ytd_budget_pace - total_actual) / ytd_budget_pace * 100
+    # Positive = actual is UNDER pace (good), Negative = actual is OVER pace (bad)
+    if variance_pct > 10:
         health_status = "HEALTHY"
         health_color = "00D4AA"
         health_text = f"Currently {abs(variance_pct):.0f}% under YTD budget pace. Spending is well-controlled."
-    elif variance_pct > 10:
+    elif variance_pct < -10:
         health_status = "CAUTION"
         health_color = "FFE66D"
-        health_text = f"Currently {variance_pct:.0f}% over YTD budget pace. Monitor closely to avoid overruns."
+        health_text = f"Currently {abs(variance_pct):.0f}% over YTD budget pace. Monitor closely to avoid overruns."
     else:
         health_status = "ON TRACK"
         health_color = "4ECDC4"
-        health_text = f"Currently {abs(variance_pct):.0f}% of YTD budget pace. Spending is aligned."
+        health_text = f"Currently within {abs(variance_pct):.0f}% of YTD budget pace. Spending is aligned."
 
     takeaway_html += f"""<div class="takeaway-card" style="border-left-color:#{health_color}">
 <div class="tw-header">
