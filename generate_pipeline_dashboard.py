@@ -527,13 +527,13 @@ def generate_html(revenues, output_path):
   .nav-link.active {{ color: #fff; border-bottom-color: var(--blue); font-weight: 500; }}
 
   /* HEADER */
-  .page-header {{ padding: 28px 28px 0; }}
+  .page-header {{ padding: 28px 28px 0; max-width: 1600px; margin: 0 auto; }}
   .page-title {{ font-size: 22px; font-weight: 700; }}
   .page-sub {{ color: var(--muted); font-size: 13px; margin-top: 4px; }}
   .generated {{ color: var(--muted); font-size: 12px; margin-top: 4px; }}
 
   /* SECTION */
-  .section {{ padding: 24px 28px 0; }}
+  .section {{ padding: 24px 28px 0; max-width: 1600px; margin: 0 auto; }}
   .section-title {{ font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }}
   .section-title::after {{ content:''; flex:1; height:1px; background: var(--border); }}
 
@@ -610,7 +610,7 @@ def generate_html(revenues, output_path):
   .rec-list li::before {{ content: '→'; position: absolute; left: 0; color: var(--yellow); font-weight: 700; }}
 
   /* FOOTER */
-  .footer {{ padding: 20px 28px; color: #94a3b8; font-size: 12px; border-top: 1px solid var(--border); margin-top: 32px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }}
+  .footer {{ padding: 20px 28px; color: #94a3b8; font-size: 12px; border-top: 1px solid var(--border); margin-top: 32px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; max-width: 1600px; margin-left: auto; margin-right: auto; }}
 
   /* SUMMARY BAR */
   .summary-bar {{ background: var(--surface2); border-radius: 12px; padding: 16px 20px; display: flex; gap: 32px; flex-wrap: wrap; margin-bottom: 0; border: 1px solid var(--border); }}
