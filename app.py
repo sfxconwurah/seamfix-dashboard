@@ -389,25 +389,35 @@ def generate_dashboard(script_name, data_folder, output_name):
 def fix_html_for_streamlit(html_content):
     """
     Remove the inter-dashboard nav bar from embedded HTML since
-    Streamlit sidebar handles navigation. Also ensure proper sizing.
+    Streamlit tabs handle navigation. Also ensure proper sizing.
     """
     if not html_content:
         return html_content
 
-    # Remove the nav bar div (it links to file:// paths that won't work)
     import re
 
+    # Remove <nav class="top-nav">...</nav> (used by cash/expense/budget/revenue/pipeline)
     html_content = re.sub(
-        r'<div class="nav-bar">.*?</div>',
+        r'<nav class="top-nav">.*?</nav>',
         "",
         html_content,
         flags=re.DOTALL,
     )
 
-    # Add responsive height to body
-    html_content = html_content.replace(
-        "padding:24px;min-height:100vh",
-        "padding:24px;min-height:100vh;width:100%",
+    # Remove <div class="nav">...</div> (used by pipeline generator)
+    html_content = re.sub(
+        r'<div class="nav[^"]*">.*?</div>',
+        "",
+        html_content,
+        flags=re.DOTALL,
+    )
+
+    # Remove legacy nav-bar pattern (older generators)
+    html_content = re.sub(
+        r'<div class="nav-bar">.*?</div>',
+        "",
+        html_content,
+        flags=re.DOTALL,
     )
 
     return html_content
