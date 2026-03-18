@@ -311,14 +311,46 @@ def generate_html(budget_items, reports, output_path):
     # Calculate weeks elapsed
     weeks_elapsed = len(reports)
 
+    # Strategic spend buckets — classifies the 32 budget categories into 4 groups
+    STRATEGIC_BUCKETS = {
+        'Revenue-Generating': [
+            'Business Development Expenses', 'Marketing & Branding - Events',
+            'Marketing & Branding - Digital', 'New Product Development - IAM',
+            'Tenders/Bids Purchase Expenses', 'Business Expansion', 'Corporate Gift expense',
+        ],
+        'People Costs': [
+            'Payroll', 'Staff welfare & benefits', 'Staff Allowances',
+            'Learning & Development', 'Retreat expenses',
+        ],
+        'Technology & Infrastructure': [
+            'Software Tools', 'Hosting Expenses', 'Assets purchase', 'Dues & Subscriptions',
+        ],
+        'Operations & Overhead': [
+            'Rental Expense', 'Diesel', 'Office Expense', 'Repairs',
+            'Property Maintenance Expenses', 'Freight and Clearing', 'Transport Expenses',
+            'Motor Vehicle Expense', 'Printing', 'Insurance Expenses',
+            'Business License and Permit', 'NED Fees', 'Professional Fees',
+            'Others - AIF Coupon', 'Miscellaneous Expenses', 'Charitable Donations/CSR',
+        ],
+    }
+    BUCKET_COLORS = {
+        'Revenue-Generating':       '#10b981',   # green
+        'People Costs':             '#3b82f6',   # blue
+        'Technology & Infrastructure': '#8b5cf6', # purple
+        'Operations & Overhead':    '#f59e0b',   # orange
+    }
+
     # Aggregate actual spend by budget category
     category_actual = {cat: 0 for cat in BUDGET_CATEGORIES.keys()}
-    all_expense_lines = []  # For deep dive table
-    weekly_spends = []  # For trend chart
+    all_expense_lines = []   # For deep dive table
+    unbudgeted_lines = []    # Expense lines with no matching budget category
+    weekly_spends = []       # For trend chart
 
     for r in reports:
         week_spend = 0
         for expense_name, amount in r.get('outflow_items', {}).items():
+            if amount <= 0:
+                continue
             budget_cat = map_expense_to_budget(expense_name, r.get('outflow_items', {}))
 
             if budget_cat:
@@ -329,6 +361,13 @@ def generate_html(budget_items, reports, output_path):
                     'item': expense_name,
                     'amount': amount,
                     'category': budget_cat
+                })
+            elif not is_investment_outflow(expense_name):
+                # Not an investment transfer and has no budget category — governance flag
+                unbudgeted_lines.append({
+                    'date': r['date_str'],
+                    'item': expense_name,
+                    'amount': amount,
                 })
 
         weekly_spends.append(week_spend)
@@ -354,6 +393,9 @@ def generate_html(budget_items, reports, output_path):
         ytd_actual = category_actual[cat]
         variance = ytd_budget - ytd_actual
         pct_used = (ytd_actual / ytd_budget * 100) if ytd_budget > 0 else 0
+        # Annual envelope view: how much of the full-year approved budget is consumed
+        pct_of_annual = (ytd_actual / annual_budget * 100) if annual_budget > 0 else 0
+        annual_remaining = annual_budget - ytd_actual
 
         category_metrics.append({
             'name': cat,
@@ -362,8 +404,27 @@ def generate_html(budget_items, reports, output_path):
             'ytd_actual': ytd_actual,
             'variance': variance,
             'pct_used': pct_used,
+            'pct_of_annual': pct_of_annual,
+            'annual_remaining': annual_remaining,
             'status': 'over' if ytd_actual > ytd_budget else 'under' if ytd_actual < ytd_budget * 0.5 else 'on-track'
         })
+
+    # Strategic bucket totals
+    bucket_totals = {}
+    for bucket, cats in STRATEGIC_BUCKETS.items():
+        b_budget = sum(BUDGET_CATEGORIES.get(c, 0) for c in cats)
+        b_actual = sum(category_actual.get(c, 0) for c in cats)
+        b_remaining = b_budget - b_actual
+        b_pct = (b_actual / b_budget * 100) if b_budget > 0 else 0
+        bucket_totals[bucket] = {
+            'budget': b_budget, 'actual': b_actual,
+            'remaining': b_remaining, 'pct': b_pct,
+            'color': BUCKET_COLORS[bucket],
+        }
+
+    # Unbudgeted spend summary
+    total_unbudgeted = sum(x['amount'] for x in unbudgeted_lines)
+    unbudgeted_lines.sort(key=lambda x: -x['amount'])
 
     # Sort by overspend amount
     category_metrics.sort(key=lambda x: -max(0, x['ytd_actual'] - x['ytd_budget']))
@@ -382,6 +443,8 @@ def generate_html(budget_items, reports, output_path):
         status_icon = "🔴" if m['status'] == 'over' else "🟢" if m['status'] == 'under' else "🟡"
         status_text = "Over Budget" if m['status'] == 'over' else "Under Budget" if m['status'] == 'under' else "On Track"
 
+        remaining_class = 'negative' if m['annual_remaining'] < 0 else 'positive'
+        remaining_label = f"({fmt_naira(abs(m['annual_remaining']))} over)" if m['annual_remaining'] < 0 else fmt_naira(m['annual_remaining'])
         category_table_rows += f"""<tr>
 <td>{m['name']}</td>
 <td>{fmt_naira(m['annual_budget'])}</td>
@@ -389,6 +452,8 @@ def generate_html(budget_items, reports, output_path):
 <td>{fmt_naira(m['ytd_actual'])}</td>
 <td class="{'negative' if m['variance'] < 0 else 'positive'}">{fmt_naira(abs(m['variance']))}</td>
 <td>{m['pct_used']:.1f}%</td>
+<td>{m['pct_of_annual']:.1f}%</td>
+<td class="{remaining_class}">{remaining_label}</td>
 <td>{status_icon} {status_text}</td>
 </tr>"""
 
@@ -485,6 +550,38 @@ def generate_html(budget_items, reports, output_path):
 <div class="tw-headline" style="color:#FF6B6B">Categories >150% of YTD Budget Pace</div>
 <div class="tw-body"><ul style="margin:6px 0 0 16px;padding:0;list-style:disc">{alert_list}</ul></div>
 </div>"""
+
+    # Build strategic spend breakdown HTML
+    strategic_section_html = ""
+    total_known_actual = sum(bt['actual'] for bt in bucket_totals.values())
+    for bucket, bt in bucket_totals.items():
+        color = bt['color']
+        bar_pct = min(bt['pct'], 100)
+        share_pct = (bt['actual'] / total_known_actual * 100) if total_known_actual > 0 else 0
+        strategic_section_html += f"""<div class="strategic-bucket" style="border-left:4px solid {color};background:rgba(15,23,42,0.6);border-radius:8px;padding:16px 20px;margin-bottom:12px;">
+<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">
+  <span style="font-weight:600;font-size:14px;color:#e2e8f0">{bucket}</span>
+  <span style="font-size:12px;color:#94a3b8">{share_pct:.1f}% of total spend</span>
+</div>
+<div style="display:flex;gap:20px;margin-bottom:10px;flex-wrap:wrap">
+  <div><span style="font-size:11px;color:#94a3b8">YTD Actual</span><br><span style="font-size:18px;font-weight:700;color:{color}">{fmt_naira(bt['actual'])}</span></div>
+  <div><span style="font-size:11px;color:#94a3b8">Annual Budget</span><br><span style="font-size:16px;color:#cbd5e1">{fmt_naira(bt['budget'])}</span></div>
+  <div><span style="font-size:11px;color:#94a3b8">Remaining</span><br><span style="font-size:16px;color:{'#ef4444' if bt['remaining'] < 0 else '#10b981'}">{fmt_naira(abs(bt['remaining']))} {'over' if bt['remaining'] < 0 else 'left'}</span></div>
+</div>
+<div style="background:#1e293b;border-radius:4px;height:8px;overflow:hidden">
+  <div style="height:100%;width:{bar_pct:.1f}%;background:{color};border-radius:4px;transition:width 0.5s"></div>
+</div>
+<div style="font-size:11px;color:#94a3b8;margin-top:4px">{bt['pct']:.1f}% of annual budget consumed</div>
+</div>"""
+
+    # Build unbudgeted spend rows HTML
+    unbudgeted_rows_html = ""
+    for line in unbudgeted_lines[:50]:   # cap at 50 rows for readability
+        unbudgeted_rows_html += f"""<tr>
+<td>{line['date']}</td>
+<td>{line['item']}</td>
+<td class="negative">{fmt_naira(line['amount'])}</td>
+</tr>"""
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -662,14 +759,23 @@ tbody tr:hover{{background:transparent!important}}
 </div>
 
 <div class="section">
+<h2>🎯 Strategic Spend Breakdown</h2>
+<p style="color:#94a3b8;font-size:13px;margin:-8px 0 18px">Where is the money going? Spend classified into four strategic buckets to show revenue-generating investment vs operational overhead.</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px">
+{strategic_section_html}
+</div>
+</div>
+
+<div class="section">
 <h2>Budget Variance Analysis</h2>
 <div class="tabs">
 <button class="tab-btn active" onclick="showTab('variance')">Variance Table</button>
 <button class="tab-btn" onclick="showTab('deepdive')">Expense Details</button>
+<button class="tab-btn" onclick="showTab('unbudgeted')">⚠ Unbudgeted Spend ({len(unbudgeted_lines)})</button>
 </div>
 <div id="tab-variance" class="tab-content active">
 <table id="varianceTable">
-<thead><tr><th class="sortable" onclick="sortTable('varianceTable',0,'text')">Category</th><th class="sortable" onclick="sortTable('varianceTable',1,'money')">Annual Budget</th><th class="sortable" onclick="sortTable('varianceTable',2,'money')">YTD Budget</th><th class="sortable" onclick="sortTable('varianceTable',3,'money')">YTD Actual</th><th class="sortable" onclick="sortTable('varianceTable',4,'money')">Variance</th><th class="sortable" onclick="sortTable('varianceTable',5,'pct')">% Used</th><th class="sortable" onclick="sortTable('varianceTable',6,'status')">Status</th></tr></thead>
+<thead><tr><th class="sortable" onclick="sortTable('varianceTable',0,'text')">Category</th><th class="sortable" onclick="sortTable('varianceTable',1,'money')">Annual Budget</th><th class="sortable" onclick="sortTable('varianceTable',2,'money')">YTD Budget</th><th class="sortable" onclick="sortTable('varianceTable',3,'money')">YTD Actual</th><th class="sortable" onclick="sortTable('varianceTable',4,'money')">Variance</th><th class="sortable" onclick="sortTable('varianceTable',5,'pct')">% Used vs YTD</th><th class="sortable" onclick="sortTable('varianceTable',6,'pct')">Annual Used %</th><th class="sortable" onclick="sortTable('varianceTable',7,'money')">Annual Remaining</th><th class="sortable" onclick="sortTable('varianceTable',8,'status')">Status</th></tr></thead>
 <tbody>{category_table_rows}</tbody>
 </table>
 </div>
@@ -678,6 +784,16 @@ tbody tr:hover{{background:transparent!important}}
 <table id="deepDiveTable">
 <thead><tr><th class="sortable" onclick="sortTable('deepDiveTable',0,'text')">Date</th><th class="sortable" onclick="sortTable('deepDiveTable',1,'text')">Expense Item</th><th class="sortable" onclick="sortTable('deepDiveTable',2,'money')">Amount</th><th class="sortable" onclick="sortTable('deepDiveTable',3,'text')">Mapped Budget Category</th></tr></thead>
 <tbody>{deep_dive_rows}</tbody>
+</table>
+</div>
+<div id="tab-unbudgeted" class="tab-content">
+<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:8px;padding:14px 18px;margin-bottom:16px">
+  <strong style="color:#ef4444">⚠ Governance Flag:</strong>
+  <span style="color:#94a3b8;font-size:13px;margin-left:8px">These {len(unbudgeted_lines)} expense line(s) totalling <strong style="color:#ef4444">{fmt_naira(total_unbudgeted)}</strong> have no matching approved budget category. They are excluded from the Variance Table above but are real cash outflows. Review and either reclassify to an existing budget heading or add a new budget line item.</span>
+</div>
+<table id="unbudgetedTable">
+<thead><tr><th class="sortable" onclick="sortTable('unbudgetedTable',0,'text')">Date</th><th class="sortable" onclick="sortTable('unbudgetedTable',1,'text')">Expense Item</th><th class="sortable" onclick="sortTable('unbudgetedTable',2,'money')">Amount</th></tr></thead>
+<tbody>{unbudgeted_rows_html}</tbody>
 </table>
 </div>
 </div>
