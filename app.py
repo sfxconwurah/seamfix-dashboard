@@ -516,32 +516,34 @@ def main():
         except Exception:
             pass
 
-    # ── Main content — render each dashboard in its tab ─────────────
+    # ── Prepare data ─────────────────────────────────────────────────
     data_folder = prepare_data_folder()
 
-    for i, dash_name in enumerate(dash_names):
-        with tab_objects[i]:
+    # ── Generate all dashboards in parallel on first load ────────────
+    # All 5 run as simultaneous subprocesses — total wait ~10s instead of ~10s × 5.
+    # Auto-regenerate (button or daily refresh) clears html_* keys then reruns,
+    # which triggers this block again with the same parallel behaviour.
+    needs_generation = any(
+        f"html_{name}" not in st.session_state for name in DASHBOARDS
+    )
+
+    if needs_generation:
+        import concurrent.futures
+
+        def _generate_one(dash_name):
             dash = DASHBOARDS[dash_name]
+            html = generate_dashboard(dash["script"], data_folder, dash["output"])
+            if html:
+                html = fix_html_for_streamlit(html)
+            return dash_name, html
 
-            # Generate or use cached HTML
-            cache_key = f"html_{dash_name}"
-            if cache_key not in st.session_state:
-                with st.spinner(f"Generating {dash_name} dashboard..."):
-                    html = generate_dashboard(
-                        dash["script"], data_folder, dash["output"]
-                    )
-                    if html:
-                        html = fix_html_for_streamlit(html)
-                        st.session_state[cache_key] = html
-                    else:
-                        st.session_state[cache_key] = None
+        with st.spinner("Loading dashboards — this takes about 10 seconds on first visit..."):
+            with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+                for dash_name, html in executor.map(_generate_one, list(DASHBOARDS.keys())):
+                    st.session_state[f"html_{dash_name}"] = html
 
-            html_content = st.session_state.get(cache_key)
-
-            if html_content:
-                # Inject auto-resize script so iframe matches content height (no inner scroll)
-                # Fires at multiple intervals to catch late-rendering content (charts, tables)
-                resize_script = """
+    # ── Render each tab from pre-generated cache ──────────────────────
+    resize_script = """
 <script>
 function sendHeight() {
     var h = document.body.scrollHeight + 100;
@@ -555,8 +557,14 @@ setTimeout(sendHeight, 3000);
 setTimeout(sendHeight, 5000);
 </script>
 """
-                html_content = html_content.replace("</body>", resize_script + "</body>")
-                components.html(html_content, height=15000, scrolling=False)
+
+    for i, dash_name in enumerate(dash_names):
+        with tab_objects[i]:
+            html_content = st.session_state.get(f"html_{dash_name}")
+
+            if html_content:
+                display_html = html_content.replace("</body>", resize_script + "</body>")
+                components.html(display_html, height=15000, scrolling=False)
             else:
                 st.warning(
                     f"Could not generate the {dash_name} dashboard. "
