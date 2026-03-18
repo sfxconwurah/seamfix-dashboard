@@ -709,6 +709,10 @@ def generate_html(reports, anomalies, insights, takeaways, output_path):
     avg_burn = sum(outflows) / len(outflows) if outflows else 1
     runway = latest_cash / avg_op_burn if avg_op_burn > 0 else 0
 
+    # 4-week cash forecast at current operational burn
+    forecast_4w = latest_cash - (avg_op_burn * 4)
+    forecast_4w_chg_pct = ((forecast_4w - latest_cash) / latest_cash * 100) if latest_cash > 0 else 0
+
     # Revenue concentration for latest week
     latest_inflows = latest.get('inflow_items', {})
     if latest_inflows:
@@ -992,6 +996,11 @@ tbody tr:hover{{background:transparent!important}}
 <div class="kpi-label">Revenue Concentration</div>
 <div class="kpi-value {'negative' if concentration > 60 else ''}">{concentration:.0f}%</div>
 <div class="kpi-change neutral">{conc_name} (latest week)</div>
+</div>
+<div class="kpi-card">
+<div class="kpi-label">4-Week Cash Forecast</div>
+<div class="kpi-value {'negative' if forecast_4w < 0 else ''}">{fmt_naira(forecast_4w)}</div>
+<div class="kpi-change {'negative' if forecast_4w_chg_pct < -20 else 'neutral'}">{forecast_4w_chg_pct:.1f}% vs today · at current op. burn</div>
 </div>
 </div>
 

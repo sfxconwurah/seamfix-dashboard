@@ -340,6 +340,12 @@ def generate_html(budget_items, reports, output_path):
     variance_amount = ytd_budget_pace - total_actual
     variance_pct = (variance_amount / ytd_budget_pace * 100) if ytd_budget_pace > 0 else 0
 
+    # Year-end projection: extrapolate current spend rate across full 52 weeks
+    projected_year_end = (total_actual / weeks_elapsed * 52) if weeks_elapsed > 0 else 0
+    projected_vs_budget = total_budget - projected_year_end   # positive = under, negative = over
+    projected_pct = (abs(projected_vs_budget) / total_budget * 100) if total_budget > 0 else 0
+    projected_over = projected_year_end > total_budget
+
     # Calculate per-category metrics
     category_metrics = []
     for cat in sorted(BUDGET_CATEGORIES.keys()):
@@ -635,6 +641,11 @@ tbody tr:hover{{background:transparent!important}}
 <div class="kpi-label">Budget Variance</div>
 <div class="kpi-value {'negative' if variance_amount < 0 else ''}">{fmt_naira(abs(variance_amount))}</div>
 <div class="kpi-change {'positive' if variance_amount > 0 else 'negative'}">{'+' if variance_amount > 0 else '-'}{abs(variance_pct):.1f}% {'under' if variance_amount > 0 else 'over'}</div>
+</div>
+<div class="kpi-card">
+<div class="kpi-label">Projected Year-End Spend</div>
+<div class="kpi-value {'negative' if projected_over else ''}">{fmt_naira(projected_year_end)}</div>
+<div class="kpi-change {'negative' if projected_over else 'positive'}">{'▲ ' + fmt_naira(abs(projected_vs_budget)) + ' over annual budget' if projected_over else '▼ ' + fmt_naira(abs(projected_vs_budget)) + ' under annual budget'}</div>
 </div>
 </div>
 

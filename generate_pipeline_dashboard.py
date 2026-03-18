@@ -466,6 +466,35 @@ def generate_html(revenues, output_path):
     conservative_bar_w = min(100, conservative_pct)
     run_rate_bar_w    = min(100, run_rate_pct)
 
+    # Customer concentration: aggregate annual value per deal name
+    client_values = {}
+    for r in revenues:
+        if r['annual_usd'] > 0:
+            client_values[r['name']] = client_values.get(r['name'], 0) + r['annual_usd']
+    total_pipeline = sum(client_values.values())
+    top_clients = sorted(client_values.items(), key=lambda x: -x[1])[:5]
+
+    # Build concentration rows HTML
+    conc_rows_html = ""
+    for client_name, val in top_clients:
+        pct = (val / total_pipeline * 100) if total_pipeline > 0 else 0
+        bar_color = '#ef4444' if pct > 25 else '#f59e0b' if pct > 15 else '#3b82f6'
+        risk_label = '<span style="color:#ef4444;font-size:11px;font-weight:700">HIGH</span>' if pct > 25 else '<span style="color:#f59e0b;font-size:11px;font-weight:700">MEDIUM</span>' if pct > 15 else '<span style="color:#94a3b8;font-size:11px">LOW</span>'
+        conc_rows_html += f"""
+    <div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+        <span style="font-size:13px;font-weight:500;color:#e2e8f0">{client_name}</span>
+        <span style="display:flex;align-items:center;gap:10px">
+          {risk_label}
+          <span style="font-size:13px;color:#94a3b8">{fmt_usd(val)}</span>
+          <span style="font-size:13px;font-weight:700;color:{bar_color}">{pct:.1f}%</span>
+        </span>
+      </div>
+      <div style="background:#334155;border-radius:4px;height:8px;overflow:hidden">
+        <div style="width:{min(100,pct):.1f}%;height:100%;background:{bar_color};border-radius:4px"></div>
+      </div>
+    </div>"""
+
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -666,6 +695,18 @@ def generate_html(revenues, output_path):
       <div class="status-count">{closed_count} deals &nbsp;·&nbsp; {closed_val/LANDING_ZONE*100:.0f}% of target</div>
       <div class="status-naira">≈ {fmt_naira(closed_val * FX_RATE)} at ₦{FX_RATE:,}/$</div>
     </div>
+  </div>
+</div>
+
+<!-- CLIENT CONCENTRATION -->
+<div class="section">
+  <div class="section-title">🎯 Client Concentration Risk</div>
+  <div style="background:var(--surface);border-radius:12px;border:1px solid var(--border);padding:24px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:18px">
+      <span style="font-size:13px;color:var(--muted)">Top 5 clients by pipeline value — total pipeline: <strong style="color:var(--text)">{fmt_usd(total_pipeline)}</strong></span>
+      <span style="font-size:11px;color:var(--muted)">Risk: &gt;25% = HIGH &nbsp;·&nbsp; 15–25% = MEDIUM &nbsp;·&nbsp; &lt;15% = LOW</span>
+    </div>
+    {conc_rows_html}
   </div>
 </div>
 
