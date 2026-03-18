@@ -388,37 +388,22 @@ def generate_dashboard(script_name, data_folder, output_name):
 # ── Helper: fix nav links for embedded view ──────────────────────────
 def fix_html_for_streamlit(html_content):
     """
-    Remove the inter-dashboard nav bar from embedded HTML since
-    Streamlit tabs handle navigation. Also ensure proper sizing.
+    Hide the inter-dashboard nav bar from embedded HTML since
+    Streamlit tabs handle navigation.
+    CSS injection is used instead of regex removal — regex breaks on nested divs.
+    Sticky positioning is also disabled since the outer Streamlit page scrolls,
+    not the iframe, so position:sticky inside the iframe has no effect.
     """
     if not html_content:
         return html_content
 
-    import re
-
-    # Remove <nav class="top-nav">...</nav> (used by cash/expense/budget/revenue/pipeline)
-    html_content = re.sub(
-        r'<nav class="top-nav">.*?</nav>',
-        "",
-        html_content,
-        flags=re.DOTALL,
-    )
-
-    # Remove <div class="nav">...</div> (used by pipeline generator)
-    html_content = re.sub(
-        r'<div class="nav[^"]*">.*?</div>',
-        "",
-        html_content,
-        flags=re.DOTALL,
-    )
-
-    # Remove legacy nav-bar pattern (older generators)
-    html_content = re.sub(
-        r'<div class="nav-bar">.*?</div>',
-        "",
-        html_content,
-        flags=re.DOTALL,
-    )
+    nav_css = """<style>
+  /* Hide internal nav bars — Streamlit tabs handle navigation */
+  .top-nav, .nav, .nav-bar { display: none !important; }
+  /* Remove top padding gap now that nav is hidden */
+  body { padding-top: 0 !important; }
+</style>"""
+    html_content = html_content.replace("<head>", "<head>" + nav_css, 1)
 
     return html_content
 
@@ -555,20 +540,23 @@ def main():
 
             if html_content:
                 # Inject auto-resize script so iframe matches content height (no inner scroll)
+                # Fires at multiple intervals to catch late-rendering content (charts, tables)
                 resize_script = """
 <script>
-window.addEventListener('load', function() {
-    const height = document.body.scrollHeight + 50;
-    window.parent.postMessage({type: 'streamlit:setFrameHeight', height: height}, '*');
-});
-setTimeout(function() {
-    const height = document.body.scrollHeight + 50;
-    window.parent.postMessage({type: 'streamlit:setFrameHeight', height: height}, '*');
-}, 2000);
+function sendHeight() {
+    var h = document.body.scrollHeight + 100;
+    window.parent.postMessage({type: 'streamlit:setFrameHeight', height: h}, '*');
+}
+window.addEventListener('load', sendHeight);
+setTimeout(sendHeight, 300);
+setTimeout(sendHeight, 800);
+setTimeout(sendHeight, 1500);
+setTimeout(sendHeight, 3000);
+setTimeout(sendHeight, 5000);
 </script>
 """
                 html_content = html_content.replace("</body>", resize_script + "</body>")
-                components.html(html_content, height=8000, scrolling=False)
+                components.html(html_content, height=15000, scrolling=False)
             else:
                 st.warning(
                     f"Could not generate the {dash_name} dashboard. "
