@@ -709,9 +709,23 @@ def generate_html(reports, anomalies, insights, takeaways, output_path):
     avg_burn = sum(outflows) / len(outflows) if outflows else 1
     runway = latest_cash / avg_op_burn if avg_op_burn > 0 else 0
 
-    # 4-week cash forecast at current operational burn
-    forecast_4w = latest_cash - (avg_op_burn * 4)
-    forecast_4w_chg_pct = ((forecast_4w - latest_cash) / latest_cash * 100) if latest_cash > 0 else 0
+    # 4-week cash forecast — two views
+    # Expected: uses avg net cash flow (op inflows minus op outflows)
+    # Floor: burn-only, assumes zero inflows (worst case / stress test)
+    op_inflows_list = []
+    for r in reports:
+        items = r.get('inflow_items', {})
+        total_in = r.get('total_inflow', 0)
+        inv_in = sum(v for k, v in items.items() if is_investment_inflow(k))
+        op_inflows_list.append(total_in - inv_in)
+    avg_op_inflow = sum(op_inflows_list) / len(op_inflows_list) if op_inflows_list else 0
+
+    avg_weekly_net = avg_op_inflow - avg_op_burn
+    forecast_4w_net = latest_cash + (avg_weekly_net * 4)
+    forecast_4w_net_chg_pct = ((forecast_4w_net - latest_cash) / latest_cash * 100) if latest_cash > 0 else 0
+
+    forecast_4w_floor = latest_cash - (avg_op_burn * 4)
+    forecast_4w_floor_chg_pct = ((forecast_4w_floor - latest_cash) / latest_cash * 100) if latest_cash > 0 else 0
 
     # Revenue concentration for latest week
     latest_inflows = latest.get('inflow_items', {})
@@ -999,8 +1013,9 @@ tbody tr:hover{{background:transparent!important}}
 </div>
 <div class="kpi-card">
 <div class="kpi-label">4-Week Cash Forecast</div>
-<div class="kpi-value {'negative' if forecast_4w < 0 else ''}">{fmt_naira(forecast_4w)}</div>
-<div class="kpi-change {'negative' if forecast_4w_chg_pct < -20 else 'neutral'}">{forecast_4w_chg_pct:.1f}% vs today · at current op. burn</div>
+<div class="kpi-value {'negative' if forecast_4w_net < 0 else ''}">{fmt_naira(forecast_4w_net)}</div>
+<div class="kpi-change {'negative' if forecast_4w_net_chg_pct < -10 else 'positive' if forecast_4w_net_chg_pct > 5 else 'neutral'}">{'+' if forecast_4w_net_chg_pct >= 0 else ''}{forecast_4w_net_chg_pct:.1f}% — expected, based on avg weekly inflows &amp; burn</div>
+<div style="margin-top:6px;font-size:0.78em;color:#94a3b8">Floor if revenue stops: {fmt_naira(forecast_4w_floor)} ({forecast_4w_floor_chg_pct:.1f}%)</div>
 </div>
 </div>
 
