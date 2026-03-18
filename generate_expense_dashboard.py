@@ -369,14 +369,19 @@ def generate_html(all_weekly_data, all_vendors, all_categories_by_week, kpis, ou
     large_payments.sort(key=lambda x: x["amount"], reverse=True)
 
     # Executive takeaways
+    # Use sum of ALL categories as the denominator — kpis["total_ytd"] only sums
+    # vendor payment batches, not all outflow line items (e.g. salary, bank charges).
+    # Using it as a base makes any non-vendor category appear falsely inflated (>100%).
+    total_all_categories = sum(ytd_by_category.values()) or 1
+
     top_5_spend = sum(v[1] for v in vendor_totals[:5])
-    vendor_concentration = (top_5_spend / kpis["total_ytd"] * 100) if kpis["total_ytd"] > 0 else 0
+    vendor_concentration = (top_5_spend / total_all_categories * 100)
 
     salary_cat_total = ytd_by_category.get("Salary & Benefits", 0)
-    salary_pct = (salary_cat_total / kpis["total_ytd"] * 100) if kpis["total_ytd"] > 0 else 0
+    salary_pct = (salary_cat_total / total_all_categories * 100)
 
     bank_charges_total = ytd_by_category.get("Bank & Financial", 0)
-    bank_pct = (bank_charges_total / kpis["total_ytd"] * 100) if kpis["total_ytd"] > 0 else 0
+    bank_pct = (bank_charges_total / total_all_categories * 100)
 
     # Check for large payments this week (last week in data)
     large_payment_alert = False
