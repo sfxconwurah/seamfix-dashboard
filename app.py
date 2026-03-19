@@ -649,65 +649,52 @@ def main():
         st.session_state.last_refresh = time.time()
         st.rerun()
 
-    # ── Inject floating 💬 button ──────────────────────────────────
-    # Clicking it opens the Streamlit sidebar (which holds the chat interface).
-    st.markdown(
-        """
-        <style>
-        .chat-fab {
-            position: fixed;
-            bottom: 28px;
-            right: 28px;
-            width: 58px;
-            height: 58px;
-            background: linear-gradient(135deg, #00D4AA 0%, #0066CC 100%);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            z-index: 99999;
-            box-shadow: 0 4px 20px rgba(0,212,170,0.45);
-            font-size: 26px;
-            border: none;
-            color: white;
-            transition: transform 0.18s, box-shadow 0.18s;
+    # ── Inject floating 💬 button into the parent Streamlit page ──────
+    # Uses components.html() so window.parent correctly targets the Streamlit
+    # page DOM — allowing us to inject the button element directly and reliably
+    # click the sidebar toggle.  st.markdown() can't reach window.parent.
+    components.html("""
+<script>
+(function injectBobby() {
+    var doc = window.parent.document;
+    if (doc.getElementById('bobby-fab-wrap')) return;  // already injected
+
+    // Styles (injected into parent page head)
+    var s = doc.createElement('style');
+    s.id = 'bobby-fab-style';
+    s.textContent =
+        '#bobby-fab-wrap{position:fixed;bottom:100px;right:28px;z-index:99999;display:flex;flex-direction:column;align-items:center;gap:6px;}' +
+        '#bobby-fab-label{background:#0f172a;color:#00D4AA;font-size:11px;font-family:-apple-system,sans-serif;padding:3px 10px;border-radius:10px;border:1px solid rgba(0,212,170,0.35);white-space:nowrap;pointer-events:none;}' +
+        '#bobby-fab{width:54px;height:54px;background:linear-gradient(135deg,#00D4AA 0%,#0066CC 100%);border-radius:50%;border:none;cursor:pointer;font-size:24px;color:#fff;box-shadow:0 4px 18px rgba(0,212,170,0.45);transition:transform 0.18s,box-shadow 0.18s;}' +
+        '#bobby-fab:hover{transform:scale(1.1);box-shadow:0 6px 26px rgba(0,212,170,0.6);}';
+    doc.head.appendChild(s);
+
+    // Build elements
+    var wrap = doc.createElement('div'); wrap.id = 'bobby-fab-wrap';
+    var lbl  = doc.createElement('div'); lbl.id  = 'bobby-fab-label'; lbl.textContent = 'Ask Bobby';
+    var btn  = doc.createElement('button'); btn.id = 'bobby-fab'; btn.title = 'Ask Bobby'; btn.textContent = '💬';
+
+    btn.addEventListener('click', function() {
+        // Try every known selector for the sidebar open button across Streamlit versions
+        var toggle =
+            doc.querySelector('[data-testid="stSidebarCollapsedControl"] button') ||
+            doc.querySelector('[data-testid="stSidebarCollapsedControl"]')        ||
+            doc.querySelector('[data-testid="collapsedControl"]')                 ||
+            doc.querySelector('[data-testid="stSidebarToggle"]')                  ||
+            doc.querySelector('button[aria-label*="sidebar"]')                    ||
+            doc.querySelector('button[aria-label*="Sidebar"]')                    ||
+            doc.querySelector('section[data-testid="stSidebar"] ~ div button');
+        if (toggle) {
+            toggle.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true, view: window.parent}));
         }
-        .chat-fab:hover {
-            transform: scale(1.12);
-            box-shadow: 0 6px 28px rgba(0,212,170,0.6);
-        }
-        .chat-fab-label {
-            position: fixed;
-            bottom: 92px;
-            right: 24px;
-            background: #0f172a;
-            color: #00D4AA;
-            font-size: 12px;
-            font-family: -apple-system, sans-serif;
-            padding: 4px 10px;
-            border-radius: 12px;
-            border: 1px solid rgba(0,212,170,0.3);
-            z-index: 99999;
-            white-space: nowrap;
-            pointer-events: none;
-        }
-        </style>
-        <div class="chat-fab-label">Ask Bobby</div>
-        <button class="chat-fab" title="Ask Bobby — AI financial analyst"
-            onclick="
-                var btn = document.querySelector('[data-testid=\\'stSidebarCollapsedControl\\']')
-                       || document.querySelector('[data-testid=\\'collapsedControl\\']')
-                       || document.querySelector('[data-testid=\\'stSidebarToggle\\']')
-                       || document.querySelector('button[aria-label*=\\'sidebar\\']')
-                       || document.querySelector('button[aria-label*=\\'Sidebar\\']');
-                if (btn) btn.click();
-            ">
-            💬
-        </button>
-        """,
-        unsafe_allow_html=True,
-    )
+    });
+
+    wrap.appendChild(lbl);
+    wrap.appendChild(btn);
+    doc.body.appendChild(wrap);
+})();
+</script>
+""", height=0)
 
     # ── Dashboard tabs ────────────────────────────────────────────
     dash_names  = list(DASHBOARDS.keys())
@@ -764,64 +751,8 @@ setTimeout(sendHeight, 5000);
     # ── Sidebar: Chat interface + Data management ─────────────────
     with st.sidebar:
 
-        # ── ADe chat interface ────────────────────────────────────
-        st.markdown(
-            """
-            <div style="padding:12px 0 4px">
-                <div style="font-size:18px;font-weight:700;color:#00D4AA">💬 Ask Bobby</div>
-                <div style="font-size:12px;color:#94a3b8;margin-top:2px">
-                    AI analyst with access to your live financial data
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        # Initialize chat history
-        if "chat_messages" not in st.session_state:
-            st.session_state.chat_messages = []
-
-        # Display chat history
-        if st.session_state.chat_messages:
-            for msg in st.session_state.chat_messages:
-                with st.chat_message(msg["role"], avatar="🧑" if msg["role"] == "user" else "🤖"):
-                    st.markdown(msg["content"])
-        else:
-            st.caption(
-                "👋 Ask me anything about Seamfix's finances — "
-                "cash position, budget variances, pipeline deals, expense categories, and more."
-            )
-
-        # Chat input
-        user_input = st.text_area(
-            "Your question",
-            key="chat_input_field",
-            placeholder="e.g. How much runway do we have? Which pipeline deals are At Risk?",
-            label_visibility="collapsed",
-            height=72,
-        )
-
-        col_send, col_clear = st.columns([3, 1])
-        with col_send:
-            send_clicked = st.button("Ask Bobby →", use_container_width=True, type="primary")
-        with col_clear:
-            clear_clicked = st.button("Clear", use_container_width=True)
-
-        if clear_clicked and st.session_state.chat_messages:
-            st.session_state.chat_messages = []
-            st.rerun()
-
-        if send_clicked and user_input.strip():
-            prompt = user_input.strip()
-            st.session_state.chat_messages.append({"role": "user", "content": prompt})
-
-            with st.spinner("Bobby is thinking..."):
-                context  = get_chat_context(data_folder)
-                response = call_claude(st.session_state.chat_messages, context)
-
-            st.session_state.chat_messages.append({"role": "assistant", "content": response})
-            # Clear the text area by rerunning (Streamlit resets widget state)
-            st.rerun()
+        # ── Bobby chat (fragment — only sidebar reruns on each send/clear) ──
+        _bobby_chat_fragment(data_folder)
 
         st.divider()
 
@@ -887,6 +818,67 @@ setTimeout(sendHeight, 5000);
                 st.logout("Sign out")
         except Exception:
             pass
+
+
+@st.fragment
+def _bobby_chat_fragment(data_folder):
+    """Bobby chat UI — runs as a fragment so only the sidebar reruns, not the full page."""
+    st.markdown(
+        """
+        <div style="padding:12px 0 4px">
+            <div style="font-size:18px;font-weight:700;color:#00D4AA">💬 Ask Bobby</div>
+            <div style="font-size:12px;color:#94a3b8;margin-top:2px">
+                AI analyst with access to your live financial data
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Initialize chat history
+    if "chat_messages" not in st.session_state:
+        st.session_state.chat_messages = []
+
+    # Display chat history
+    if st.session_state.chat_messages:
+        for msg in st.session_state.chat_messages:
+            with st.chat_message(msg["role"], avatar="🧑" if msg["role"] == "user" else "🤖"):
+                st.markdown(msg["content"])
+    else:
+        st.caption(
+            "👋 Ask me anything about Seamfix's finances — "
+            "cash position, budget variances, pipeline deals, expense categories, and more."
+        )
+
+    # Chat input
+    user_input = st.text_area(
+        "Your question",
+        key="chat_input_field",
+        placeholder="e.g. How much runway do we have? Which pipeline deals are At Risk?",
+        label_visibility="collapsed",
+        height=96,
+    )
+
+    col_send, col_clear = st.columns([2, 1])
+    with col_send:
+        send_clicked = st.button("Ask Bobby →", use_container_width=True, type="primary")
+    with col_clear:
+        clear_clicked = st.button("Clear", use_container_width=True)
+
+    if clear_clicked:
+        st.session_state.chat_messages = []
+        st.rerun(scope="fragment")
+
+    if send_clicked and user_input.strip():
+        prompt = user_input.strip()
+        st.session_state.chat_messages.append({"role": "user", "content": prompt})
+
+        with st.spinner("Bobby is thinking..."):
+            context  = get_chat_context(data_folder)
+            response = call_claude(st.session_state.chat_messages, context)
+
+        st.session_state.chat_messages.append({"role": "assistant", "content": response})
+        st.rerun(scope="fragment")
 
 
 if __name__ == "__main__":
