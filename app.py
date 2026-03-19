@@ -29,6 +29,10 @@ DATA_DIR = APP_DIR / "data"
 GENERATED_DIR = APP_DIR / "generated"
 GENERATED_DIR.mkdir(exist_ok=True)
 
+# ── Bobby usage log ───────────────────────────────────────────────────
+# Google Sheet shared with the service account for query audit trail
+BOBBY_LOG_SHEET_ID = "1c7QMZuV-YNDsmn1XYLJtx8pRyYi6g_wwdAHJ-D0cgtk"
+
 GOOGLE_SHEET_ID = "1XKIE9eRP8H1AWpuMAJA0U8bM7pQ9o1jvoQobc6aUn5s"
 GOOGLE_DRIVE_FOLDER_ID = "1vLq8m030d1ifL6nAVuo9LT5N9NSeGs9U"
 REVENUE_FILENAME = "2026 Path to Revenue (1).xlsx"
@@ -369,10 +373,52 @@ GUIDELINES:
             ],
             messages=api_messages,
         )
-        return response.content[0].text
+        text = response.content[0].text
+        in_tok  = getattr(response.usage, "input_tokens",  0)
+        out_tok = getattr(response.usage, "output_tokens", 0)
+        return text, in_tok, out_tok
 
     except Exception as e:
-        return f"⚠️ API error: {str(e)}"
+        return f"⚠️ API error: {str(e)}", 0, 0
+
+
+# ── Bobby usage logger ───────────────────────────────────────────────
+def log_bobby_query(user_email, question, response, input_tokens=0, output_tokens=0):
+    """
+    Append one row to the Bobby usage log Google Sheet.
+    Columns: Timestamp | User Email | Question | Response (first 300 chars) | Input Tokens | Output Tokens
+    Silent on any failure — never let logging break the chat.
+    """
+    try:
+        import gspread
+        from google.oauth2.service_account import Credentials
+
+        creds_dict = dict(st.secrets["gcp_service_account"])
+        creds = Credentials.from_service_account_info(
+            creds_dict,
+            scopes=["https://www.googleapis.com/auth/spreadsheets"],
+        )
+        gc = gspread.authorize(creds)
+        ws = gc.open_by_key(BOBBY_LOG_SHEET_ID).sheet1
+
+        # Add header row if the sheet is empty
+        first_cell = ws.cell(1, 1).value
+        if not first_cell or first_cell != "Timestamp":
+            ws.insert_row(
+                ["Timestamp", "User Email", "Question", "Response (first 300 chars)", "Input Tokens", "Output Tokens"],
+                index=1,
+            )
+
+        ws.append_row([
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            user_email or "unknown",
+            question,
+            response[:300] if response else "",
+            input_tokens,
+            output_tokens,
+        ])
+    except Exception:
+        pass  # Logging must never crash the chat
 
 
 # ── Helper: Google OAuth check ───────────────────────────────────────
@@ -875,9 +921,17 @@ def _bobby_chat_fragment(data_folder):
 
         with st.spinner("Bobby is thinking..."):
             context  = get_chat_context(data_folder)
-            response = call_claude(st.session_state.chat_messages, context)
+            response, in_tok, out_tok = call_claude(st.session_state.chat_messages, context)
 
         st.session_state.chat_messages.append({"role": "assistant", "content": response})
+
+        # Log to Google Sheet (silent on failure)
+        try:
+            user_email = st.user.email if st.user.is_logged_in else "unknown"
+        except Exception:
+            user_email = "unknown"
+        log_bobby_query(user_email, prompt, response, in_tok, out_tok)
+
         st.rerun(scope="fragment")
 
 
