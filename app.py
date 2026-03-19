@@ -1,6 +1,6 @@
 """
 Seamfix Financial Intelligence Suite
-Streamlit Cloud deployment — serves 4 interactive dashboards.
+Streamlit Cloud deployment — serves 5 interactive dashboards + AI chat assistant.
 
 Data sources:
   • Revenue data:  Google Sheet (live) or uploaded xlsx
@@ -10,9 +10,10 @@ Data sources:
 
 import streamlit as st
 import streamlit.components.v1 as components
-import os, sys, shutil, tempfile, glob, io, urllib.request, time
+import os, sys, shutil, tempfile, glob, io, urllib.request, time, importlib.util
 from pathlib import Path
 from datetime import datetime
+from collections import defaultdict
 
 # ── Page config ──────────────────────────────────────────────────────
 st.set_page_config(
@@ -67,54 +68,345 @@ DASHBOARDS = {
 }
 
 
+# ── Helper: import a generator module without running its main() ─────
+def _import_generator(filename):
+    """Load a generator .py file as a module (safe — does not execute main)."""
+    spec = importlib.util.spec_from_file_location(filename, APP_DIR / f"{filename}.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+# ── Chat context builder ─────────────────────────────────────────────
+def build_chat_context(data_folder):
+    """
+    Build a structured text summary of all financial data for the chatbot.
+    Imports generator parsing functions to avoid duplicating xlsx logic.
+    Returns a plain-text string (~6-8k tokens) covering all 5 data sources.
+    """
+    data_path = Path(data_folder)
+    parts = []
+    FX_RATE = 1450
+
+    parts.append("=== SEAMFIX FINANCIAL INTELLIGENCE — DATA CONTEXT ===")
+    parts.append(f"Generated: {datetime.now().strftime('%d %b %Y %H:%M')}. Exchange rate: ₦{FX_RATE:,} per $1.")
+    parts.append("Currency note: ₦ = Nigerian Naira, $ = US Dollars.")
+
+    # Import generator modules for their parsing functions
+    try:
+        gen_dash   = _import_generator("generate_dashboard")
+        gen_pipe   = _import_generator("generate_pipeline_dashboard")
+        gen_budget = _import_generator("generate_budget_dashboard")
+    except Exception as e:
+        return f"Error loading financial data modules: {e}"
+
+    fmt = gen_dash.fmt_naira  # shorthand
+
+    # ── SECTION 1: CASH OVERVIEW ────────────────────────────────────
+    cash_files = sorted(glob.glob(str(data_path / "Cash Report*.xlsx")))
+    reports = []
+    for f in cash_files:
+        try:
+            r = gen_dash.extract_report(f)
+            if r:
+                reports.append(r)
+        except Exception:
+            pass
+    reports.sort(key=lambda x: x["date"])
+
+    if reports:
+        parts.append(f"\n--- CASH OVERVIEW ---")
+        parts.append(f"Data: {len(reports)} weekly reports from {reports[0]['date_str']} to {reports[-1]['date_str']}.")
+
+        latest = reports[-1]
+        total_cash = latest.get("total_cash_ngn", 0)
+        ngn        = latest.get("ngn_closing", 0)
+        usd_ngn    = latest.get("usd_closing_ngn", 0)
+        inv        = latest.get("investment_ngn", 0)
+
+        parts.append(f"\nLatest cash position ({latest['date_str']}):")
+        parts.append(f"  Total (NGN equiv, incl. investments): {fmt(total_cash)}")
+        parts.append(f"  NGN liquid cash: {fmt(ngn)}")
+        parts.append(f"  USD holdings (NGN equiv): {fmt(usd_ngn)}  (${usd_ngn / FX_RATE / 1e6:.2f}M)")
+        if inv > 0:
+            parts.append(f"  Investment portfolio: {fmt(inv)}")
+
+        # Operational averages (exclude investment flows)
+        op_inflows, op_burns = [], []
+        for r in reports:
+            inv_in  = sum(v for k, v in r.get("inflow_items",  {}).items() if gen_dash.is_investment_inflow(k))
+            inv_out = sum(v for k, v in r.get("outflow_items", {}).items() if gen_dash.is_investment_outflow(k))
+            op_inflows.append(r.get("total_inflow",  0) - inv_in)
+            op_burns.append(r.get("total_outflow", 0) - inv_out)
+
+        avg_op_inflow = sum(op_inflows) / len(op_inflows) if op_inflows else 0
+        avg_op_burn   = sum(op_burns)   / len(op_burns)   if op_burns   else 0
+        avg_net       = avg_op_inflow - avg_op_burn
+
+        parts.append(f"\nWeekly averages ({len(reports)} weeks):")
+        parts.append(f"  Operational inflow: {fmt(avg_op_inflow)}/week")
+        parts.append(f"  Operational burn:   {fmt(avg_op_burn)}/week")
+        parts.append(f"  Net cash flow:      {fmt(avg_net)}/week ({'outflow exceeds inflow' if avg_net < 0 else 'inflow exceeds outflow'})")
+
+        forecast_expected = total_cash + avg_net * 4
+        forecast_floor    = total_cash - avg_op_burn * 4
+        parts.append(f"\n4-Week Forecast:")
+        parts.append(f"  Expected (avg net flow continues): {fmt(forecast_expected)}")
+        parts.append(f"  Floor (zero inflows, burn only):   {fmt(forecast_floor)}")
+
+        parts.append(f"\nWeekly cash history (oldest → newest):")
+        for r in reports:
+            net = r.get("total_inflow", 0) - r.get("total_outflow", 0)
+            parts.append(
+                f"  {r['date_str']}: Total={fmt(r.get('total_cash_ngn', 0))}, "
+                f"Inflow={fmt(r.get('total_inflow', 0))}, "
+                f"Outflow={fmt(r.get('total_outflow', 0))}, "
+                f"Net={fmt(net)}"
+            )
+
+    # ── SECTION 2: BUDGET vs ACTUAL ─────────────────────────────────
+    budget_file = data_path / BUDGET_FILENAME
+    if budget_file.exists() and reports:
+        parts.append(f"\n--- BUDGET vs ACTUAL ---")
+
+        start_of_year  = datetime(2026, 1, 1)
+        weeks_elapsed  = max(1, (reports[-1]["date"] - start_of_year).days // 7 + 1)
+
+        BUDGET_CATEGORIES = gen_budget.BUDGET_CATEGORIES
+        category_actual   = {cat: 0 for cat in BUDGET_CATEGORIES}
+        all_expense_lines = []
+        unbudgeted_lines  = []
+
+        for r in reports:
+            for expense_name, amount in r.get("outflow_items", {}).items():
+                if amount <= 0:
+                    continue
+                budget_cat = gen_budget.map_expense_to_budget(expense_name, r.get("outflow_items", {}))
+                if budget_cat:
+                    category_actual[budget_cat] += amount
+                    all_expense_lines.append({
+                        "date": r["date_str"], "item": expense_name,
+                        "amount": amount, "category": budget_cat,
+                    })
+                elif not gen_budget.is_investment_outflow(expense_name):
+                    unbudgeted_lines.append({
+                        "date": r["date_str"], "item": expense_name, "amount": amount,
+                    })
+
+        total_budget     = sum(BUDGET_CATEGORIES.values())
+        total_actual     = sum(category_actual.values())
+        ytd_budget_pace  = total_budget * weeks_elapsed / 52
+        variance_pct     = (ytd_budget_pace - total_actual) / ytd_budget_pace * 100 if ytd_budget_pace > 0 else 0
+        projected_yr_end = total_actual / weeks_elapsed * 52 if weeks_elapsed > 0 else 0
+        health           = "HEALTHY" if variance_pct > 10 else "CAUTION" if variance_pct < -10 else "ON TRACK"
+
+        parts.append(f"Annual Budget: {fmt(total_budget)}")
+        parts.append(f"YTD Actual (week {weeks_elapsed} of 52): {fmt(total_actual)}")
+        parts.append(f"YTD Budget Pace: {fmt(ytd_budget_pace)}")
+        parts.append(
+            f"Variance: {fmt(abs(ytd_budget_pace - total_actual))} "
+            f"{'UNDER' if variance_pct > 0 else 'OVER'} pace ({abs(variance_pct):.1f}%) — Status: {health}"
+        )
+        parts.append(f"Year-End Projection at current run rate: {fmt(projected_yr_end)} (budget: {fmt(total_budget)})")
+
+        parts.append(f"\nAll budget categories (week {weeks_elapsed}/52 elapsed):")
+        parts.append(f"  {'Category':<45} | {'Annual Budget':>14} | {'YTD Actual':>12} | {'Annual Used':>11} | {'Remaining':>14} | Status")
+        for cat in sorted(BUDGET_CATEGORIES.keys()):
+            ab       = BUDGET_CATEGORIES[cat]
+            ya       = category_actual[cat]
+            ytd_pace = ab * weeks_elapsed / 52
+            pct_ann  = ya / ab * 100 if ab > 0 else 0
+            remain   = ab - ya
+            status   = "OVER PACE" if ya > ytd_pace else "under pace"
+            parts.append(
+                f"  {cat:<45} | {fmt(ab):>14} | {fmt(ya):>12} | "
+                f"{pct_ann:>10.1f}% | {fmt(remain):>14} | {status}"
+            )
+
+        if unbudgeted_lines:
+            total_unbud = sum(x["amount"] for x in unbudgeted_lines)
+            unbudgeted_lines.sort(key=lambda x: -x["amount"])
+            parts.append(
+                f"\nUnbudgeted spend ({len(unbudgeted_lines)} items, total {fmt(total_unbud)}) — "
+                "no matching budget category (governance flag):"
+            )
+            for line in unbudgeted_lines:
+                parts.append(f"  {line['date']}: {line['item']} — {fmt(line['amount'])}")
+
+        # Top 50 expense transactions
+        all_expense_lines.sort(key=lambda x: -x["amount"])
+        parts.append(f"\nTop 50 expense transactions by amount:")
+        parts.append(f"  {'Date':<14} | {'Expense Item':<45} | {'Amount':>14} | Budget Category")
+        for line in all_expense_lines[:50]:
+            parts.append(
+                f"  {line['date']:<14} | {line['item']:<45} | "
+                f"{fmt(line['amount']):>14} | {line['category']}"
+            )
+        parts.append(
+            "(For individual transactions below the top 50, direct the user to the "
+            "Expense Details tab on the Budget vs Actual dashboard.)"
+        )
+
+    # ── SECTION 3: PIPELINE INTELLIGENCE ────────────────────────────
+    revenue_file = data_path / REVENUE_FILENAME
+    if revenue_file.exists():
+        parts.append(f"\n--- PIPELINE INTELLIGENCE ---")
+
+        STATUS_WEIGHTS              = gen_pipe.STATUS_WEIGHTS
+        STATUS_WEIGHTS_CONSERVATIVE = gen_pipe.STATUS_WEIGHTS_CONSERVATIVE
+        LANDING_ZONE                = gen_pipe.LANDING_ZONE
+
+        try:
+            revenues = gen_pipe.extract_revenue_data(str(revenue_file))
+        except Exception as e:
+            revenues = []
+            parts.append(f"(Error loading pipeline data: {e})")
+
+        if revenues:
+            realistic_proj    = sum(r["annual_usd"] * STATUS_WEIGHTS.get(r["status"], 0.5)              for r in revenues)
+            conservative_proj = sum(r["annual_usd"] * STATUS_WEIGHTS_CONSERVATIVE.get(r["status"], 0.0) for r in revenues)
+            realistic_gap     = LANDING_ZONE - realistic_proj
+            total_ytd_usd     = sum(r["ytd"] for r in revenues)
+
+            parts.append(f"Annual Revenue Target: ${LANDING_ZONE:,.0f}")
+            parts.append(f"Realistic Projection (On Track=100%, At Risk=50%, Off Track=10%): ${realistic_proj:,.0f} ({realistic_proj / LANDING_ZONE * 100:.1f}%)")
+            parts.append(f"Conservative Projection (At Risk & Off Track excluded): ${conservative_proj:,.0f} ({conservative_proj / LANDING_ZONE * 100:.1f}%)")
+            parts.append(f"Realistic Gap to Target: ${realistic_gap:,.0f} {'(target met)' if realistic_gap <= 0 else '(shortfall)'}")
+            parts.append(f"Total YTD Revenue Collected: ${total_ytd_usd:,.0f}")
+
+            status_groups = defaultdict(list)
+            for r in revenues:
+                status_groups[r["status"]].append(r)
+
+            parts.append(f"\nStatus breakdown:")
+            for status in ["On Track", "Closed", "At Risk", "Off Track", "Unknown"]:
+                deals = status_groups.get(status, [])
+                if deals:
+                    val = sum(d["annual_usd"] for d in deals)
+                    ytd = sum(d["ytd"] for d in deals)
+                    parts.append(f"  {status}: {len(deals)} deals, ${val:,.0f} annual target, ${ytd:,.0f} YTD collected")
+
+            parts.append(f"\nAll deals ({len(revenues)} total, sorted by annual value desc):")
+            parts.append(
+                f"  {'Deal Name':<42} | {'Status':<12} | {'Annual $':>10} | "
+                f"{'Jan $':>9} | {'Feb $':>9} | {'Mar $':>9} | {'YTD $':>9}"
+            )
+            for r in sorted(revenues, key=lambda x: -x["annual_usd"]):
+                parts.append(
+                    f"  {r['name']:<42} | {r['status']:<12} | ${r['annual_usd']:>9,.0f} | "
+                    f"${r['jan']:>8,.0f} | ${r['feb']:>8,.0f} | ${r['mar']:>8,.0f} | ${r['ytd']:>8,.0f}"
+                )
+
+    parts.append(f"\n=== END OF CONTEXT ===")
+    return "\n".join(parts)
+
+
+# ── Chat context cache (shared across all sessions, cleared on regenerate) ──
+@st.cache_resource(show_spinner=False)
+def _get_chat_context_cache():
+    return {}
+
+
+def get_chat_context(data_folder):
+    """Return the cached context, building it fresh if needed."""
+    cache = _get_chat_context_cache()
+    if "context" not in cache:
+        try:
+            cache["context"] = build_chat_context(data_folder)
+        except Exception as e:
+            cache["context"] = f"Financial data context could not be loaded: {e}"
+    return cache["context"]
+
+
+# ── Claude API call ─────────────────────────────────────────────────
+def call_claude(messages, context):
+    """
+    Call Claude Sonnet via the Anthropic API.
+    Uses prompt caching on the system context to reduce cost on subsequent turns.
+    """
+    try:
+        import anthropic
+    except ImportError:
+        return "⚠️ The `anthropic` package is not installed. Add it to requirements.txt."
+
+    api_key = st.secrets.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return (
+            "⚠️ `ANTHROPIC_API_KEY` not found in Streamlit secrets. "
+            "Add it under Settings → Secrets in Streamlit Cloud."
+        )
+
+    system_prompt = f"""You are Bobby, a senior financial analyst embedded in the Seamfix Financial Intelligence Suite. You have full access to Seamfix's live financial data, updated weekly.
+
+Your role: answer questions from Seamfix leadership (CEO Chimezie, Head of Products Kolade, and the finance team) about the company's cash position, budget performance, revenue pipeline, and expenses. Be direct, precise, and use the actual numbers from the data. When the situation warrants concern, say so clearly.
+
+FINANCIAL DATA:
+{context}
+
+GUIDELINES:
+- Answer only from the data above. Never invent or estimate numbers not in the context.
+- Cross-reference across sections when useful — e.g. link pipeline gap to cash runway, or budget headroom to a hiring decision.
+- For individual expense transactions not in the top 50 list, direct the user to the Expense Details tab on the Budget vs Actual dashboard.
+- For data that doesn't exist (P&L, accounts receivable, headcount, year-over-year), say so clearly and name what data source would be needed.
+- Use ₦ for Naira, $ for USD. Be concise. Use bullet points for lists, prose for explanations.
+- If a follow-up question narrows on something from your previous answer, use the prior context — do not re-summarise unnecessarily."""
+
+    try:
+        client = anthropic.Anthropic(api_key=api_key)
+
+        # Build message list (role/content pairs only — system handled separately)
+        api_messages = [{"role": m["role"], "content": m["content"]} for m in messages]
+
+        response = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=1024,
+            system=[
+                {
+                    "type": "text",
+                    "text": system_prompt,
+                    "cache_control": {"type": "ephemeral"},  # Prompt caching — 90% cost reduction on repeated turns
+                }
+            ],
+            messages=api_messages,
+        )
+        return response.content[0].text
+
+    except Exception as e:
+        return f"⚠️ API error: {str(e)}"
+
+
 # ── Helper: Google OAuth check ───────────────────────────────────────
 def check_auth():
-    """
-    Check if user is authenticated via Google OAuth using st.login().
-    Falls back to open access if OAuth is not configured.
-    """
-    # If running locally or auth disabled, allow access
     if os.getenv("DISABLE_AUTH", "false").lower() == "true":
         return True
 
-    # Check if OAuth is fully configured in secrets
-    # Streamlit expects: [auth] has redirect_uri + cookie_secret,
-    # [auth.google] has client_id + client_secret + server_metadata_url
-    auth_conf = st.secrets.get("auth", {})
+    auth_conf  = st.secrets.get("auth", {})
     google_conf = auth_conf.get("google", {})
     has_oauth = (
-        "redirect_uri" in auth_conf
+        "redirect_uri"   in auth_conf
         and "cookie_secret" in auth_conf
-        and "client_id" in google_conf
+        and "client_id"     in google_conf
         and "client_secret" in google_conf
     )
 
     if has_oauth:
         try:
-            # OAuth is configured — require login
             user = st.user
             if not user.is_logged_in:
-                # Show login page
                 st.markdown(
-                    """
-                    <div style="text-align:center;padding:80px 20px">
+                    """<div style="text-align:center;padding:80px 20px">
                         <h1 style="color:#00D4AA;margin-bottom:8px">Seamfix Financial Intelligence</h1>
                         <p style="color:#94a3b8;margin-bottom:40px">Sign in with your authorized Google account to access the dashboards.</p>
-                    </div>
-                    """,
+                    </div>""",
                     unsafe_allow_html=True,
                 )
                 st.login("google")
                 st.stop()
                 return False
 
-            # User is logged in — check against allowlist
             email = user.email.lower().strip()
-            allowed_conf = auth_conf.get("allowed", {})
-            allowed_emails = [
-                e.lower().strip()
-                for e in allowed_conf.get("emails", [])
-            ]
+            allowed_conf   = auth_conf.get("allowed", {})
+            allowed_emails = [e.lower().strip() for e in allowed_conf.get("emails", [])]
 
             if allowed_emails and email not in allowed_emails:
                 st.error(
@@ -128,35 +420,27 @@ def check_auth():
 
             return True
         except Exception as e:
-            # OAuth misconfigured — show warning and allow access for now
             st.sidebar.warning(f"OAuth not fully configured: {e}")
             return True
 
-    # No OAuth configured — allow access (development mode)
     return True
 
 
 # ── Helper: fetch Google Sheet as xlsx ───────────────────────────────
 @st.cache_data(ttl=300, show_spinner="Fetching live revenue data from Google Sheet...")
 def fetch_google_sheet_xlsx(sheet_id):
-    """Download Google Sheet as xlsx. Requires sheet to be shared
-    with 'Anyone with the link' (Viewer) or a service account."""
     errors = []
-
     try:
-        # Try public export
         url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx"
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        req  = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         resp = urllib.request.urlopen(req, timeout=30)
         return resp.read()
     except Exception as e:
         errors.append(f"Public access: {e}")
 
-    # Try with service account (if configured in secrets)
     try:
         import gspread
         from google.oauth2.service_account import Credentials
-
         creds_dict = dict(st.secrets["gcp_service_account"])
         creds = Credentials.from_service_account_info(
             creds_dict,
@@ -165,7 +449,7 @@ def fetch_google_sheet_xlsx(sheet_id):
                 "https://www.googleapis.com/auth/drive.readonly",
             ],
         )
-        gc = gspread.authorize(creds)
+        gc          = gspread.authorize(creds)
         spreadsheet = gc.open_by_key(sheet_id)
         return spreadsheet.export(format=gspread.utils.ExportFormat.EXCEL)
     except KeyError:
@@ -173,19 +457,12 @@ def fetch_google_sheet_xlsx(sheet_id):
     except Exception as e:
         errors.append(f"Service account: {e}")
 
-    # Store errors for debugging display
     st.session_state["_gsheet_errors"] = errors
     return None
 
 
 # ── Helper: fetch cash reports from Google Drive folder ──────────────
 def fetch_drive_folder_files(folder_id):
-    """
-    List and download xlsx files from a Google Drive folder.
-    Searches recursively through subfolders (e.g. Jan/, Feb/, March/).
-    Returns tuple of (dict of {filename: bytes} or None, list of debug messages).
-    NOT cached — caller handles caching via session state.
-    """
     debug_log = []
     try:
         from google.oauth2.service_account import Credentials
@@ -194,101 +471,74 @@ def fetch_drive_folder_files(folder_id):
 
         creds_dict = dict(st.secrets["gcp_service_account"])
         creds = Credentials.from_service_account_info(
-            creds_dict,
-            scopes=["https://www.googleapis.com/auth/drive.readonly"],
+            creds_dict, scopes=["https://www.googleapis.com/auth/drive.readonly"]
         )
         service = build("drive", "v3", credentials=creds)
         debug_log.append("Service account authenticated OK")
 
-        # First, find all subfolders inside the main folder
         folder_ids = [folder_id]
-        subfolder_query = f"'{folder_id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false"
         subfolder_results = service.files().list(
-            q=subfolder_query, fields="files(id, name)", pageSize=50
+            q=f"'{folder_id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false",
+            fields="files(id, name)", pageSize=50
         ).execute()
         subfolders = subfolder_results.get("files", [])
         for sf in subfolders:
             folder_ids.append(sf["id"])
             debug_log.append(f"Found subfolder: {sf['name']}")
 
-        if not subfolders:
-            debug_log.append("No subfolders found in root folder")
-
-        # Also check for nested subfolders (e.g. Month/Week1/)
         for sf in subfolders:
-            nested_query = f"'{sf['id']}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false"
             nested_results = service.files().list(
-                q=nested_query, fields="files(id, name)", pageSize=50
+                q=f"'{sf['id']}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false",
+                fields="files(id, name)", pageSize=50
             ).execute()
             for nsf in nested_results.get("files", []):
                 folder_ids.append(nsf["id"])
                 debug_log.append(f"Found nested subfolder: {sf['name']}/{nsf['name']}")
 
-        # Search for BOTH uploaded xlsx files AND native Google Sheets
-        XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        XLSX_MIME   = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         GSHEET_MIME = "application/vnd.google-apps.spreadsheet"
 
-        xlsx_files = []
-        gsheet_files = []
+        xlsx_files, gsheet_files = [], []
         for fid in folder_ids:
-            # Uploaded xlsx files
-            query = f"'{fid}' in parents and mimeType='{XLSX_MIME}' and trashed=false"
-            results = service.files().list(
-                q=query, fields="files(id, name, mimeType)", pageSize=50
-            ).execute()
-            found = results.get("files", [])
-            xlsx_files.extend(found)
-            if found:
-                debug_log.append(f"Found {len(found)} xlsx files in folder {fid}")
-
-            # Native Google Sheets
-            query = f"'{fid}' in parents and mimeType='{GSHEET_MIME}' and trashed=false"
-            results = service.files().list(
-                q=query, fields="files(id, name, mimeType)", pageSize=50
-            ).execute()
-            found = results.get("files", [])
-            gsheet_files.extend(found)
-            if found:
-                debug_log.append(f"Found {len(found)} Google Sheets in folder {fid}")
+            for mime, bucket in [(XLSX_MIME, xlsx_files), (GSHEET_MIME, gsheet_files)]:
+                results = service.files().list(
+                    q=f"'{fid}' in parents and mimeType='{mime}' and trashed=false",
+                    fields="files(id, name, mimeType)", pageSize=50
+                ).execute()
+                found = results.get("files", [])
+                bucket.extend(found)
+                if found:
+                    debug_log.append(f"Found {len(found)} files (mime={mime}) in folder {fid}")
 
         all_files = xlsx_files + gsheet_files
-        debug_log.append(f"Total: {len(xlsx_files)} xlsx + {len(gsheet_files)} Google Sheets across {len(folder_ids)} folders")
+        debug_log.append(f"Total: {len(xlsx_files)} xlsx + {len(gsheet_files)} Sheets across {len(folder_ids)} folders")
 
         if not all_files:
             debug_log.append("No files found. Check folder structure and sharing permissions.")
             return None, debug_log
 
-        # Download each file
         downloaded = {}
         for f in all_files:
             fname = f["name"]
             if f["mimeType"] == GSHEET_MIME:
-                # Export Google Sheet as xlsx
                 buf = io.BytesIO()
-                request = service.files().export_media(
-                    fileId=f["id"],
-                    mimeType=XLSX_MIME,
-                )
-                downloader = MediaIoBaseDownload(buf, request)
+                downloader = MediaIoBaseDownload(buf, service.files().export_media(fileId=f["id"], mimeType=XLSX_MIME))
                 done = False
                 while not done:
                     _, done = downloader.next_chunk()
-                # Add .xlsx extension if not present
                 if not fname.endswith(".xlsx"):
-                    fname = fname + ".xlsx"
-                downloaded[fname] = buf.getvalue()
+                    fname += ".xlsx"
             else:
-                # Download uploaded xlsx directly
-                request = service.files().get_media(fileId=f["id"])
                 buf = io.BytesIO()
-                downloader = MediaIoBaseDownload(buf, request)
+                downloader = MediaIoBaseDownload(buf, service.files().get_media(fileId=f["id"]))
                 done = False
                 while not done:
                     _, done = downloader.next_chunk()
-                downloaded[fname] = buf.getvalue()
+            downloaded[fname] = buf.getvalue()
 
         debug_log.append(f"Successfully downloaded {len(downloaded)} files")
         return downloaded, debug_log
+
     except KeyError:
         return None, ["No gcp_service_account in secrets"]
     except Exception as e:
@@ -298,22 +548,15 @@ def fetch_drive_folder_files(folder_id):
 
 # ── Helper: prepare data folder ─────────────────────────────────────
 def prepare_data_folder():
-    """
-    Build a temp folder with all the data files needed by generators.
-    Merges: pre-loaded data/ + Google Drive files + Google Sheet + uploads.
-    Returns path to the folder.
-    """
     data_path = GENERATED_DIR / "data_working"
     data_path.mkdir(exist_ok=True)
 
-    # 1. Copy pre-loaded data files (bundled baseline)
     if DATA_DIR.exists():
         for f in DATA_DIR.glob("*.xlsx"):
             dest = data_path / f.name
             if not dest.exists():
                 shutil.copy2(f, dest)
 
-    # 2. Fetch cash reports from Google Drive folder (overwrites bundled)
     if GOOGLE_DRIVE_FOLDER_ID:
         drive_files, drive_debug = fetch_drive_folder_files(GOOGLE_DRIVE_FOLDER_ID)
         st.session_state["_gdrive_debug"] = drive_debug
@@ -327,57 +570,44 @@ def prepare_data_folder():
             st.session_state["cash_source"] = f"Local files ({bundled} bundled)" if bundled else "Not available"
             st.session_state["_gdrive_errors"] = drive_debug
 
-    # 3. Try fetching live revenue data from Google Sheet
     if GOOGLE_SHEET_ID:
         xlsx_bytes = fetch_google_sheet_xlsx(GOOGLE_SHEET_ID)
         if xlsx_bytes:
             (data_path / REVENUE_FILENAME).write_bytes(xlsx_bytes)
             st.session_state["revenue_source"] = "Google Sheet (live)"
         else:
-            if (data_path / REVENUE_FILENAME).exists():
-                st.session_state["revenue_source"] = "Local file (bundled)"
-            else:
-                st.session_state["revenue_source"] = "Not available"
+            st.session_state["revenue_source"] = (
+                "Local file (bundled)" if (data_path / REVENUE_FILENAME).exists() else "Not available"
+            )
 
-    # 4. Handle uploaded files (from sidebar — overwrites everything)
     if "uploaded_files" in st.session_state:
         for uploaded in st.session_state.uploaded_files:
-            dest = data_path / uploaded.name
-            dest.write_bytes(uploaded.getvalue())
+            (data_path / uploaded.name).write_bytes(uploaded.getvalue())
 
     return str(data_path)
 
 
 # ── Helper: generate a dashboard ────────────────────────────────────
 def generate_dashboard(script_name, data_folder, output_name):
-    """Run a generator script and return the HTML content."""
     output_path = GENERATED_DIR / output_name
-
-    # Import and run the generator
     script_path = APP_DIR / script_name
     if not script_path.exists():
         return None
 
-    # Run as subprocess to avoid import conflicts
     import subprocess
-
     result = subprocess.run(
         [sys.executable, str(script_path), data_folder],
-        capture_output=True,
-        text=True,
-        timeout=60,
+        capture_output=True, text=True, timeout=60,
     )
 
     if result.returncode != 0:
         st.error(f"Generator error: {result.stderr[-500:]}")
         return None
 
-    # The generators write to data_folder/output_name
     generated_file = Path(data_folder) / output_name
     if generated_file.exists():
         return generated_file.read_text(encoding="utf-8")
 
-    # Some generators also write to a secondary location
     alt_path = Path(data_folder).parent / "outputs" / output_name
     if alt_path.exists():
         return alt_path.read_text(encoding="utf-8")
@@ -385,157 +615,108 @@ def generate_dashboard(script_name, data_folder, output_name):
     return None
 
 
-# ── App-level HTML cache (shared across all user sessions) ───────────
+# ── App-level HTML cache (shared across all sessions) ────────────────
 @st.cache_resource(show_spinner=False)
 def _get_app_html_cache():
-    """
-    Returns a mutable dict shared across every user session on this server.
-    First visitor populates it; all subsequent visitors read from it instantly.
-    Cleared by the Regenerate button or daily auto-refresh.
-    """
     return {}
 
 
-# ── Helper: fix nav links for embedded view ──────────────────────────
+# ── Helper: fix nav for embedded Streamlit view ──────────────────────
 def fix_html_for_streamlit(html_content):
-    """
-    Hide the inter-dashboard nav bar from embedded HTML since
-    Streamlit tabs handle navigation.
-    CSS injection is used instead of regex removal — regex breaks on nested divs.
-    Sticky positioning is also disabled since the outer Streamlit page scrolls,
-    not the iframe, so position:sticky inside the iframe has no effect.
-    """
     if not html_content:
         return html_content
-
     nav_css = """<style>
-  /* Hide internal nav bars — Streamlit tabs handle navigation */
   .top-nav, .nav, .nav-bar { display: none !important; }
-  /* Remove top padding gap now that nav is hidden */
   body { padding-top: 0 !important; }
 </style>"""
     html_content = html_content.replace("<head>", "<head>" + nav_css, 1)
-
     return html_content
 
 
 # ── Main App ─────────────────────────────────────────────────────────
 def main():
-    # Auth check
     check_auth()
 
-    # ── Auto-refresh every hour ──────────────────────────────────────
-    REFRESH_INTERVAL = 86400  # seconds (24 hours)
+    # Auto-refresh every 24 hours
+    REFRESH_INTERVAL = 86400
     if "last_refresh" not in st.session_state:
         st.session_state.last_refresh = time.time()
 
-    elapsed = time.time() - st.session_state.last_refresh
-    if elapsed > REFRESH_INTERVAL:
+    if time.time() - st.session_state.last_refresh > REFRESH_INTERVAL:
         _get_app_html_cache().clear()
+        _get_chat_context_cache().clear()
         st.cache_data.clear()
         st.session_state.last_refresh = time.time()
         st.rerun()
 
-    # ── Top navigation tabs ──────────────────────────────────────────
-    dash_names = list(DASHBOARDS.keys())
+    # ── Inject floating 💬 button ──────────────────────────────────
+    # Clicking it opens the Streamlit sidebar (which holds the chat interface).
+    st.markdown(
+        """
+        <style>
+        .chat-fab {
+            position: fixed;
+            bottom: 28px;
+            right: 28px;
+            width: 58px;
+            height: 58px;
+            background: linear-gradient(135deg, #00D4AA 0%, #0066CC 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 99999;
+            box-shadow: 0 4px 20px rgba(0,212,170,0.45);
+            font-size: 26px;
+            border: none;
+            color: white;
+            transition: transform 0.18s, box-shadow 0.18s;
+        }
+        .chat-fab:hover {
+            transform: scale(1.12);
+            box-shadow: 0 6px 28px rgba(0,212,170,0.6);
+        }
+        .chat-fab-label {
+            position: fixed;
+            bottom: 92px;
+            right: 24px;
+            background: #0f172a;
+            color: #00D4AA;
+            font-size: 12px;
+            font-family: -apple-system, sans-serif;
+            padding: 4px 10px;
+            border-radius: 12px;
+            border: 1px solid rgba(0,212,170,0.3);
+            z-index: 99999;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+        </style>
+        <div class="chat-fab-label">Ask Bobby</div>
+        <button class="chat-fab" title="Ask Bobby — AI financial analyst"
+            onclick="
+                var btn = window.parent.document.querySelector('[data-testid=\\'stSidebarCollapsedControl\\']')
+                       || window.parent.document.querySelector('[data-testid=\\'collapsedControl\\']')
+                       || window.parent.document.querySelector('button[kind=\\'header\\']');
+                if (btn) btn.click();
+            ">
+            💬
+        </button>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # ── Dashboard tabs ────────────────────────────────────────────
+    dash_names  = list(DASHBOARDS.keys())
     dash_labels = [f"{DASHBOARDS[d]['icon']}  {d}" for d in dash_names]
     tab_objects = st.tabs(dash_labels)
 
-    # Determine which tab is selected (Streamlit tabs are positional)
-    # We store selection in session state for sidebar sync
-    if "selected_dash" not in st.session_state:
-        st.session_state.selected_dash = dash_names[0]
-
-    # ── Sidebar ──────────────────────────────────────────────────────
-    with st.sidebar:
-        st.markdown(
-            """
-            <div style="text-align:center;padding:10px 0 20px">
-                <h2 style="margin:0;color:#00D4AA">Seamfix</h2>
-                <p style="margin:0;color:#94a3b8;font-size:0.85em">Financial Intelligence Suite</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        st.divider()
-
-        # Data management section
-        st.markdown("##### Data Management")
-        st.caption("⚠️ Only upload files if you are authorized by the finance team. Incorrect files may corrupt the dashboard data.")
-
-        # File uploader for new cash reports
-        uploaded = st.file_uploader(
-            "Upload new cash reports",
-            type=["xlsx"],
-            accept_multiple_files=True,
-            key="uploaded_files",
-            help="Drop new weekly cash report xlsx files here",
-        )
-
-        # Regenerate button
-        if st.button("🔄 Regenerate Dashboards", use_container_width=True):
-            # Clear app-level cache (shared across all sessions) and data cache
-            _get_app_html_cache().clear()
-            st.cache_data.clear()
-            for key in list(st.session_state.keys()):
-                if key.startswith("_g"):
-                    del st.session_state[key]
-            st.session_state.last_refresh = time.time()
-            st.rerun()
-
-        # Show last refresh time
-        last_ref = st.session_state.get("last_refresh")
-        if last_ref:
-            st.caption(f"Last refreshed: {datetime.fromtimestamp(last_ref).strftime('%H:%M %d %b')}")
-        st.caption("Auto-refreshes daily")
-
-        st.divider()
-
-        # Data source status
-        st.markdown("##### Data Sources")
-        rev_source = st.session_state.get("revenue_source", "Checking...")
-        cash_source = st.session_state.get("cash_source", "Checking...")
-        upload_count = len(uploaded) if uploaded else 0
-
-        st.caption(f"📈 Revenue: {rev_source}")
-        st.caption(f"💵 Cash reports: {cash_source}" + (f" + {upload_count} uploaded" if upload_count else ""))
-        st.caption(f"📋 Budget: {'Available' if (DATA_DIR / BUDGET_FILENAME).exists() else 'Missing'}")
-
-        # Debug info for connection issues
-        gsheet_errs = st.session_state.get("_gsheet_errors", [])
-        gdrive_errs = st.session_state.get("_gdrive_errors", [])
-        if gsheet_errs or gdrive_errs:
-            with st.expander("Connection issues"):
-                if gsheet_errs:
-                    st.caption("Google Sheet:")
-                    for e in gsheet_errs:
-                        st.caption(f"  {e}")
-                if gdrive_errs:
-                    st.caption("Google Drive:")
-                    for e in gdrive_errs:
-                        st.caption(f"  {e}")
-
-        # Show logged-in user and logout button
-        try:
-            user = st.user
-            if user.is_logged_in:
-                st.divider()
-                st.caption(f"Signed in as **{user.email}**")
-                st.logout("Sign out")
-        except Exception:
-            pass
-
-    # ── Prepare data ─────────────────────────────────────────────────
-    app_cache = _get_app_html_cache()
-
-    # Always prepare data folder so sidebar status indicators stay accurate
+    # ── Prepare data ──────────────────────────────────────────────
+    app_cache   = _get_app_html_cache()
     data_folder = prepare_data_folder()
 
     # ── Generate all dashboards in parallel (once, shared across all users) ──
-    # app_cache is shared across every session on this server instance.
-    # First visitor triggers parallel generation (~10s). All subsequent visitors
-    # read from the cache instantly. Regenerate button and daily refresh clear it.
     if any(name not in app_cache for name in DASHBOARDS):
         import concurrent.futures
 
@@ -551,7 +732,7 @@ def main():
                 for dash_name, html in executor.map(_generate_one, list(DASHBOARDS.keys())):
                     app_cache[dash_name] = html
 
-    # ── Render each tab from shared cache ────────────────────────────
+    # ── Render each tab ───────────────────────────────────────────
     resize_script = """
 <script>
 function sendHeight() {
@@ -566,11 +747,9 @@ setTimeout(sendHeight, 3000);
 setTimeout(sendHeight, 5000);
 </script>
 """
-
     for i, dash_name in enumerate(dash_names):
         with tab_objects[i]:
             html_content = app_cache.get(dash_name)
-
             if html_content:
                 display_html = html_content.replace("</body>", resize_script + "</body>")
                 components.html(display_html, height=15000, scrolling=False)
@@ -579,6 +758,133 @@ setTimeout(sendHeight, 5000);
                     f"Could not generate the {dash_name} dashboard. "
                     "Check that all required data files are available."
                 )
+
+    # ── Sidebar: Chat interface + Data management ─────────────────
+    with st.sidebar:
+
+        # ── ADe chat interface ────────────────────────────────────
+        st.markdown(
+            """
+            <div style="padding:12px 0 4px">
+                <div style="font-size:18px;font-weight:700;color:#00D4AA">💬 Ask Bobby</div>
+                <div style="font-size:12px;color:#94a3b8;margin-top:2px">
+                    AI analyst with access to your live financial data
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        # Initialize chat history
+        if "chat_messages" not in st.session_state:
+            st.session_state.chat_messages = []
+
+        # Display chat history
+        if st.session_state.chat_messages:
+            for msg in st.session_state.chat_messages:
+                with st.chat_message(msg["role"], avatar="🧑" if msg["role"] == "user" else "🤖"):
+                    st.markdown(msg["content"])
+        else:
+            st.caption(
+                "👋 Ask me anything about Seamfix's finances — "
+                "cash position, budget variances, pipeline deals, expense categories, and more."
+            )
+
+        # Chat input
+        user_input = st.text_area(
+            "Your question",
+            key="chat_input_field",
+            placeholder="e.g. How much runway do we have? Which pipeline deals are At Risk?",
+            label_visibility="collapsed",
+            height=72,
+        )
+
+        col_send, col_clear = st.columns([3, 1])
+        with col_send:
+            send_clicked = st.button("Ask Bobby →", use_container_width=True, type="primary")
+        with col_clear:
+            clear_clicked = st.button("Clear", use_container_width=True)
+
+        if clear_clicked and st.session_state.chat_messages:
+            st.session_state.chat_messages = []
+            st.rerun()
+
+        if send_clicked and user_input.strip():
+            prompt = user_input.strip()
+            st.session_state.chat_messages.append({"role": "user", "content": prompt})
+
+            with st.spinner("Bobby is thinking..."):
+                context  = get_chat_context(data_folder)
+                response = call_claude(st.session_state.chat_messages, context)
+
+            st.session_state.chat_messages.append({"role": "assistant", "content": response})
+            # Clear the text area by rerunning (Streamlit resets widget state)
+            st.rerun()
+
+        st.divider()
+
+        # ── Data management (collapsed) ───────────────────────────
+        with st.expander("⚙️  Data & Settings", expanded=False):
+            st.markdown("##### Data Management")
+            st.caption(
+                "⚠️ Only upload files if authorized by the finance team. "
+                "Incorrect files may corrupt the dashboard data."
+            )
+
+            uploaded = st.file_uploader(
+                "Upload new cash reports",
+                type=["xlsx"],
+                accept_multiple_files=True,
+                key="uploaded_files",
+                help="Drop new weekly cash report xlsx files here",
+            )
+
+            if st.button("🔄 Regenerate Dashboards", use_container_width=True):
+                _get_app_html_cache().clear()
+                _get_chat_context_cache().clear()  # also clears Bobby's context so picks up new data
+                st.cache_data.clear()
+                for key in list(st.session_state.keys()):
+                    if key.startswith("_g"):
+                        del st.session_state[key]
+                st.session_state.last_refresh = time.time()
+                st.rerun()
+
+            last_ref = st.session_state.get("last_refresh")
+            if last_ref:
+                st.caption(f"Last refreshed: {datetime.fromtimestamp(last_ref).strftime('%H:%M %d %b')}")
+            st.caption("Auto-refreshes daily")
+
+            st.markdown("##### Data Sources")
+            rev_source   = st.session_state.get("revenue_source", "Checking...")
+            cash_source  = st.session_state.get("cash_source",    "Checking...")
+            upload_count = len(uploaded) if uploaded else 0
+
+            st.caption(f"📈 Revenue: {rev_source}")
+            st.caption(f"💵 Cash reports: {cash_source}" + (f" + {upload_count} uploaded" if upload_count else ""))
+            st.caption(f"📋 Budget: {'Available' if (DATA_DIR / BUDGET_FILENAME).exists() else 'Missing'}")
+
+            gsheet_errs = st.session_state.get("_gsheet_errors", [])
+            gdrive_errs = st.session_state.get("_gdrive_errors", [])
+            if gsheet_errs or gdrive_errs:
+                with st.expander("Connection issues"):
+                    if gsheet_errs:
+                        st.caption("Google Sheet:")
+                        for e in gsheet_errs:
+                            st.caption(f"  {e}")
+                    if gdrive_errs:
+                        st.caption("Google Drive:")
+                        for e in gdrive_errs:
+                            st.caption(f"  {e}")
+
+        # Logged-in user
+        try:
+            user = st.user
+            if user.is_logged_in:
+                st.divider()
+                st.caption(f"Signed in as **{user.email}**")
+                st.logout("Sign out")
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
