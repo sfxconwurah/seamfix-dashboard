@@ -696,9 +696,11 @@ def main():
         <div class="chat-fab-label">Ask Bobby</div>
         <button class="chat-fab" title="Ask Bobby — AI financial analyst"
             onclick="
-                var btn = window.parent.document.querySelector('[data-testid=\\'stSidebarCollapsedControl\\']')
-                       || window.parent.document.querySelector('[data-testid=\\'collapsedControl\\']')
-                       || window.parent.document.querySelector('button[kind=\\'header\\']');
+                var btn = document.querySelector('[data-testid=\\'stSidebarCollapsedControl\\']')
+                       || document.querySelector('[data-testid=\\'collapsedControl\\']')
+                       || document.querySelector('[data-testid=\\'stSidebarToggle\\']')
+                       || document.querySelector('button[aria-label*=\\'sidebar\\']')
+                       || document.querySelector('button[aria-label*=\\'Sidebar\\']');
                 if (btn) btn.click();
             ">
             💬
