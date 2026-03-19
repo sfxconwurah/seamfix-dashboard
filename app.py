@@ -373,21 +373,50 @@ GUIDELINES:
             ],
             messages=api_messages,
         )
-        text = response.content[0].text
-        in_tok  = getattr(response.usage, "input_tokens",  0)
-        out_tok = getattr(response.usage, "output_tokens", 0)
-        return text, in_tok, out_tok
+        text           = response.content[0].text
+        in_tok         = getattr(response.usage, "input_tokens",          0)
+        cache_read_tok = getattr(response.usage, "cache_read_input_tokens",    0)
+        cache_write_tok= getattr(response.usage, "cache_creation_input_tokens", 0)
+        out_tok        = getattr(response.usage, "output_tokens",         0)
+        return text, in_tok, cache_read_tok, cache_write_tok, out_tok
 
     except Exception as e:
-        return f"⚠️ API error: {str(e)}", 0, 0
+        return f"⚠️ API error: {str(e)}", 0, 0, 0, 0
 
 
-# ── Bobby usage logger ───────────────────────────────────────────────
-def log_bobby_query(user_email, question, response, input_tokens=0, output_tokens=0):
+# ── Shared helper: open (or create) a named worksheet ────────────────
+def _get_or_create_worksheet(spreadsheet, title, headers):
     """
-    Append one row to the Bobby usage log Google Sheet.
-    Columns: Timestamp | User Email | Question | Response (first 300 chars) | Input Tokens | Output Tokens
-    Silent on any failure — never let logging break the chat.
+    Return the worksheet named *title*, creating it (with *headers*) if absent.
+    Also renames Sheet1/Sheet2 placeholders on first use.
+    Silent on failure — returns None.
+    """
+    try:
+        try:
+            ws = spreadsheet.worksheet(title)
+        except Exception:
+            ws = spreadsheet.add_worksheet(title=title, rows=5000, cols=len(headers))
+
+        # Write headers if the sheet is brand-new
+        if not ws.cell(1, 1).value:
+            ws.insert_row(headers, index=1)
+        return ws
+    except Exception:
+        return None
+
+
+# ── Bobby query logger ────────────────────────────────────────────────
+def log_bobby_query(user_email, question, response,
+                    input_tokens=0, cache_read_tokens=0, cache_write_tokens=0, output_tokens=0):
+    """
+    Append one row to the 'Bobby Queries' worksheet.
+
+    Token columns explained:
+      Non-Cached Input  — new tokens sent this turn (question + conversation history)
+      Cache Read        — context tokens served from the prompt cache (~20k, charged at ~10%)
+      Cache Write       — tokens written to cache on the very first turn of a session
+      Output            — tokens in Bobby's reply
+    Silent on any failure — never crash the chat.
     """
     try:
         import gspread
@@ -395,19 +424,20 @@ def log_bobby_query(user_email, question, response, input_tokens=0, output_token
 
         creds_dict = dict(st.secrets["gcp_service_account"])
         creds = Credentials.from_service_account_info(
-            creds_dict,
-            scopes=["https://www.googleapis.com/auth/spreadsheets"],
+            creds_dict, scopes=["https://www.googleapis.com/auth/spreadsheets"]
         )
         gc = gspread.authorize(creds)
-        ws = gc.open_by_key(BOBBY_LOG_SHEET_ID).sheet1
+        spreadsheet = gc.open_by_key(BOBBY_LOG_SHEET_ID)
 
-        # Add header row if the sheet is empty
-        first_cell = ws.cell(1, 1).value
-        if not first_cell or first_cell != "Timestamp":
-            ws.insert_row(
-                ["Timestamp", "User Email", "Question", "Response (first 300 chars)", "Input Tokens", "Output Tokens"],
-                index=1,
-            )
+        headers = [
+            "Timestamp", "User Email", "Question",
+            "Response (first 300 chars)",
+            "Non-Cached Input Tokens", "Cache Read Tokens",
+            "Cache Write Tokens", "Output Tokens",
+        ]
+        ws = _get_or_create_worksheet(spreadsheet, "Bobby Queries", headers)
+        if ws is None:
+            return
 
         ws.append_row([
             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -415,10 +445,43 @@ def log_bobby_query(user_email, question, response, input_tokens=0, output_token
             question,
             response[:300] if response else "",
             input_tokens,
+            cache_read_tokens,
+            cache_write_tokens,
             output_tokens,
         ])
     except Exception:
-        pass  # Logging must never crash the chat
+        pass
+
+
+# ── Dashboard visit logger ────────────────────────────────────────────
+def log_dashboard_visit(user_email):
+    """
+    Append one row to the 'Dashboard Visits' worksheet.
+    Call once per browser session (guard with st.session_state).
+    Silent on any failure.
+    """
+    try:
+        import gspread
+        from google.oauth2.service_account import Credentials
+
+        creds_dict = dict(st.secrets["gcp_service_account"])
+        creds = Credentials.from_service_account_info(
+            creds_dict, scopes=["https://www.googleapis.com/auth/spreadsheets"]
+        )
+        gc = gspread.authorize(creds)
+        spreadsheet = gc.open_by_key(BOBBY_LOG_SHEET_ID)
+
+        headers = ["Timestamp", "User Email"]
+        ws = _get_or_create_worksheet(spreadsheet, "Dashboard Visits", headers)
+        if ws is None:
+            return
+
+        ws.append_row([
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            user_email or "unknown",
+        ])
+    except Exception:
+        pass
 
 
 # ── Helper: Google OAuth check ───────────────────────────────────────
@@ -683,6 +746,15 @@ def fix_html_for_streamlit(html_content):
 def main():
     check_auth()
 
+    # ── Log dashboard visit once per browser session ───────────────────
+    if "visit_logged" not in st.session_state:
+        try:
+            user_email = st.user.email if st.user.is_logged_in else "unknown"
+        except Exception:
+            user_email = "unknown"
+        log_dashboard_visit(user_email)
+        st.session_state.visit_logged = True
+
     # Auto-refresh every 24 hours
     REFRESH_INTERVAL = 86400
     if "last_refresh" not in st.session_state:
@@ -920,8 +992,9 @@ def _bobby_chat_fragment(data_folder):
         st.session_state.chat_messages.append({"role": "user", "content": prompt})
 
         with st.spinner("Bobby is thinking..."):
-            context  = get_chat_context(data_folder)
-            response, in_tok, out_tok = call_claude(st.session_state.chat_messages, context)
+            context = get_chat_context(data_folder)
+            response, in_tok, cache_read_tok, cache_write_tok, out_tok = \
+                call_claude(st.session_state.chat_messages, context)
 
         st.session_state.chat_messages.append({"role": "assistant", "content": response})
 
@@ -930,7 +1003,8 @@ def _bobby_chat_fragment(data_folder):
             user_email = st.user.email if st.user.is_logged_in else "unknown"
         except Exception:
             user_email = "unknown"
-        log_bobby_query(user_email, prompt, response, in_tok, out_tok)
+        log_bobby_query(user_email, prompt, response,
+                        in_tok, cache_read_tok, cache_write_tok, out_tok)
 
         st.rerun(scope="fragment")
 
