@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Seamfix Cash Reports Dashboard Generator
+Seamfix Cash Reports Dashboard Generator v2
 Reads all .xlsx files from a folder and generates an interactive HTML dashboard.
+Includes USD investment portfolio in total cash position (fix: Mar 2026).
 Usage: python3 generate_dashboard.py [folder_path]
 """
 
