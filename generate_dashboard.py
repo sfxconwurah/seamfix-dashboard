@@ -304,12 +304,13 @@ def generate_insights(reports):
         pct = (first_cash - last_cash) / first_cash * 100
         insights.append(f"Cash position declined {pct:.0f}% from {fmt_naira(first_cash)} to {fmt_naira(last_cash)}. Peak was {fmt_naira(peak_cash)} on {peak_wk['date_str']}.")
 
-    # Revenue concentration analysis
+    # Revenue concentration analysis (exclude investment liquidations — asset conversions, not revenue)
     all_sources = {}
     for r in reports:
         for k, v in r.get('inflow_items', {}).items():
-            all_sources.setdefault(k, 0)
-            all_sources[k] += v
+            if not is_investment_inflow(k):
+                all_sources.setdefault(k, 0)
+                all_sources[k] += v
     total_rev = sum(all_sources.values())
     if total_rev > 0:
         sorted_sources = sorted(all_sources.items(), key=lambda x: -x[1])
@@ -323,18 +324,19 @@ def generate_insights(reports):
                 names = ', '.join([f"{s[0]} ({fmt_naira(s[1])})" for s in new_streams])
                 insights.append(f"Emerging revenue streams showing promise: {names}.")
 
-    # Expense analysis
+    # Expense analysis (exclude investment transfers — asset reallocation, not operational expense)
     all_expenses = {}
     for r in reports:
         for k, v in r.get('outflow_items', {}).items():
-            all_expenses.setdefault(k, 0)
-            all_expenses[k] += v
+            if not is_investment_outflow(k):
+                all_expenses.setdefault(k, 0)
+                all_expenses[k] += v
     total_exp = sum(all_expenses.values())
     if total_exp > 0:
         sorted_exp = sorted(all_expenses.items(), key=lambda x: -x[1])
         top3 = sorted_exp[:3]
         parts = ', '.join([f"{e[0]} ({e[1]/total_exp*100:.0f}%)" for e in top3])
-        insights.append(f"Top 3 expense categories over the period: {parts}.")
+        insights.append(f"Top 3 operational expense categories over the period: {parts}.")
 
     # Average weekly burn and runway (using operational burn, excluding investment outflows)
     op_burns_ins = []
@@ -423,11 +425,13 @@ def generate_takeaways(reports):
     takeaways.append({'title': 'Cash Position & Trajectory', 'headline': headline, 'body': body, 'urgency': urgency, 'icon': '\U0001F4B0'})
 
     # --- 2. REVENUE CONCENTRATION RISK ---
+    # Exclude investment liquidations — these are asset conversions, not revenue
     all_sources = {}
     for r in reports:
         for k, v in r.get('inflow_items', {}).items():
-            all_sources.setdefault(k, 0)
-            all_sources[k] += v
+            if not is_investment_inflow(k):
+                all_sources.setdefault(k, 0)
+                all_sources[k] += v
     total_rev = sum(all_sources.values())
 
     if total_rev > 0:
@@ -461,7 +465,7 @@ def generate_takeaways(reports):
 
         body = f"Across the period, {num_sources} meaningful revenue streams identified. "
 
-        # New/emerging streams
+        # New/emerging streams (exclude investment liquidations — asset conversions, not revenue)
         recent_new = set()
         for i in range(max(0, len(reports)-3), len(reports)):
             curr_keys = set(reports[i].get('inflow_items', {}).keys())
@@ -471,7 +475,7 @@ def generate_takeaways(reports):
                     prev_keys.update(reports[j].get('inflow_items', {}).keys())
                 new = curr_keys - prev_keys
                 for n in new:
-                    if reports[i]['inflow_items'].get(n, 0) > 5_000_000:
+                    if not is_investment_inflow(n) and reports[i]['inflow_items'].get(n, 0) > 5_000_000:
                         recent_new.add(n)
         if recent_new:
             body += f"Recently emerged: {', '.join(recent_new)}. These need nurturing to reduce dependency on {top[0]}. "
@@ -570,8 +574,8 @@ def generate_takeaways(reports):
     runway_weeks = last_cash / avg_op_burn if avg_op_burn > 0 else float('inf')
     runway_months = runway_weeks / 4.3
 
-    # Investment balance
-    inv_balance = latest.get('investment_ngn', 0)
+    # Investment balance (NGN + USD portfolios)
+    inv_balance = latest.get('investment_ngn', 0) + latest.get('investment_usd_ngn', 0)
     liquid_cash = latest.get('liquid_cash_ngn', 0)
 
     if runway_weeks < 8:
@@ -585,9 +589,7 @@ def generate_takeaways(reports):
         headline = f"Healthy runway of {runway_weeks:.0f} weeks ({runway_months:.0f} months) at operational burn rate"
 
     body = f"Total position: {fmt_naira(last_cash)} (liquid: {fmt_naira(liquid_cash)}, investments: {fmt_naira(inv_balance)}). "
-    body += f"Operational burn (excl. investments): {fmt_naira(avg_op_burn)}/week. "
-    if abs(avg_op_burn - avg_total_burn) > 10_000_000:
-        body += f"Total burn including investment outflows: {fmt_naira(avg_total_burn)}/week. "
+    body += f"Operational burn (excl. investment transfers): {fmt_naira(avg_op_burn)}/week. "
 
     # FX exposure
     usd_pct = latest.get('usd_closing_ngn', 0) / last_cash * 100 if last_cash > 0 else 0
@@ -1233,9 +1235,10 @@ def main():
         net_inv_out = max(0, inv_out - inv_in)
         r['investment_outflow'] = inv_out
         r['investment_inflow'] = inv_in
-        # Add back net investment outflow to reflect true position
-        # (bank cash is reduced, but investment asset is created)
-        r['total_cash_ngn'] = r.get('liquid_cash_ngn', 0) + r.get('investment_ngn', 0) + r.get('investment_usd_ngn', 0) + net_inv_out
+        # total_cash_ngn = liquid cash + NGN investments + USD investments (both closing balances
+        # from the Cash Report sheet). net_inv_out is NOT added back here because the investment
+        # portfolio closing balances already reflect any money transferred into them during the week.
+        r['total_cash_ngn'] = r.get('liquid_cash_ngn', 0) + r.get('investment_ngn', 0) + r.get('investment_usd_ngn', 0)
 
     print(f"\nExtracted {len(reports)} weeks")
 
