@@ -101,7 +101,7 @@ def extract_report(filepath):
 
     # === CASH REPORT SHEET ===
     ws = wb['Cash Report']
-    for row in ws.iter_rows(min_row=5, max_row=50, values_only=False):
+    for row in ws.iter_rows(min_row=5, max_row=70, values_only=False):
         cells = safe_row_dict(row)
         c_str = str(cells.get('C', '') or '').strip()
         b_str = str(cells.get('B', '') or '').strip()
@@ -120,7 +120,12 @@ def extract_report(filepath):
             rec['usd_raw'] = sf(cells.get('D'))
 
         if 'TOTAL INVESTMENT' in b_str:
-            rec['investment_ngn'] = sf(cells.get('J'))
+            if 'USD' in b_str.upper():
+                # USD investments: closing balance is in column H (different layout from cash section)
+                rec['investment_usd_raw'] = sf(cells.get('H'))
+            else:
+                # NGN investments: closing balance is in column J (standard layout)
+                rec['investment_ngn'] = sf(cells.get('J'))
 
     # FX rate - scan USD rows for exchange rate
     rec['fx_rate'] = 1.0
@@ -141,8 +146,17 @@ def extract_report(filepath):
             rec['gbp_closing_ngn'] = sf(cells.get('J'))
             break
 
-    # Total cash position in NGN equivalent (including investments as cash equivalents)
-    rec['total_cash_ngn'] = rec.get('ngn_closing', 0) + rec.get('usd_closing_ngn', 0) + rec.get('gbp_closing_ngn', 0) + rec.get('investment_ngn', 0)
+    # USD investments converted to NGN (FX rate must be resolved first)
+    rec['investment_usd_ngn'] = rec.get('investment_usd_raw', 0) * rec.get('fx_rate', 1)
+
+    # Total cash position in NGN equivalent (liquid cash + all investments)
+    rec['total_cash_ngn'] = (
+        rec.get('ngn_closing', 0)
+        + rec.get('usd_closing_ngn', 0)
+        + rec.get('gbp_closing_ngn', 0)
+        + rec.get('investment_ngn', 0)
+        + rec.get('investment_usd_ngn', 0)
+    )
     # Also keep a liquid-only view for reference
     rec['liquid_cash_ngn'] = rec.get('ngn_closing', 0) + rec.get('usd_closing_ngn', 0) + rec.get('gbp_closing_ngn', 0)
 
