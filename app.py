@@ -710,7 +710,7 @@ def generate_dashboard(script_name, data_folder, output_name):
 
     import subprocess
     result = subprocess.run(
-        [sys.executable, str(script_path), data_folder],
+        [sys.executable, "-B", str(script_path), data_folder],  # -B: bypass .pyc bytecode cache
         capture_output=True, text=True, timeout=60,
     )
 
