@@ -270,8 +270,10 @@ CATEGORY_MAP = {
 }
 
 
-def map_expense_to_budget(expense_name, outflow_items_all):
-    """Map a cash report expense name to a budget category using keyword matching."""
+def map_expense_to_budget(expense_name, outflow_items_all, budget_cats=None):
+    """Map a cash report expense name to a budget category using keyword matching.
+    budget_cats: dict of {category: annual_ngn} to use for fuzzy matching.
+                 Defaults to the hardcoded BUDGET_CATEGORIES if not provided."""
     if not expense_name:
         return None
 
@@ -291,9 +293,10 @@ def map_expense_to_budget(expense_name, outflow_items_all):
             return budget_cat
 
     # 3. Fuzzy match as last resort (raised threshold to 0.6 to reduce false positives)
+    cats = budget_cats if budget_cats is not None else BUDGET_CATEGORIES
     best_match = None
     best_ratio = 0.0
-    for budget_cat in BUDGET_CATEGORIES.keys():
+    for budget_cat in cats.keys():
         ratio = SequenceMatcher(None, expense_lower, budget_cat.lower()).ratio()
         if ratio > best_ratio:
             best_ratio = ratio
@@ -307,6 +310,22 @@ def map_expense_to_budget(expense_name, outflow_items_all):
 
 def generate_html(budget_items, reports, output_path):
     """Generate the budget vs actual dashboard HTML."""
+
+    # ── Resolve effective budget from live Excel data ────────────────────
+    # budget_items comes from extract_budget() which reads the 'Budget Summary'
+    # sheet. We use those live values so that budget updates in Excel are
+    # automatically reflected without touching the code.
+    # Excluded: aggregate rows like 'TOTAL EXPENSE BUDGETS'.
+    # Fallback: hardcoded BUDGET_CATEGORIES if the Excel file is unavailable.
+    SKIP_ROWS = {'TOTAL EXPENSE BUDGETS', 'TOTAL'}
+    if budget_items:
+        live_cats = {k: v for k, v in budget_items.items()
+                     if k.strip().upper() not in SKIP_ROWS and v > 0}
+        # Merge: live values take precedence. Keep zero-value hardcoded categories
+        # so that expense-mapping logic referencing them doesn't break.
+        effective_budget = {**BUDGET_CATEGORIES, **live_cats}
+    else:
+        effective_budget = BUDGET_CATEGORIES
 
     # Calculate weeks elapsed
     weeks_elapsed = len(reports)
@@ -341,7 +360,7 @@ def generate_html(budget_items, reports, output_path):
     }
 
     # Aggregate actual spend by budget category
-    category_actual = {cat: 0 for cat in BUDGET_CATEGORIES.keys()}
+    category_actual = {cat: 0 for cat in effective_budget.keys()}
     all_expense_lines = []   # For deep dive table
     unbudgeted_lines = []    # Expense lines with no matching budget category
     weekly_spends = []       # For trend chart
@@ -351,9 +370,11 @@ def generate_html(budget_items, reports, output_path):
         for expense_name, amount in r.get('outflow_items', {}).items():
             if amount <= 0:
                 continue
-            budget_cat = map_expense_to_budget(expense_name, r.get('outflow_items', {}))
+            budget_cat = map_expense_to_budget(expense_name, r.get('outflow_items', {}),
+                                               budget_cats=effective_budget)
 
             if budget_cat:
+                category_actual.setdefault(budget_cat, 0)
                 category_actual[budget_cat] += amount
                 week_spend += amount
                 all_expense_lines.append({
@@ -373,7 +394,7 @@ def generate_html(budget_items, reports, output_path):
         weekly_spends.append(week_spend)
 
     # Calculate KPIs
-    total_budget = sum(BUDGET_CATEGORIES.values())
+    total_budget = sum(effective_budget.values())
     total_actual = sum(category_actual.values())
     ytd_budget_pace = total_budget * weeks_elapsed / 52
     variance_amount = ytd_budget_pace - total_actual
@@ -387,10 +408,10 @@ def generate_html(budget_items, reports, output_path):
 
     # Calculate per-category metrics
     category_metrics = []
-    for cat in sorted(BUDGET_CATEGORIES.keys()):
-        annual_budget = BUDGET_CATEGORIES[cat]
+    for cat in sorted(effective_budget.keys()):
+        annual_budget = effective_budget[cat]
         ytd_budget = annual_budget * weeks_elapsed / 52
-        ytd_actual = category_actual[cat]
+        ytd_actual = category_actual.get(cat, 0)
         variance = ytd_budget - ytd_actual
         pct_used = (ytd_actual / ytd_budget * 100) if ytd_budget > 0 else 0
         # Annual envelope view: how much of the full-year approved budget is consumed
@@ -412,7 +433,7 @@ def generate_html(budget_items, reports, output_path):
     # Strategic bucket totals
     bucket_totals = {}
     for bucket, cats in STRATEGIC_BUCKETS.items():
-        b_budget = sum(BUDGET_CATEGORIES.get(c, 0) for c in cats)
+        b_budget = sum(effective_budget.get(c, 0) for c in cats)
         b_actual = sum(category_actual.get(c, 0) for c in cats)
         b_remaining = b_budget - b_actual
         b_pct = (b_actual / b_budget * 100) if b_budget > 0 else 0

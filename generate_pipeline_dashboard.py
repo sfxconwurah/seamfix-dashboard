@@ -85,12 +85,17 @@ def extract_revenue_data(filepath):
     current_parent = None
     current_parent_rail = ''
 
-    for row in ws.iter_rows(min_row=3, max_row=62):
+    # Scan to row 80 — sheet grows as deals are added. Break on TOTAL to avoid
+    # picking up secondary budget tables that sit below the deals table.
+    for row in ws.iter_rows(min_row=3, max_row=80):
         d = safe(row)
         name = str(d.get('B', '') or '').strip()
-        if not name or name.upper() in SECTION_HEADERS:
-            if name.upper() in SECTION_HEADERS:
-                current_parent = None
+        if not name:
+            continue
+        if name.upper() == 'TOTAL':
+            break  # Stop — everything below is a different table
+        if name.upper() in SECTION_HEADERS:
+            current_parent = None
             continue
 
         sn = sf(d.get('A'))
