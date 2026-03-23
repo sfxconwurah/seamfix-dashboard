@@ -1235,7 +1235,7 @@ def main():
         r['investment_inflow'] = inv_in
         # Add back net investment outflow to reflect true position
         # (bank cash is reduced, but investment asset is created)
-        r['total_cash_ngn'] = r.get('liquid_cash_ngn', 0) + r.get('investment_ngn', 0) + net_inv_out
+        r['total_cash_ngn'] = r.get('liquid_cash_ngn', 0) + r.get('investment_ngn', 0) + r.get('investment_usd_ngn', 0) + net_inv_out
 
     print(f"\nExtracted {len(reports)} weeks")
 
