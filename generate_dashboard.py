@@ -287,6 +287,80 @@ def detect_anomalies(reports):
     return anomalies
 
 
+def validate_reports(reports):
+    """
+    Sanity-check parsed reports and return a list of data quality warnings.
+    These surface in the dashboard as a visible banner so parsing failures
+    are caught immediately — before leadership acts on wrong numbers.
+
+    Returns a list of dicts: {level: 'error'|'warning', report: date_str, message: str}
+    """
+    warnings = []
+    if not reports:
+        return warnings
+
+    totals = [r.get('total_cash_ngn', 0) for r in reports]
+    median_total = sorted(totals)[len(totals) // 2]
+
+    for i, r in enumerate(reports):
+        wk = r['date_str']
+        total = r.get('total_cash_ngn', 0)
+        liquid = r.get('liquid_cash_ngn', 0)
+        usd_raw = r.get('investment_usd_raw', 0)
+        ngn_close = r.get('ngn_closing', 0)
+
+        # 1. NGN closing balance not found — sheet structure may have changed
+        if ngn_close == 0:
+            warnings.append({
+                'level': 'error', 'report': wk,
+                'message': f"NGN closing balance is zero — 'TOTAL CASH (NGN)' row not found. "
+                           f"The Cash Report sheet layout may have changed."
+            })
+
+        # 2. USD investment portfolio not detected
+        if usd_raw == 0:
+            warnings.append({
+                'level': 'error', 'report': wk,
+                'message': f"USD investment portfolio not found (expected ~$1.25M+). "
+                           f"Check that 'TOTAL INVESTMENT (USD)' row is within rows 5–70 of the Cash Report sheet."
+            })
+
+        # 3. Total implausibly low vs historical median
+        if median_total > 0 and total < median_total * 0.4 and total > 0:
+            warnings.append({
+                'level': 'error', 'report': wk,
+                'message': f"Total cash position of {fmt_naira(total)} is less than 40% of the historical median "
+                           f"({fmt_naira(median_total)}). Likely a parsing failure — verify the source file."
+            })
+
+        # 4. Implausible week-on-week drop (>40%) not explained by investment activity
+        if i > 0:
+            prev_total = reports[i-1].get('total_cash_ngn', 0)
+            if prev_total > 0:
+                wow_chg = (total - prev_total) / prev_total
+                inv_out = get_investment_outflows(r.get('outflow_items', {}))
+                inv_in = get_investment_inflows(r.get('inflow_items', {}))
+                # Only flag if the drop can't be explained by a large investment outflow
+                if wow_chg < -0.4 and inv_out < abs(total - prev_total) * 0.5:
+                    warnings.append({
+                        'level': 'warning', 'report': wk,
+                        'message': f"Cash position dropped {abs(wow_chg)*100:.0f}% WoW "
+                                   f"({fmt_naira(prev_total)} → {fmt_naira(total)}) without a matching "
+                                   f"investment transfer. Confirm the source file is correct."
+                    })
+
+        # 5. FX rate looks implausible (outside ₦800–₦3000/$)
+        fx = r.get('fx_rate', 0)
+        if fx > 0 and (fx < 800 or fx > 3000):
+            warnings.append({
+                'level': 'warning', 'report': wk,
+                'message': f"FX rate of ₦{fx:,.0f}/$ looks implausible. "
+                           f"USD-denominated balances may be misconverted."
+            })
+
+    return warnings
+
+
 def generate_insights(reports):
     if len(reports) < 2:
         return ["Insufficient data for trend analysis. Need at least 2 weeks."]
@@ -645,7 +719,7 @@ def generate_takeaways(reports):
     return takeaways
 
 
-def generate_html(reports, anomalies, insights, takeaways, output_path):
+def generate_html(reports, anomalies, insights, takeaways, output_path, data_warnings=None):
     dates = [r['date_str'] for r in reports]
     cash_positions = [r.get('total_cash_ngn', 0) or r.get('closing_balance', 0) for r in reports]
     ngn_positions = [r.get('ngn_closing', 0) for r in reports]
@@ -849,6 +923,31 @@ def generate_html(reports, anomalies, insights, takeaways, output_path):
     latest_report_date = reports[-1]['date_str']
     first_report_date  = reports[0]['date_str']
 
+    # ── Build data-quality warning banner ───────────────────────────────
+    data_warnings_html = ""
+    if data_warnings:
+        error_items = [w for w in data_warnings if w['level'] == 'error']
+        warn_items  = [w for w in data_warnings if w['level'] == 'warning']
+        banner_bg   = "#7f1d1d" if error_items else "#78350f"   # dark red / dark amber
+        banner_border = "#ef4444" if error_items else "#f59e0b"
+        banner_icon = "🚨" if error_items else "⚠️"
+        banner_label = "DATA QUALITY ERRORS" if error_items else "DATA QUALITY WARNINGS"
+        rows_html = ""
+        for w in data_warnings:
+            icon = "🔴" if w['level'] == 'error' else "🟡"
+            rows_html += (f"<div style='margin-top:6px;font-size:13px;color:#fef2f2'>"
+                          f"{icon} <strong>[{w['report']}]</strong> {w['message']}</div>")
+        data_warnings_html = (
+            f"<div style='margin:0 0 20px 0;padding:16px 20px;background:{banner_bg};"
+            f"border:1px solid {banner_border};border-radius:8px;'>"
+            f"<div style='font-size:14px;font-weight:700;color:#fef2f2'>"
+            f"{banner_icon} {banner_label} — Numbers below may be incorrect</div>"
+            f"{rows_html}"
+            f"<div style='margin-top:10px;font-size:12px;color:#fca5a5'>"
+            f"Action: Check the source Excel file for the affected week(s) and click Regenerate.</div>"
+            f"</div>"
+        )
+
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -997,6 +1096,7 @@ tbody tr:hover{{background:transparent!important}}
 
 <!-- old nav-bar replaced by top-nav -->
 
+{data_warnings_html}
 <div class="kpi-grid">
 <div class="kpi-card">
 <div class="kpi-label">Total Position (incl. Investments)</div>
@@ -1257,8 +1357,20 @@ def main():
     insights = generate_insights(reports)
     takeaways = generate_takeaways(reports)
 
+    # Data quality validation — catches parsing failures before numbers reach leadership
+    data_warnings = validate_reports(reports)
+    if data_warnings:
+        print(f"\n{'='*60}")
+        print(f"DATA QUALITY WARNINGS ({len(data_warnings)} issue(s)):")
+        for w in data_warnings:
+            prefix = "ERROR  " if w['level'] == 'error' else "WARNING"
+            print(f"  [{prefix}] [{w['report']}] {w['message']}")
+        print(f"{'='*60}")
+    else:
+        print(f"\nData validation: OK — all {len(reports)} reports look clean.")
+
     out_path = os.path.join(folder, 'dashboard.html')
-    generate_html(reports, anomalies, insights, takeaways, out_path)
+    generate_html(reports, anomalies, insights, takeaways, out_path, data_warnings=data_warnings)
     print(f"\nDashboard: {out_path}")
 
     # Also copy to outputs if available

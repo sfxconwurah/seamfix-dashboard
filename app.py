@@ -718,6 +718,28 @@ def generate_dashboard(script_name, data_folder, output_name):
         st.error(f"Generator error: {result.stderr[-500:]}")
         return None
 
+    # Surface any data-quality warnings emitted by validate_reports()
+    # These indicate parsing failures that could produce wrong numbers.
+    stdout = result.stdout or ""
+    if "DATA QUALITY" in stdout:
+        # Extract the warning block between the ===...=== lines
+        lines = stdout.splitlines()
+        in_block = False
+        warn_lines = []
+        for line in lines:
+            if line.startswith("=" * 10):
+                in_block = not in_block
+                continue
+            if in_block:
+                warn_lines.append(line.strip())
+        if warn_lines:
+            is_error = any("[ERROR" in l for l in warn_lines)
+            msg = "\n".join(warn_lines)
+            if is_error:
+                st.error(f"⚠️ **Data quality errors detected** — numbers may be incorrect.\n\n{msg}")
+            else:
+                st.warning(f"⚠️ **Data quality warnings** — verify source files.\n\n{msg}")
+
     generated_file = Path(data_folder) / output_name
     if generated_file.exists():
         return generated_file.read_text(encoding="utf-8")

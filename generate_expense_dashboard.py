@@ -369,10 +369,10 @@ def generate_html(all_weekly_data, all_vendors, all_categories_by_week, kpis, ou
     large_payments.sort(key=lambda x: x["amount"], reverse=True)
 
     # Executive takeaways
-    # Use sum of ALL categories as the denominator — kpis["total_ytd"] only sums
-    # vendor payment batches, not all outflow line items (e.g. salary, bank charges).
-    # Using it as a base makes any non-vendor category appear falsely inflated (>100%).
-    total_all_categories = sum(ytd_by_category.values()) or 1
+    # Use sum of OPERATIONAL categories as the denominator — exclude "Investment Outflows"
+    # which are asset transfers (not operational expenses). Including them would understate
+    # salary %, vendor concentration, and bank charges as a share of real operating spend.
+    total_all_categories = sum(v for k, v in ytd_by_category.items() if k != "Investment Outflows") or 1
 
     top_5_spend = sum(v[1] for v in vendor_totals[:5])
     vendor_concentration = (top_5_spend / total_all_categories * 100)

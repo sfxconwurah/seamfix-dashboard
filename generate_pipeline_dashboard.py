@@ -205,6 +205,12 @@ def generate_html(revenues, output_path):
     generated_at = datetime.now().strftime('%d %b %Y, %H:%M')
     today = datetime.now().strftime('%d %b %Y')
 
+    # ── LANDING ZONE: derive from live data, not a hardcoded constant ───
+    # Uses the sum of all deal annual targets from the revenue file, so it
+    # stays in sync with generate_revenue_dashboard.py. Falls back to the
+    # module-level constant if the data is empty (shouldn't happen in prod).
+    LANDING_ZONE = sum(r['annual_usd'] for r in revenues) or globals()['LANDING_ZONE']
+
     # ── STATUS BUCKETS ──────────────────────────────────────────────
     buckets = {}
     for r in revenues:
