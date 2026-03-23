@@ -86,17 +86,23 @@ def extract_revenue_data(revenue_file):
     revenues = []
     current_parent = None  # Track parent deal for sub-items
 
-    # Section headers to skip
+    # Section headers to skip (but not TOTAL — hitting TOTAL means we stop scanning)
     SECTION_HEADERS = {"ANCHOR DEALS", "EXISTING CUSTOMERS", "DEALS FROM 2025", "NEW BUSINESS"}
 
-    # Rows with data: 3 to 61 (Row 62 is TOTAL)
-    for row_idx in range(3, 62):
+    # Scan up to row 80 — sheet previously ended at row 62 but grows as new deals are added.
+    # We BREAK on the TOTAL row to avoid picking up secondary tables (e.g. monthly budget
+    # breakdown) that sit below the main deals table in the same sheet.
+    for row_idx in range(3, 80):
         row = ws[row_idx]
         cells = safe_row_dict(row)
 
         # Skip if E is None and this looks like a subtotal (Column A is empty)
         sn = sf(cells.get('A'))
         name = cells.get('B')
+
+        # Stop at the TOTAL row — everything below is a different table
+        if name and str(name).strip().upper() == 'TOTAL':
+            break
 
         # Skip section headers
         if name and str(name).strip() in SECTION_HEADERS:
