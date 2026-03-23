@@ -629,23 +629,28 @@ def fetch_drive_folder_files(folder_id):
         downloaded = {}
         for f in all_files:
             fname = f["name"]
-            if f["mimeType"] == GSHEET_MIME:
-                buf = io.BytesIO()
-                downloader = MediaIoBaseDownload(buf, service.files().export_media(fileId=f["id"], mimeType=XLSX_MIME))
-                done = False
-                while not done:
-                    _, done = downloader.next_chunk()
-                if not fname.endswith(".xlsx"):
-                    fname += ".xlsx"
-            else:
-                buf = io.BytesIO()
-                downloader = MediaIoBaseDownload(buf, service.files().get_media(fileId=f["id"]))
-                done = False
-                while not done:
-                    _, done = downloader.next_chunk()
-            downloaded[fname] = buf.getvalue()
+            try:
+                if f["mimeType"] == GSHEET_MIME:
+                    buf = io.BytesIO()
+                    downloader = MediaIoBaseDownload(buf, service.files().export_media(fileId=f["id"], mimeType=XLSX_MIME))
+                    done = False
+                    while not done:
+                        _, done = downloader.next_chunk()
+                    if not fname.endswith(".xlsx"):
+                        fname += ".xlsx"
+                else:
+                    buf = io.BytesIO()
+                    downloader = MediaIoBaseDownload(buf, service.files().get_media(fileId=f["id"]))
+                    done = False
+                    while not done:
+                        _, done = downloader.next_chunk()
+                downloaded[fname] = buf.getvalue()
+            except Exception as file_err:
+                debug_log.append(f"Skipped '{fname}': {file_err}")
 
         debug_log.append(f"Successfully downloaded {len(downloaded)} files")
+        if not downloaded:
+            return None, debug_log
         return downloaded, debug_log
 
     except KeyError:
