@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seamfix Revenue & Fundability Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:linear-gradient(135deg,#0f172a,#1e293b);color:#e2e8f0;padding:0;min-height:100vh}
+.container{max-width:1600px;margin:0 auto;padding:0 28px 28px}
+.header{margin-bottom:32px;padding-bottom:20px;border-bottom:2px solid rgba(0,212,170,0.2)}
+.header h1{font-size:2.4em;font-weight:700;background:linear-gradient(135deg,#00D4AA,#4ECDC4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}
+.header .sub{color:#94a3b8;font-size:0.95em}
+.header .meta{color:#64748b;font-size:0.8em;margin-top:6px}
+
+.nav-bar{display:none!important}
+
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:36px}
+.kpi-card{background:linear-gradient(135deg,rgba(30,41,59,0.9),rgba(15,23,42,0.9));border:1px solid rgba(0,212,170,0.15);border-radius:12px;padding:22px;transition:all 0.3s ease}
+.kpi-card:hover{border-color:rgba(0,212,170,0.4);transform:translateY(-3px);box-shadow:0 8px 30px rgba(0,212,170,0.1)}
+.kpi-label{font-size:0.78em;color:#94a3b8;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px;font-weight:600}
+.kpi-value{font-size:1.4em;font-weight:700;color:#00D4AA;margin-bottom:6px}
+.kpi-value.negative{color:#FF6B6B}
+.kpi-secondary{font-size:0.85em;color:#64748b;margin-bottom:4px}
+.kpi-change{font-size:0.82em;color:#94a3b8}
+
+.charts-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(480px,1fr));gap:20px;margin-bottom:36px}
+.chart-box{background:linear-gradient(135deg,rgba(30,41,59,0.9),rgba(15,23,42,0.9));border:1px solid rgba(0,212,170,0.15);border-radius:12px;padding:22px;min-height:380px}
+.chart-box h3{font-size:1em;font-weight:600;margin-bottom:16px;color:#cbd5e1}
+
+.section{background:linear-gradient(135deg,rgba(30,41,59,0.9),rgba(15,23,42,0.9));border:1px solid rgba(0,212,170,0.15);border-radius:12px;padding:24px;margin-bottom:24px}
+.section h2{font-size:1.3em;margin-bottom:16px;color:#00D4AA}
+
+.fundability-section{border-color:rgba(78,205,196,0.2)}
+.fundability-section h2{color:#4ECDC4}
+
+
+
+.scenario-label{font-size:0.8em;color:#94a3b8;text-transform:uppercase;margin-bottom:10px;font-weight:600}
+.scenario-value{font-size:1.2em;font-weight:700;color:#00D4AA;margin-bottom:4px}
+.scenario-secondary{font-size:0.75em;color:#64748b;margin-bottom:6px}
+.scenario-coverage{font-size:0.9em;color:#4ECDC4;margin-bottom:4px}
+.scenario-gap{font-size:0.85em;color:#FFE66D}
+
+.gauge{width:100%;height:24px;background:rgba(0,0,0,0.3);border-radius:12px;overflow:hidden;margin-top:8px}
+.gauge-fill{height:100%;background:linear-gradient(90deg,#FF6B6B,#FFE66D,#00D4AA);border-radius:12px;transition:width 0.3s}
+
+.action-card{background:rgba(255,107,107,0.05);border-left:4px solid #FF6B6B;border-radius:8px;padding:16px;margin-bottom:12px}
+.action-header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.action-icon{font-size:1.2em}
+.action-title{font-size:0.9em;font-weight:700;color:#cbd5e1;text-transform:uppercase;letter-spacing:0.5px}
+.action-badge{font-size:0.7em;font-weight:700;padding:3px 10px;border-radius:12px;letter-spacing:0.5px}
+.action-description{font-size:0.85em;color:#94a3b8;line-height:1.6}
+
+.takeaways-section{margin-bottom:36px}
+.takeaways-section h2{font-size:1.4em;margin-bottom:16px;color:#FFE66D;display:flex;align-items:center;gap:10px}
+.takeaways-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(440px,1fr));gap:16px}
+.takeaway-card{background:linear-gradient(135deg,rgba(30,41,59,0.95),rgba(15,23,42,0.95));border:1px solid rgba(0,212,170,0.1);border-left:4px solid #64748b;border-radius:10px;padding:20px;transition:all 0.3s ease}
+.takeaway-card:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(0,0,0,0.2)}
+.tw-header{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.tw-icon{font-size:1.2em}
+.tw-title{font-size:0.82em;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8}
+.tw-badge{font-size:0.7em;font-weight:700;padding:3px 10px;border-radius:12px;letter-spacing:0.5px}
+.tw-headline{font-size:1.05em;font-weight:600;margin-bottom:8px;line-height:1.4}
+.tw-body{font-size:0.88em;color:#94a3b8;line-height:1.65}
+
+table{width:100%;border-collapse:collapse;font-size:0.85em}
+thead{background:rgba(0,212,170,0.08)}
+th{padding:10px 12px;text-align:left;font-weight:600;color:#00D4AA;border-bottom:2px solid rgba(0,212,170,0.15)}
+td{padding:10px 12px;border-bottom:1px solid rgba(0,212,170,0.06);color:#cbd5e1}
+tbody tr:hover{background:rgba(0,212,170,0.04)}
+.positive{color:#00D4AA}
+.negative{color:#FF6B6B}
+
+th.sortable{cursor:pointer;user-select:none}
+th.sortable:hover{color:#FFE66D}
+th.sort-asc::after{content:' ▲';font-size:0.7em}
+th.sort-desc::after{content:' ▼';font-size:0.7em}
+
+.top-nav{background:#0a0f1e;border-bottom:1px solid #334155;padding:0 24px;display:flex;align-items:center;height:48px;overflow-x:auto;position:sticky;top:0;z-index:200}
+.top-nav-brand{color:#e2e8f0;font-weight:700;font-size:15px;margin-right:24px;white-space:nowrap;text-decoration:none}
+.top-nav-link{color:#94a3b8;text-decoration:none;padding:0 14px;height:48px;display:flex;align-items:center;font-size:13px;border-bottom:2px solid transparent;white-space:nowrap;transition:color .2s}
+.top-nav-link:hover{color:#e2e8f0}
+.top-nav-link.active{color:#fff;border-bottom-color:#00D4AA;font-weight:500}
+.pdf-btn{display:none!important}
+
+@media(max-width:1024px){.charts-grid{grid-template-columns:1fr}.kpi-grid{grid-template-columns:repeat(2,1fr)}.takeaways-grid{grid-template-columns:1fr}}
+@media(max-width:640px){.kpi-grid{grid-template-columns:1fr}.header h1{font-size:1.6em}.nav-bar{flex-wrap:wrap}}
+
+@media print{
+.pdf-btn{display:none!important}
+#revenueSearch{display:none!important}
+#searchResults{display:none!important}
+*{color-adjust:exact!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+body{background:#fff!important;color:#1e293b!important;padding:12px!important;font-size:9pt!important}
+.container{max-width:100%}
+.header h1{font-size:1.6em!important;background:none!important;-webkit-text-fill-color:#0f172a!important;color:#0f172a!important}
+.header .sub,.header .meta{color:#475569!important}
+.nav-bar{background:#f8fafc!important;border-color:#e2e8f0!important;display:none!important}
+.kpi-grid{grid-template-columns:repeat(6,1fr)!important;gap:8px!important;margin-bottom:16px!important}
+.kpi-card{background:#f8fafc!important;border:1px solid #e2e8f0!important;padding:12px!important;box-shadow:none!important;page-break-inside:avoid}
+.kpi-label{color:#475569!important;font-size:0.65em!important}
+.kpi-value{color:#0f172a!important;font-size:1.2em!important}
+.kpi-value.negative{color:#dc2626!important}
+.kpi-secondary{color:#64748b!important;font-size:0.7em!important}
+.takeaways-section{page-break-inside:avoid}
+.takeaways-section h2{color:#0f172a!important;font-size:1.1em!important}
+.takeaways-grid{grid-template-columns:repeat(2,1fr)!important}
+.takeaway-card{background:#f8fafc!important;border:1px solid #e2e8f0!important;padding:14px!important;page-break-inside:avoid}
+.tw-title{color:#475569!important}
+.tw-body{color:#475569!important}
+.charts-grid{grid-template-columns:repeat(2,1fr)!important;margin-bottom:16px!important}
+.chart-box{background:#fff!important;border:1px solid #e2e8f0!important;padding:14px!important;min-height:auto!important;page-break-inside:avoid}
+.section{background:#f8fafc!important;border:1px solid #e2e8f0!important;padding:16px!important;page-break-inside:avoid}
+.section h2{color:#0f172a!important}
+.fundability-section{border-color:#b3e5fc!important}
+
+
+.scenario-label{color:#475569!important}
+.scenario-value{color:#0f172a!important}
+.scenario-secondary{color:#64748b!important}
+.scenario-coverage{color:#0f172a!important}
+.scenario-gap{color:#ea580c!important}
+.action-card{background:#fef2f2!important;border-color:#fca5a5!important}
+.action-title{color:#0f172a!important}
+.action-description{color:#475569!important}
+table{font-size:0.75em!important}
+thead{background:#f1f5f9!important}
+th{color:#0f172a!important;border-bottom-color:#cbd5e1!important}
+td{color:#334155!important;border-bottom-color:#e2e8f0!important}
+tbody tr:hover{background:transparent!important}
+}
+.dashboard-footer{margin-top:48px;padding:20px 28px;border-top:1px solid #334155;color:#94a3b8;font-size:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.dashboard-footer span{color:#94a3b8}
+/* ── HEADER: match Pipeline Intelligence style ── */
+.header{padding:24px 28px 16px!important;border-bottom:1px solid #334155!important;margin-bottom:24px!important;background:none!important}
+.header h1{font-size:22px!important;font-weight:700!important;background:none!important;-webkit-background-clip:unset!important;-webkit-text-fill-color:#e2e8f0!important;color:#e2e8f0!important;margin-bottom:4px!important}
+.header .sub{font-size:13px!important;color:#94a3b8!important}
+.header .meta{font-size:12px!important;color:#94a3b8!important;margin-top:4px!important}
+.header p{font-size:13px!important;color:#94a3b8!important;margin-top:4px!important}
+</style>
+</head>
+<body>
+<nav class="top-nav"><span class="top-nav-brand">⚡ Seamfix</span><a href="dashboard.html" class="top-nav-link ">Cash Overview</a><a href="expense_dashboard.html" class="top-nav-link ">Expense &amp; Vendor</a><a href="budget_dashboard.html" class="top-nav-link ">Budget vs Actual</a><a href="revenue_dashboard.html" class="top-nav-link active">Revenue &amp; Fundability</a><a href="pipeline_dashboard.html" class="top-nav-link ">Pipeline Intelligence</a></nav>
+<!-- PDF button hidden per user request -->
+
+<div class="container">
+<div class="header">
+<h1>Seamfix Revenue & Fundability Dashboard</h1>
+<div class="sub">2026 Budget Coverage Analysis &mdash; Path to Revenue (All amounts in USD with Naira equivalents)</div>
+</div>
+
+<!-- old nav-bar replaced by top-nav -->
+
+<div class="kpi-grid">
+<div class="kpi-card">
+<div class="kpi-label">Annual Revenue Target</div>
+<div class="kpi-value">$10.00M</div>
+<div class="kpi-secondary">₦14.50B</div>
+<div class="kpi-change">47 streams across pipeline</div>
+</div>
+<div class="kpi-card">
+<div class="kpi-label">YTD Actual Revenue</div>
+<div class="kpi-value">$1.22M</div>
+<div class="kpi-secondary">₦1.77B</div>
+<div class="kpi-change">Through 13 Mar 2026</div>
+</div>
+<div class="kpi-card">
+<div class="kpi-label">Annual Progress</div>
+<div class="kpi-value">12%</div>
+<div class="kpi-secondary">$1.22M of $10.00M</div>
+<div class="kpi-change">Actual earned vs full-year target</div>
+</div>
+<div class="kpi-card">
+<div class="kpi-label">Q1 Achievement (Active Streams)</div>
+<div class="kpi-value ">101%</div>
+<div class="kpi-secondary">$1.22M vs $1.21M expected</div>
+<div class="kpi-change">30 of 47 streams active in Q1</div>
+</div>
+<div class="kpi-card">
+<div class="kpi-label">Budget Fundability Score</div>
+<div class="kpi-value ">284%</div>
+<div class="kpi-secondary">₦5.10B</div>
+<div class="kpi-change">Annual revenue / budget</div>
+</div>
+<div class="kpi-card">
+<div class="kpi-label">Funding Gap (100% conversion)</div>
+<div class="kpi-value negative">$0</div>
+<div class="kpi-secondary">₦0</div>
+<div class="kpi-change">Additional revenue needed</div>
+</div>
+</div>
+
+<div class="takeaways-section">
+<h2>📋 Executive Takeaways</h2>
+<div class="takeaways-grid">
+<div class="takeaway-card" style="border-left-color:#00D4AA">
+<div class="tw-header"><span class="tw-icon">💰</span><span class="tw-title">Fundability Assessment</span><span class="tw-badge" style="background:rgba(0,212,170,0.15);color:#00D4AA">HEALTHY</span></div>
+<div class="tw-headline" style="color:#00D4AA">Projected revenue fully funds the budget</div>
+<div class="tw-body"><ul style='margin:6px 0 0 16px;padding:0;list-style:disc'><li>Revenue target: $10.00M (₦14.50B)</li><li>Annual budget: ₦5.10B</li><li>Funding ratio: 284%</li><li>Strong revenue diversification and deal confidence</li></ul></div>
+</div><div class="takeaway-card" style="border-left-color:#FF6B6B">
+<div class="tw-header"><span class="tw-icon">📊</span><span class="tw-title">Revenue Health</span><span class="tw-badge" style="background:rgba(255,107,107,0.15);color:#FF6B6B">NEEDS ACTION</span></div>
+<div class="tw-headline" style="color:#FF6B6B">29 On Track, 3 Closed, 10 At Risk, 3 Off Track</div>
+<div class="tw-body"><ul style='margin:6px 0 0 16px;padding:0;list-style:disc'><li>Annual progress: 12% — $1.22M (₦1.77B) of $10.00M (₦14.50B)</li><li>Q1 streams on pace: 101% (30 active streams)</li><li>2 streams exceeding targets (total surplus: $535.8K)</li><li>16 streams below target (total deficit: $439.3K)</li><li><strong>Top performers:</strong> NIMC License direct sales - NGN ($226.1K), Existing contactless licenses ($147.0K), MTN AMC & Workforce IAM ( Jan - Mar 2026) ($104.7K)</li><li>15 On Track deals still in pipeline (no revenue yet)</li><li><strong>Needs attention:</strong> Change Request_Biosmart Enhancement, MTN Liberia Biosmart X implementation, AMC - BSX Upgrade</li></ul></div>
+</div><div class="takeaway-card" style="border-left-color:#FF6B6B">
+<div class="tw-header"><span class="tw-icon">⚠️</span><span class="tw-title">Risk Alerts</span><span class="tw-badge" style="background:rgba(255,107,107,0.15);color:#FF6B6B">MONITOR</span></div>
+<div class="tw-headline" style="color:#FF6B6B">Key risks to fundability</div>
+<div class="tw-body"><ul style='margin:6px 0 0 16px;padding:0;list-style:disc'><li><strong>Underperformance:</strong> NIMC Enrolment transaction fees - recurring, Change Requests significantly behind target</li><li><strong>Execution Risk:</strong> 12 major deals not yet started</li></ul></div>
+</div>
+</div>
+</div>
+
+<div class="section fundability-section">
+<h2>💼 Revenue Projection</h2>
+<p style="color:#94a3b8;margin-bottom:16px">Status-weighted projections are on <a href="pipeline_dashboard.html" style="color:#00D4AA;text-decoration:none">Pipeline Intelligence</a> — deal-level scenarios built from actual On Track / At Risk / Off Track weights are more accurate than flat conversion rates.</p>
+<div style="background:rgba(0,212,170,0.06);border:1px solid rgba(0,212,170,0.2);border-radius:10px;padding:16px 20px">
+  <div style="display:flex;gap:32px;flex-wrap:wrap">
+    <div><div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Annual Target</div><div style="font-size:1.4em;font-weight:700;color:#00D4AA">$10.00M</div></div>
+    <div><div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Budget</div><div style="font-size:1.4em;font-weight:700;color:#e2e8f0">₦5.10B</div></div>
+    <div><div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Full-conversion Coverage</div><div style="font-size:1.4em;font-weight:700;color:#00D4AA">284%</div></div>
+  </div>
+</div>
+</div>
+
+<div class="section">
+<h2>🚨 Critical Actions Engine</h2>
+<p style="color:#94a3b8;margin-bottom:16px">Auto-generated recommendations based on pipeline health and fundability scenarios.</p>
+<div class="action-card" style="border-left-color:#FFE66D">
+<div class="action-header">
+<span class="action-icon">⚠️</span>
+<span class="action-title">Underperforming Revenue Streams</span>
+<span class="action-badge" style="background:rgba(255,230,109,0.15);color:#FFE66D">WARNING</span>
+</div>
+<div class="action-description"><p style='margin-bottom:8px'>These streams are below 50% of YTD target — investigate delays and re-baseline if needed:</p><ul style='margin:0 0 0 16px;padding:0;list-style:disc'><li>Change Requests — 22% of YTD target ($3.6K vs $16.7K pace)</li><li>Annual Maintenance Services (BioSmart-X) — 0% of YTD target ($0 vs $25.2K pace)</li><li>Change Requests — 0% of YTD target ($0 vs $25.0K pace)</li><li>Ministry of Agriculture — 0% of YTD target ($0 vs $39.4K pace)</li><li>Telekom Networks (TNM) — 0% of YTD target ($0 vs $53.0K pace)</li></ul></div>
+</div><div class="action-card" style="border-left-color:#4ECDC4">
+<div class="action-header">
+<span class="action-icon">👁️</span>
+<span class="action-title">Upcoming Revenue Start Dates</span>
+<span class="action-badge" style="background:rgba(78,205,196,0.15);color:#4ECDC4">WATCH</span>
+</div>
+<div class="action-description">Monitor these deals starting soon: NIMC License sales - BNPL (NGN) (N/A), Fixiam (01 May 2026), Fixiam (01 Jul 2026). Ensure implementation is on track.</div>
+</div>
+</div>
+
+<div class="charts-grid">
+<div class="chart-box"><h3>Revenue Pipeline by Rail (USD)</h3><canvas id="railChart"></canvas></div>
+<div class="chart-box"><h3>YTD Performance vs Target (USD)</h3><canvas id="perfChart"></canvas></div>
+</div>
+
+<div class="section">
+<h2>📊 Revenue Streams Overview</h2>
+<p style="color:#94a3b8;margin-bottom:12px;font-size:0.9em">All revenue streams sorted by projected annual amount. Values in USD (₦ equivalent). Status from revenue tracker.</p>
+<div style="margin-bottom:16px">
+<input type="text" id="revenueSearch" placeholder="Search revenue streams (e.g. NIMC, MTN, Fixiam, Benin...)" style="width:100%;max-width:500px;padding:10px 16px;border-radius:8px;border:1px solid rgba(0,212,170,0.3);background:rgba(15,23,42,0.8);color:#e2e8f0;font-family:inherit;font-size:0.9em;outline:none" onfocus="this.style.borderColor='#00D4AA'" onblur="this.style.borderColor='rgba(0,212,170,0.3)'" oninput="filterRevenueTable()">
+</div>
+<table id="revenueTable">
+<thead><tr>
+<th class="sortable" onclick="sortTable('revenueTable',0,'text')">Revenue Stream</th>
+<th class="sortable" onclick="sortTable('revenueTable',1,'text')">Rail</th>
+<th class="sortable" onclick="sortTable('revenueTable',2,'text')">Start Date</th>
+<th class="sortable" onclick="sortTable('revenueTable',3,'money')">Annual Target</th>
+<th class="sortable" onclick="sortTable('revenueTable',4,'money')">YTD Actual</th>
+<th class="sortable" onclick="sortTable('revenueTable',5,'pct')">Achievement %</th>
+<th class="sortable" onclick="sortTable('revenueTable',6,'status')">Status</th>
+<th class="sortable" onclick="sortTable('revenueTable',7,'money')">Surplus / Deficit</th>
+</tr></thead>
+<tbody id="revenueBody">
+<tr>
+<td>New Business Opportunities</td>
+<td>Others</td>
+<td>N/A</td>
+<td class="positive">$1.46M (₦2.12B)</td>
+<td class="positive">$0 (₦0)</td>
+<td>0%</td>
+<td style="color:#FFE66D;font-weight:600">At Risk</td>
+<td><span style="color:#64748b">—</span></td>
+</tr><tr>
+<td>NCC SIM-NIN Linkage management Solution</td>
+<td>Compliance</td>
+<td>01 Jun 2026</td>
+<td class="positive">$777.8K (₦1.13B)</td>
+<td class="positive">$0 (₦0)</td>
+<td>0%</td>
+<td style="color:#00D4AA;font-weight:600">On Track</td>
+<td><span style="color:#64748b">—</span></td>
+</tr><tr>
+<td>NIMC License direct sales - NGN</td>
+<td>Data Capture</td>
+<td>01 Jan 2026</td>
+<td class="positive">$723.3K (₦1.05B)</td>
+<td class="positive">$226.1K (₦327.8M)</td>
+<td>125%</td>
+<td style="color:#00D4AA;font-weight:600">On Track</td>
+<td><span class="positive">+$535.2K</span></td>
+</tr><tr>
+<td>ARTCI CIV</td>
+<td>Data Capture</td>
+<td>01 Aug 2026</td>
+<td class="positive">$651.5K (₦944.7M)</td>
+<td class="positive">$0 (₦0)</td>
+<td>0%</td>
+<td style="color:#00D4AA;font-weight:600">On Track</td>
+<td><span style="color:#64748b">—</span></td>
+</tr><tr>
+<td>NIA Ekyc Solution</td>
+<td>Data Capture</td>
+<td>01 Jun 2026</td>
+<td class="positive">$589.5K (₦854.8M)</td>
+<td class="positive">$0 (₦0)</td>
+<td>0%</td>
+<td style="color:#00D4AA;font-weight:600">On Track</td>
+<td><span style="color:#64748b">—</span></td>
+</tr><tr>
+<td>MTN Benin - Fixiam & AI Capabilities</td>
+<td>Identity</td>
+<td>01 Aug 2026</td>
+<td class="positive">$532.2K (₦771.7M)</td>
+<td class="positive">$0 (₦0)</td>
+<td>0%</td>
+<td style="color:#FFE66D;font-weight:600">At Risk</td>
+<td><span style="color:#64748b">—</span></td>
+</tr><tr>
+<td>BTC Botswana</td>
+<td>Data Capture</td>
+<td>30 Apr 2026</td>
+<td class="positive">$440.0K (₦638.0M)</td>
+<td class="positive">$0 (₦0)</td>
+<td>0%</td>
+<td style="color:#FFE66D;font-weight:600">At Risk</td>
+<td><span style="color:#64748b">—</span></td>
+</tr><tr>
+<td>NIMC License sales - BNPL (NGN)</td>
+<td>Data Capture</td>
+<td>N/A</td>
+<td class="positive">$335.5K (₦486.5M)</td>
+<td class="positive">$335.5K (₦486.5M)</td>
+<td>400%</td>
+<td style="color:#94a3b8;font-weight:600">Unknown</td>
+<td><span style="color:#64748b">—</span></td>
+</tr><tr>
+<td>Existing contactless licenses</td>
+<td>Data Capture</td>
+<td>Closed - Aug 31</td>
+<td class="positive">$316.0K (₦458.1M)</td>
+<td class="positive">$147.0K (₦213.1M)</td>
+<td>186%</td>
+<td style="color:#00D4AA;font-weight:600">On Track</td>
+<td><span style="color:#64748b">—</span></td>
+</tr><tr>
+<td>Change Requests</td>
+<td>Data Capture</td>
+<td>31 Mar 2026</td>
+<td class="positive">$300.1K (₦435.2M)</td>
+<td class="positive">$0 (₦0)</td>
+<td>0%</td>
+<td style="color:#00D4AA;font-weight:600">On Track</td>
+<td><span class="negative">-$75.0K</span></td>
+</tr><tr>
+<td>Fixiam</td>
+<td>Identity</td>
+<td>01 Jul 2026</td>
+<td class="positive">$300.0K (₦435.0M)</td>
+<td class="positive">$0 (₦0)</td>
+<td>0%</td>
+<td style="color:#FFE66D;font-weight:600">At Risk</td>
+<td><span class="negative">-$75.0K</span></td>
+</tr><tr>
+<td>SNEDAI/CIV Passport Renewal</td>
+<td>Data Capture</td>
+<td>01 Jul 2026</td>
+<td class="positive">$275.0K (₦398.8M)</td>
+<td class="positive">$0 (₦0)</td>
+<td>0%</td>
+<td style="color:#00D4AA;font-weight:600">On Track</td>
+<td><span style="color:#64748b">—</span></td>
+</tr><tr>
+<td>Fixiam</td>
+<td>Identity</td>
+<td>30 May 2026</td>
+<td class="positive">$260.0K (₦377.0M)</td>
+<td class="positive">$0 (₦0)</td>
+<td>0%</td>
+<td style="color:#00D4AA;font-weight:600">On Track</td>
+<td><span class="negative">-$65.0K</span></td>
+</tr><tr>
+<td>Telekom Networks (TNM)</td>
+<td>Data Capture</td>
+<td>N/A</td>
+<td class="positive">$212.0K (₦307.4M)</td>
+<td class="positive">$0 (₦0)</td>
+<td>0%</td>
+<td style="color:#FFE66D;font-weight:600">At Risk</td>
+<td><span style="color:#64748b">—</span></td>
+</tr><tr>
+<td>Fixiam</td>
+<td>Identity</td>
+<td>01 May 2026</td>
+<td class="positive">$202.5K (₦293.6M)</td>
+<td class="positive">$0 (₦0)</td>
+<td>0%</td>
+<td style="color:#FFE66D;font-weight:600">At Risk</td>
+<td><span class="negative">-$50.6K</span></td>
+</tr><tr>
+<td>One Telco Regulator (NCA, PURA, BOCRA, TCRA, INCM)</td>
+<td>Data Capture</td>
+<td>N/A</td>
+<td class="positive">$200.0K (₦290.0M)</td>
+<td class="positive">$0 (₦0)</td>
+<td>0%</td>
+<td style="color:#00D4AA;font-weight:600">On Track</td>
+<td><span style="color:#64748b">—</span></td>
+</tr><tr>
+<td>One Immigration body / Ministry of Foreign Affairs / Interior</td>
+<td>Data Capture</td>
+<td>N/A</td>
+<td class="positive">$200.0K (₦290.0M)</td>
+<td class="positive">$0 (₦0)</td>
+<td>0%</td>
+<td style="color:#FFE66D;font-weight:600">At Risk</td>
+<td><span style="color:#64748b">—</span></td>
+</tr><tr>
+<td>PNL/MVNO_NCC Central KYC Multiple Tenancy Platform  Fee & Transaction fee</td>
+<td>Compliance</td>
+<td>01 Jul 2026</td>
+<td class="positive">$196.1K (₦284.3M)</td>
+<td class="positive">$0 (₦0)</td>
+<td>0%</td>
+<td style="color:#00D4AA;font-weight:600">On Track</td>
+<td><span style="color:#64748b">—</span></td>
+</tr><tr>
+<td>UNN- iTranscript & IDQR</td>
+<td>Others</td>
+<td>01 Jan 2026</td>
+<td class="positive">$165.5K (₦240.0M)</td>
+<td class="positive">$23.0K (₦33.4M)</td>
+<td>56%</td>
+<td style="color:#FFE66D;font-weight:600">At Risk</td>
+<td><span class="negative">-$18.4K</span></td>
+</tr><tr>
+<td>BSX</td>
+<td>Data Capture</td>
+<td>Closed - Dec 31</td>
+<td class="positive">$162.0K (₦234.9M)</td>
+<td class="positive">$40.5K (₦58.7M)</td>
+<td>100%</td>
+<td style="color:#00D4AA;font-weight:600">On Track</td>
+<td><span style="color:#64748b">—</span></td>
+</tr><tr>
+<td>Ministry of Agriculture</td>
+<td>Data Capture</td>
+<td>N/A</td>
+<td class="positive">$157.5K (₦228.4M)</td>
+<td class="positive">$0 (₦0)</td>
+<td>0%</td>
+<td style="color:#FFE66D;font-weight:600">At Risk</td>
+<td><span style="color:#64748b">—</span></td>
+</tr><tr>
+<td>AMPRT Mali</td>
+<td>Data Capture</td>
+<td>01 Jul 2026</td>
+<td class="positive">$156.2K (₦226.6M)</td>
+<td class="positive">$0 (₦0)</td>
+<td>0%</td>
+<td style="color:#00D4AA;font-weight:600">On Track</td>
+<td><span style="color:#64748b">—</span></td>
+</tr><tr>
+<td>BioSmart-X License - 23k units 3 year subscription</td>
+<td>Data Capture</td>
+<td>01 Apr 2026</td>
+<td class="positive">$138.0K (₦200.1M)</td>
+<td class="positive">$0 (₦0)</td>
+<td>0%</td>
+<td style="color:#00D4AA;font-weight:600">On Track</td>
+<td><span class="negative">-$34.5K</span></td>
+</tr><tr>
+<td>Lebara Biosmart X Solution</td>
+<td>Data Capture</td>
+<td>01 Mar 2026</td>
+<td class="positive">$125.5K (₦182.0M)</td>
+<td class="positive">$0 (₦0)</td>
+<td>0%</td>
+<td style="color:#4ECDC4;font-weight:600">Closed</td>
+<td><span style="color:#64748b">—</span></td>
+</tr><tr>
+<td>AI Capabilities</td>
+<td>API</td>
+<td>Closed</td>
+<td class="positive">$111.6K (₦161.8M)</td>
+<td class="positive">$31.2K (₦45.3M)</td>
+<td>112%</td>
+<td style="color:#00D4AA;font-weight:600">On Track</td>
+<td><span class="negative">-$24.6K</span></td>
+</tr><tr>
+<td>MFA Benin (e-Pass and Fixiam)</td>
+<td>Data Capture</td>
+<td>01 Jan 2026</td>
+<td class="positive">$109.3K (₦158.5M)</td>
+<td class="positive">$21.5K (₦31.2M)</td>
+<td>79%</td>
+<td style="color:#00D4AA;font-weight:600">On Track</td>
+<td><span class="negative">-$5.8K</span></td>
+</tr><tr>
+<td>MTN AMC & Workforce IAM ( Jan - Mar 2026)</td>
+<td>Data Capture</td>
+<td>Closed</td>
+<td class="positive">$104.7K (₦151.8M)</td>
+<td class="positive">$104.7K (₦151.8M)</td>
+<td>400%</td>
+<td style="color:#00D4AA;font-weight:600">On Track</td>
+<td><span style="color:#64748b">—</span></td>
+</tr><tr>
+<td>Annual Maintenance Services (BioSmart-X)</td>
+<td>Data Capture</td>
+<td>01 Jan 2026</td>
+<td class="positive">$100.8K (₦146.2M)</td>
+<td class="positive">$0 (₦0)</td>
+<td>0%</td>
+<td style="color:#4ECDC4;font-weight:600">Closed</td>
+<td><span class="negative">-$25.2K</span></td>
+</tr><tr>
+<td>Change Requests</td>
+<td>Data Capture</td>
+<td>28 Feb 2026</td>
+<td class="positive">$100.0K (₦145.0M)</td>
+<td class="positive">$3.6K (₦5.2M)</td>
+<td>22%</td>
+<td style="color:#00D4AA;font-weight:600">On Track</td>
+<td><span class="negative">-$21.4K</span></td>
+</tr><tr>
+<td>Sun King - Self-Service Implementation for ID verification services.</td>
+<td>API</td>
+<td>31 Mar 2026</td>
+<td class="positive">$93.1K (₦135.0M)</td>
+<td class="positive">$0 (₦0)</td>
+<td>0%</td>
+<td style="color:#00D4AA;font-weight:600">On Track</td>
+<td><span style="color:#64748b">—</span></td>
+</tr><tr>
+<td>MTN NIMC Support Yearly Renewal -  4K (Mar 2026-Feb 2027)</td>
+<td>Data Capture</td>
+<td>01 Mar 2026</td>
+<td class="positive">$86.9K (₦125.9M)</td>
+<td class="positive">$0 (₦0)</td>
+<td>0%</td>
+<td style="color:#00D4AA;font-weight:600">On Track</td>
+<td><span class="negative">-$8.7K</span></td>
+</tr><tr>
+<td>PENCOM IAM Solution</td>
+<td>Identity</td>
+<td>01 Mar 2026</td>
+<td class="positive">$64.6K (₦93.6M)</td>
+<td class="positive">$0 (₦0)</td>
+<td>0%</td>
+<td style="color:#00D4AA;font-weight:600">On Track</td>
+<td><span style="color:#64748b">—</span></td>
+</tr><tr>
+<td>NIMC Enrolment transaction fees - recurring</td>
+<td>Data Capture</td>
+<td>01 Mar 2026</td>
+<td class="positive">$64.2K (₦93.1M)</td>
+<td class="positive">$0 (₦0)</td>
+<td>0%</td>
+<td style="color:#00D4AA;font-weight:600">On Track</td>
+<td><span style="color:#64748b">—</span></td>
+</tr><tr>
+<td>NIBSS IAM opportunity</td>
+<td>Identity</td>
+<td>N/A</td>
+<td class="positive">$60.4K (₦87.5M)</td>
+<td class="positive">$0 (₦0)</td>
+<td>0%</td>
+<td style="color:#00D4AA;font-weight:600">On Track</td>
+<td><span style="color:#64748b">—</span></td>
+</tr><tr>
+<td>AMC - BSX Upgrade</td>
+<td>Data Capture</td>
+<td>01 Oct 2026</td>
+<td class="positive">$50.0K (₦72.5M)</td>
+<td class="positive">$0 (₦0)</td>
+<td>0%</td>
+<td style="color:#FF6B6B;font-weight:600">Off Track</td>
+<td><span class="negative">-$12.5K</span></td>
+</tr><tr>
+<td>ESUT iTranscript</td>
+<td>Others</td>
+<td>01 Jan 2026</td>
+<td class="positive">$35.5K (₦51.5M)</td>
+<td class="positive">$7.9K (₦11.5M)</td>
+<td>89%</td>
+<td style="color:#00D4AA;font-weight:600">On Track</td>
+<td><span class="negative">-$985</span></td>
+</tr><tr>
+<td>Fixiam</td>
+<td>Identity</td>
+<td>01 Aug 2026</td>
+<td class="positive">$30.0K (₦43.5M)</td>
+<td class="positive">$0 (₦0)</td>
+<td>0%</td>
+<td style="color:#FFE66D;font-weight:600">At Risk</td>
+<td><span class="negative">-$7.5K</span></td>
+</tr><tr>
+<td>Managed Services</td>
+<td>Data Capture</td>
+<td>Closed</td>
+<td class="positive">$28.0K (₦40.6M)</td>
+<td class="positive">$7.0K (₦10.2M)</td>
+<td>100%</td>
+<td style="color:#4ECDC4;font-weight:600">Closed</td>
+<td><span style="color:#64748b">—</span></td>
+</tr><tr>
+<td>MTN Liberia Biosmart X implementation</td>
+<td>Data Capture</td>
+<td>01 Oct 2026</td>
+<td class="positive">$24.5K (₦35.5M)</td>
+<td class="positive">$0 (₦0)</td>
+<td>0%</td>
+<td style="color:#FF6B6B;font-weight:600">Off Track</td>
+<td><span class="negative">-$6.1K</span></td>
+</tr><tr>
+<td>MTN NIMC Support Yearly Renewal -  4K (Nov 2025-Feb 2026)</td>
+<td>Data Capture</td>
+<td>Closed</td>
+<td class="positive">$16.7K (₦24.3M)</td>
+<td class="positive">$16.7K (₦24.3M)</td>
+<td>400%</td>
+<td style="color:#00D4AA;font-weight:600">On Track</td>
+<td><span style="color:#64748b">—</span></td>
+</tr><tr>
+<td>PAPSS (P-GATE):</td>
+<td>Compliance</td>
+<td>01 Oct 2026</td>
+<td class="positive">$12.3K (₦17.8M)</td>
+<td class="positive">$0 (₦0)</td>
+<td>0%</td>
+<td style="color:#00D4AA;font-weight:600">On Track</td>
+<td><span style="color:#64748b">—</span></td>
+</tr><tr>
+<td>Change Request_Biosmart Enhancement</td>
+<td>Data Capture</td>
+<td>Closed</td>
+<td class="positive">$8.1K (₦11.7M)</td>
+<td class="positive">$0 (₦0)</td>
+<td>0%</td>
+<td style="color:#FF6B6B;font-weight:600">Off Track</td>
+<td><span class="negative">-$8.1K</span></td>
+</tr><tr>
+<td>Veremark</td>
+<td>Identity</td>
+<td>01 Jan 2026</td>
+<td class="positive">$7.6K (₦11.0M)</td>
+<td class="positive">$2.6K (₦3.7M)</td>
+<td>136%</td>
+<td style="color:#00D4AA;font-weight:600">On Track</td>
+<td><span class="positive">+$673</span></td>
+</tr><tr>
+<td>Implementation of NCC - 96 hour barring</td>
+<td>Data Capture</td>
+<td>28 Feb 2026</td>
+<td class="positive">$6.7K (₦9.7M)</td>
+<td class="positive">$6.9K (₦10.0M)</td>
+<td>621%</td>
+<td style="color:#00D4AA;font-weight:600">On Track</td>
+<td><span style="color:#64748b">—</span></td>
+</tr><tr>
+<td>Hardware sales -IB Kojak</td>
+<td>Others</td>
+<td>N/A</td>
+<td class="positive">$6.2K (₦8.9M)</td>
+<td class="positive">$6.2K (₦8.9M)</td>
+<td>400%</td>
+<td style="color:#00D4AA;font-weight:600">On Track</td>
+<td><span style="color:#64748b">—</span></td>
+</tr><tr>
+<td>NG Ride</td>
+<td>Identity</td>
+<td>01 Jan 2026</td>
+<td class="positive">$348 (₦505K)</td>
+<td class="positive">$209 (₦303K)</td>
+<td>240%</td>
+<td style="color:#00D4AA;font-weight:600">On Track</td>
+<td><span style="color:#64748b">—</span></td>
+</tr><tr>
+<td>NIMC License direct sales - USD</td>
+<td>Data Capture</td>
+<td>N/A</td>
+<td class="positive">$0 (₦0)</td>
+<td class="positive">$238.3K (₦345.5M)</td>
+<td>0%</td>
+<td style="color:#94a3b8;font-weight:600">Unknown</td>
+<td><span style="color:#64748b">—</span></td>
+</tr>
+</tbody>
+<tfoot style="background:rgba(0,212,170,0.08);font-weight:700">
+<tr>
+<td colspan="3" style="color:#00D4AA;font-weight:700">TOTAL (47 streams)</td>
+<td class="positive">$10.00M (₦14.50B)</td>
+<td class="positive">$1.22M (₦1.77B)</td>
+<td>12% annual / 101% Q1</td>
+<td></td>
+<td></td>
+</tr>
+</tfoot>
+</table>
+<div id="searchResults" style="color:#64748b;font-size:0.8em;margin-top:8px"></div>
+</div>
+</div>
+
+<script>
+function sortTable(tableId, colIdx, type) {
+    const table = document.getElementById(tableId);
+    const tbody = table.querySelector('tbody');
+    if (!tbody) return;
+
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    const headers = table.querySelectorAll('th.sortable');
+    const tfoot = table.querySelector('tfoot');
+
+    // Filter out tfoot rows
+    const bodyRows = rows.filter(row => !tfoot || !tfoot.contains(row));
+
+    // Determine sort direction
+    const header = headers[colIdx];
+    const isAsc = header.classList.contains('sort-asc');
+
+    // Clear previous sort indicators
+    headers.forEach(h => {
+        h.classList.remove('sort-asc', 'sort-desc');
+    });
+
+    // Sort rows
+    bodyRows.sort((a, b) => {
+        let aVal = a.cells[colIdx].textContent.trim();
+        let bVal = b.cells[colIdx].textContent.trim();
+
+        if (type === 'money') {
+            aVal = parseFloat(aVal.replace(/[₦$B M K(),\-]/g, '')) || 0;
+            bVal = parseFloat(bVal.replace(/[₦$B M K(),\-]/g, '')) || 0;
+        } else if (type === 'pct') {
+            aVal = parseFloat(aVal) || 0;
+            bVal = parseFloat(bVal) || 0;
+        } else if (type === 'status') {
+            const statusOrder = {'On Track': 0, 'Closed': 1, 'At Risk': 2, 'Off Track': 3, 'Unknown': 4};
+            aVal = statusOrder[aVal] ?? 4;
+            bVal = statusOrder[bVal] ?? 4;
+        } else {
+            aVal = aVal.toLowerCase();
+            bVal = bVal.toLowerCase();
+        }
+
+        return isAsc ? (aVal > bVal ? 1 : -1) : (aVal < bVal ? 1 : -1);
+    });
+
+    // Re-append body rows (keep tfoot in place)
+    bodyRows.forEach(row => tbody.appendChild(row));
+    header.classList.add(isAsc ? 'sort-desc' : 'sort-asc');
+}
+
+const C = {p:'#00D4AA',s:'#4ECDC4',a:'#FFE66D',d:'#FF6B6B',g:'rgba(0,212,170,0.08)'};
+const baseOpts = {
+    responsive:true,
+    maintainAspectRatio:true,
+    plugins:{legend:{labels:{color:'#94a3b8',font:{family:"'Inter',sans-serif",size:11}}}},
+    scales:{x:{grid:{color:C.g},ticks:{color:'#64748b'}},y:{grid:{color:C.g},ticks:{color:'#64748b',callback:function(v){if(v>=1e6)return'$'+(v/1e6).toFixed(1)+'M';if(v>=1e3)return'$'+(v/1e3).toFixed(0)+'K';return'$'+v}}}}
+};
+
+const railLabels = ["Data Capture", "Compliance", "Identity", "API", "Others"];
+const railAnnual = [5682046.419976667, 986103.7100000001, 1457550.07693, 204665.94828, 1669633.8482758622];
+const railActual = [1147850.47781, 0.0, 2775.81, 31212.74108, 37070.1365931];
+
+new Chart(document.getElementById('railChart'),{
+    type:'doughnut',
+    data:{
+        labels:railLabels,
+        datasets:[
+            {label:'Projected Annual (USD)',data:railAnnual,backgroundColor:['#00D4AA','#4ECDC4','#FFE66D','#FF6B6B','#A8E6CF','#95E1D3','#F38181','#AA96DA']}
+        ]
+    },
+    options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{labels:{color:'#94a3b8',font:{family:"'Inter',sans-serif",size:11}}}},}
+});
+
+const streams = ["New Business Opportunitie", "NCC SIM-NIN Linkage manag", "NIMC License direct sales", "ARTCI CIV", "NIA Ekyc Solution", "MTN Benin - Fixiam & AI C", "BTC Botswana", "NIMC License sales - BNPL", "Existing contactless lice", "Change Requests"];
+const annuals = [1462421.8268965518, 777777.8, 723255.81, 651500.0, 589538.7931, 532187.5, 440000.0, 335525.2606, 315957.0, 300111.0];
+const ytds = [0.0, 0.0, 226053.13237, 0.0, 0.0, 0.0, 0.0, 335525.2607, 146992.00487, 0.0];
+
+new Chart(document.getElementById('perfChart'),{
+    type:'bar',
+    data:{
+        labels:streams,
+        datasets:[
+            {label:'Annual Target (USD)',data:annuals,backgroundColor:'rgba(100,116,139,0.5)',borderColor:'rgba(100,116,139,0.8)',borderWidth:1,borderRadius:4},
+            {label:'YTD Actual (USD)',data:ytds,backgroundColor:'rgba(0,212,170,0.8)',borderColor:'rgba(0,212,170,1)',borderWidth:1,borderRadius:4}
+        ]
+    },
+    options:{...baseOpts,indexAxis:undefined}
+});
+
+function filterRevenueTable() {
+    const q = document.getElementById('revenueSearch').value.toLowerCase();
+    const rows = document.getElementById('revenueBody').getElementsByTagName('tr');
+    let shown = 0;
+    for (let i = 0; i < rows.length; i++) {
+        const text = rows[i].textContent.toLowerCase();
+        if (q === '' || text.includes(q)) {
+            rows[i].style.display = '';
+            shown++;
+        } else {
+            rows[i].style.display = 'none';
+        }
+    }
+    const info = document.getElementById('searchResults');
+    if (q) {
+        info.textContent = shown + ' of ' + rows.length + ' streams matching "' + document.getElementById('revenueSearch').value + '"';
+    } else {
+        info.textContent = '';
+    }
+}
+</script>
+<div class="dashboard-footer">
+<span>Seamfix Financial Intelligence &nbsp;·&nbsp; Powered by Claude Cowork</span>
+<span>Generated: 23 Mar 2026 15:59 &nbsp;&bull;&nbsp; $1 = ₦1,450</span>
+</div>
+</body>
+</html>

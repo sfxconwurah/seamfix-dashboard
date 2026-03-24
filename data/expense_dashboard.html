@@ -1,0 +1,1862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seamfix Expense & Vendor Analysis Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 0 28px 28px;
+        }
+
+        .header {
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #00D4AA, #4ECDC4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            color: #94a3b8;
+            font-size: 0.95rem;
+        }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .kpi-card {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(100, 116, 139, 0.3);
+            border-radius: 12px;
+            padding: 24px;
+            backdrop-filter: blur(10px);
+        }
+
+        .kpi-card.highlight {
+            border-color: #00D4AA;
+            background: rgba(0, 212, 170, 0.05);
+        }
+
+        .kpi-label {
+            font-size: 0.85rem;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .kpi-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #00D4AA;
+            margin-bottom: 8px;
+        }
+
+        .kpi-detail {
+            font-size: 0.8rem;
+            color: #64748b;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .chart-card {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(100, 116, 139, 0.3);
+            border-radius: 12px;
+            padding: 24px;
+            backdrop-filter: blur(10px);
+        }
+
+        .chart-card h3 {
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+            color: #e2e8f0;
+            font-weight: 600;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+        }
+
+        .table-card {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(100, 116, 139, 0.3);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+        }
+
+        .table-card h3 {
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+            color: #e2e8f0;
+            font-weight: 600;
+        }
+
+        .search-box {
+            margin-bottom: 20px;
+        }
+
+        .search-box input {
+            width: 100%;
+            max-width: 400px;
+            padding: 10px 15px;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(100, 116, 139, 0.3);
+            border-radius: 8px;
+            color: #e2e8f0;
+            font-size: 0.9rem;
+        }
+
+        .search-box input::placeholder {
+            color: #64748b;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: #00D4AA;
+            background: rgba(15, 23, 42, 0.8);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        th {
+            background: rgba(15, 23, 42, 0.6);
+            padding: 12px 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #cbd5e1;
+            border-bottom: 1px solid rgba(100, 116, 139, 0.2);
+        }
+
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid rgba(100, 116, 139, 0.1);
+        }
+
+        tr:hover {
+            background: rgba(100, 116, 139, 0.1);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-yes {
+            background: rgba(0, 212, 170, 0.2);
+            color: #00D4AA;
+        }
+
+        .badge-no {
+            background: rgba(255, 107, 107, 0.2);
+            color: #FF6B6B;
+        }
+
+        .amount {
+            color: #00D4AA;
+            font-weight: 600;
+        }
+
+        .takeaway-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .takeaway-card {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(100, 116, 139, 0.3);
+            border-radius: 12px;
+            padding: 0;
+            backdrop-filter: blur(10px);
+        }
+
+        .takeaway-card h4 {
+            font-size: 0.95rem;
+            color: #cbd5e1;
+            margin-bottom: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .takeaway-value {
+            font-size: 1.5rem;
+            color: #FFE66D;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .takeaway-insight {
+            font-size: 0.85rem;
+            color: #94a3b8;
+            line-height: 1.5;
+        }
+
+        .alert {
+            background: rgba(255, 107, 107, 0.1);
+            border-left: 3px solid #FF6B6B;
+            padding: 12px 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            color: #FF6B6B;
+            font-size: 0.9rem;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .footer {
+            text-align: center;
+            color: #64748b;
+            font-size: 0.85rem;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(100, 116, 139, 0.2);
+        }
+
+        .print-button{display:none!important}
+        .top-nav{background:#0a0f1e;border-bottom:1px solid #334155;padding:0 24px;display:flex;align-items:center;height:48px;overflow-x:auto;position:sticky;top:0;z-index:200}
+.top-nav-brand{color:#e2e8f0;font-weight:700;font-size:15px;margin-right:24px;white-space:nowrap;text-decoration:none}
+.top-nav-link{color:#94a3b8;text-decoration:none;padding:0 14px;height:48px;display:flex;align-items:center;font-size:13px;border-bottom:2px solid transparent;white-space:nowrap;transition:color .2s}
+.top-nav-link:hover{color:#e2e8f0}
+        .top-nav-link.active{color:#fff;border-bottom-color:#00D4AA;font-weight:500}
+
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .kpi-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            table {
+                font-size: 0.8rem;
+            }
+
+            th, td {
+                padding: 8px 10px;
+            }
+        }
+
+        .nav-bar{display:none!important}
+
+        th.sortable {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        th.sortable:hover {
+            color: #FFE66D;
+        }
+
+        th.sort-asc::after {
+            content: ' ▲';
+            font-size: 0.7em;
+        }
+
+        th.sort-desc::after {
+            content: ' ▼';
+            font-size: 0.7em;
+        }
+
+        @media print {
+            * {
+                color-adjust: exact !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            body {
+                background: #fff !important;
+                color: #1e293b !important;
+                padding: 12px !important;
+                font-size: 9pt !important;
+            }
+
+            .container {
+                max-width: 100%;
+            }
+
+            .print-button {
+                display: none !important;
+            }
+
+            .nav-bar {
+                display: none !important;
+            }
+
+            .header h1 {
+                font-size: 1.6em !important;
+                background: none !important;
+                -webkit-text-fill-color: #0f172a !important;
+                color: #0f172a !important;
+            }
+
+            .header p, .header .sub {
+                color: #475569 !important;
+            }
+
+            .header .meta {
+                color: #64748b !important;
+            }
+
+            /* KPI Cards */
+            .kpi-grid {
+                grid-template-columns: repeat(3, 1fr) !important;
+                gap: 8px !important;
+                margin-bottom: 16px !important;
+            }
+
+            .kpi-card {
+                background: #f8fafc !important;
+                border: 1px solid #e2e8f0 !important;
+                padding: 12px !important;
+                border-radius: 8px !important;
+                box-shadow: none !important;
+                backdrop-filter: none !important;
+                page-break-inside: avoid;
+            }
+
+            .kpi-card.highlight {
+                border-color: #10b981 !important;
+                background: #f0fdf4 !important;
+            }
+
+            .kpi-label {
+                color: #475569 !important;
+                font-size: 0.65em !important;
+            }
+
+            .kpi-value {
+                color: #0f172a !important;
+                font-size: 1.2em !important;
+            }
+
+            .kpi-detail {
+                color: #64748b !important;
+            }
+
+            /* Takeaway Cards */
+            .takeaway-grid {
+                grid-template-columns: repeat(2, 1fr) !important;
+                gap: 10px !important;
+                margin-bottom: 16px !important;
+            }
+
+            .takeaway-card {
+                background: #f8fafc !important;
+                border: 1px solid #e2e8f0 !important;
+                padding: 14px !important;
+                border-radius: 8px !important;
+                backdrop-filter: none !important;
+                page-break-inside: avoid;
+            }
+
+            .takeaway-card h4 {
+                color: #475569 !important;
+            }
+
+            .takeaway-value {
+                color: #0f172a !important;
+                font-size: 1.3em !important;
+            }
+
+            .takeaway-insight {
+                color: #475569 !important;
+            }
+
+            /* Alert */
+            .alert {
+                background: #fef2f2 !important;
+                border-left-color: #dc2626 !important;
+                color: #dc2626 !important;
+            }
+
+            /* Charts */
+            .charts-grid {
+                grid-template-columns: repeat(2, 1fr) !important;
+                gap: 12px !important;
+                margin-bottom: 16px !important;
+            }
+
+            .chart-card {
+                background: #fff !important;
+                border: 1px solid #e2e8f0 !important;
+                padding: 14px !important;
+                backdrop-filter: none !important;
+                page-break-inside: avoid;
+            }
+
+            .chart-card h3 {
+                color: #1e293b !important;
+                font-size: 0.85em !important;
+            }
+
+            .chart-container {
+                height: 280px !important;
+            }
+
+            /* Tables */
+            .table-card {
+                background: #f8fafc !important;
+                border: 1px solid #e2e8f0 !important;
+                padding: 16px !important;
+                backdrop-filter: none !important;
+                page-break-inside: avoid;
+            }
+
+            .table-card h3 {
+                color: #0f172a !important;
+                font-size: 1em !important;
+            }
+
+            .search-box {
+                display: none !important;
+            }
+
+            table {
+                font-size: 0.75em !important;
+                color: #1e293b !important;
+            }
+
+            thead {
+                background: #f1f5f9 !important;
+            }
+
+            th {
+                background: #f1f5f9 !important;
+                color: #0f172a !important;
+                border-bottom: 1px solid #cbd5e1 !important;
+            }
+
+            td {
+                color: #334155 !important;
+                border-bottom: 1px solid #e2e8f0 !important;
+            }
+
+            .amount {
+                color: #0f172a !important;
+                font-weight: 700 !important;
+            }
+
+            .badge {
+                font-size: 0.7em !important;
+            }
+
+            .badge-yes {
+                background: #dcfce7 !important;
+                color: #16a34a !important;
+            }
+
+            .badge-no {
+                background: #fee2e2 !important;
+                color: #dc2626 !important;
+            }
+
+            tbody tr:hover {
+                background: transparent !important;
+            }
+
+            .hidden {
+                display: none !important;
+            }
+
+            /* Footer */
+            .footer {
+                color: #64748b !important;
+                border-top-color: #e2e8f0 !important;
+            }
+        }
+    /* ── HEADER: match Pipeline Intelligence style ── */
+.header{padding:24px 28px 16px!important;border-bottom:1px solid #334155!important;margin-bottom:24px!important;background:none!important}
+.header h1{font-size:22px!important;font-weight:700!important;background:none!important;-webkit-background-clip:unset!important;-webkit-text-fill-color:#e2e8f0!important;color:#e2e8f0!important;margin-bottom:4px!important}
+.header .sub{font-size:13px!important;color:#94a3b8!important}
+.header .meta{font-size:12px!important;color:#94a3b8!important;margin-top:4px!important}
+.header p{font-size:13px!important;color:#94a3b8!important;margin-top:4px!important}
+</style>
+</head>
+<body>
+<nav class="top-nav"><span class="top-nav-brand">⚡ Seamfix</span><a href="dashboard.html" class="top-nav-link ">Cash Overview</a><a href="expense_dashboard.html" class="top-nav-link active">Expense &amp; Vendor</a><a href="budget_dashboard.html" class="top-nav-link ">Budget vs Actual</a><a href="revenue_dashboard.html" class="top-nav-link ">Revenue &amp; Fundability</a><a href="pipeline_dashboard.html" class="top-nav-link ">Pipeline Intelligence</a></nav>
+    <div class="container">
+        <div class="header">
+            <h1>Seamfix Expense & Vendor Analysis</h1>
+            <p class="sub">Detailed Outflow & Vendor Tracking &mdash; Weekly Cash Reports 2026</p>
+        </div>
+
+        <!-- old nav-bar replaced -->
+
+        <!-- PDF button hidden per user request -->
+
+        <!-- KPI Cards -->
+        <div class="kpi-grid">
+            <div class="kpi-card highlight">
+                <div class="kpi-label">Total YTD Expenses</div>
+                <div class="kpi-value">₦164.1M</div>
+                <div class="kpi-detail">11 weeks of data</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Unique Vendors Paid</div>
+                <div class="kpi-value">93</div>
+                <div class="kpi-detail">Across all payment batches</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Avg Weekly Burn Rate</div>
+                <div class="kpi-value">₦14.9M</div>
+                <div class="kpi-detail">Average per week</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Top Vendor by Spend</div>
+                <div class="kpi-value" style="color: #FFE66D; font-size: 1.3rem;">Ezeaku Frederick</div>
+                <div class="kpi-detail">Total: ₦29.1M</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Recurring Vendors</div>
+                <div class="kpi-value">11</div>
+                <div class="kpi-detail">Appeared 3+ weeks</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Largest Single Payment</div>
+                <div class="kpi-value">₦29.1M</div>
+                <div class="kpi-detail">YTD maximum</div>
+            </div>
+        </div>
+
+        <!-- Executive Takeaways -->
+        <div class="takeaway-grid">
+            <div class="takeaway-card">
+                <h4>Vendor Concentration</h4>
+                <div class="takeaway-value">8.0%</div>
+                <div class="takeaway-insight">of total vendor spend goes to top 5 vendors</div>
+            </div>
+            <div class="takeaway-card">
+                <h4>Salary & Benefits</h4>
+                <div class="takeaway-value">40.5%</div>
+                <div class="takeaway-insight">of total outflows (YTD)</div>
+            </div>
+            <div class="takeaway-card">
+                <h4>Bank & Financial Costs</h4>
+                <div class="takeaway-value">2.01%</div>
+                <div class="takeaway-insight">of total outflows</div>
+            </div>
+            <div class="takeaway-card">
+                <h4>Vendor Sprawl</h4>
+                <div class="takeaway-value">93</div>
+                <div class="takeaway-insight">unique vendors across 11 weeks</div>
+            </div>
+        </div>
+
+        
+
+        <!-- Charts -->
+        <div class="charts-grid">
+            <div class="chart-card">
+                <h3>Expense Category Trend</h3>
+                <div class="chart-container">
+                    <canvas id="categoryTrendChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <h3>Top 15 Vendors by Total Spend</h3>
+                <div class="chart-container">
+                    <canvas id="topVendorsChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <h3>Vendor Frequency Distribution</h3>
+                <div class="chart-container">
+                    <canvas id="vendorFreqChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <h3>Weekly Expense Volatility</h3>
+                <div class="chart-container">
+                    <canvas id="volatilityChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card" style="grid-column: span 1;">
+                <h3>YTD Spend by Category</h3>
+                <div class="chart-container">
+                    <canvas id="categoryPieChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vendor Ledger -->
+        <div class="table-card">
+            <h3>Complete Vendor Ledger</h3>
+            <div class="search-box">
+                <input type="text" id="vendorSearch" placeholder="Search vendor name..." onkeyup="filterTable('vendorTable', 'vendorSearch')">
+            </div>
+            <table id="vendorTable">
+                <thead>
+                    <tr>
+                        <th class="sortable" onclick="sortTable('vendorTable',0,'text')">Vendor Name</th>
+                        <th class="sortable" onclick="sortTable('vendorTable',1,'money')">Total YTD</th>
+                        <th class="sortable" onclick="sortTable('vendorTable',2,'number')">Payments</th>
+                        <th class="sortable" onclick="sortTable('vendorTable',3,'money')">Avg Payment</th>
+                        <th class="sortable" onclick="sortTable('vendorTable',4,'text')">Last Payment</th>
+                        <th class="sortable" onclick="sortTable('vendorTable',5,'text')">Last Description</th>
+                        <th class="sortable" onclick="sortTable('vendorTable',6,'text')">Recurring?</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Ezeaku Frederick</td>
+                        <td class="amount">₦29.1M</td>
+                        <td>1</td>
+                        <td class="amount">₦29.1M</td>
+                        <td>13 Feb 2026</td>
+                        <td>UNN accumulated partner splits for 2025...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>H.D Logistics</td>
+                        <td class="amount">₦13.2M</td>
+                        <td>1</td>
+                        <td class="amount">₦13.2M</td>
+                        <td>06 Mar 2026</td>
+                        <td>70% Advance payment for Infrastructure Devices for...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>RELIANCE HMO LTD</td>
+                        <td class="amount">₦12.1M</td>
+                        <td>1</td>
+                        <td class="amount">₦12.1M</td>
+                        <td>13 Mar 2026</td>
+                        <td>Reliance HMO March 11, 2026 – June 10, 2026...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Todara Lagos</td>
+                        <td class="amount">₦11.7M</td>
+                        <td>1</td>
+                        <td class="amount">₦11.7M</td>
+                        <td>20 Feb 2026</td>
+                        <td>Advance payment for Office renovation project...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Airbroadband Limited</td>
+                        <td class="amount">₦9.8M</td>
+                        <td>1</td>
+                        <td class="amount">₦9.8M</td>
+                        <td>06 Mar 2026</td>
+                        <td>Biosmart Market Development Services...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Adebiyi Adekunle Shehu</td>
+                        <td class="amount">₦7.3M</td>
+                        <td>1</td>
+                        <td class="amount">₦7.3M</td>
+                        <td>30 Jan 2026</td>
+                        <td>Consultancy fee for Orange Liberia...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Ini Medichem Resources</td>
+                        <td class="amount">₦5.3M</td>
+                        <td>2</td>
+                        <td class="amount">₦2.7M</td>
+                        <td>20 Mar 2026</td>
+                        <td>LIRS consulting fee...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Ugonwa Nkemdilim Nnubia</td>
+                        <td class="amount">₦5.1M</td>
+                        <td>1</td>
+                        <td class="amount">₦5.1M</td>
+                        <td>23 Jan 2026</td>
+                        <td>Retainer fee for fourth quarter (oct - Dec 2025)...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>ProDevs Technology Outsourcing Ltd</td>
+                        <td class="amount">₦4.7M</td>
+                        <td>2</td>
+                        <td class="amount">₦2.4M</td>
+                        <td>06 Mar 2026</td>
+                        <td>Payment to ProDevs Technology for Chidi and Oliver...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Iplug Hareware Ltd</td>
+                        <td class="amount">₦4.6M</td>
+                        <td>1</td>
+                        <td class="amount">₦4.6M</td>
+                        <td>06 Feb 2026</td>
+                        <td>Purchase of MACBOOK M3 & HP ELITEBOOK (1 UNITS EAC...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Oguno Ebuka Johnbosco</td>
+                        <td class="amount">₦4.0M</td>
+                        <td>1</td>
+                        <td class="amount">₦4.0M</td>
+                        <td>15 Jan 2026</td>
+                        <td>Support for UNN and ESUT Staff...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Cascia Solutions</td>
+                        <td class="amount">₦4.0M</td>
+                        <td>1</td>
+                        <td class="amount">₦4.0M</td>
+                        <td>06 Mar 2026</td>
+                        <td>Facilitation fee for Lebara project...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Microware Solutions Limited</td>
+                        <td class="amount">₦3.3M</td>
+                        <td>1</td>
+                        <td class="amount">₦3.3M</td>
+                        <td>13 Feb 2026</td>
+                        <td>40% balnace payment for  Acumatica IMPLEMENTATION ...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Ebuta Nkort-Ejik</td>
+                        <td class="amount">₦2.9M</td>
+                        <td>1</td>
+                        <td class="amount">₦2.9M</td>
+                        <td>30 Jan 2026</td>
+                        <td>Seamfix Brand Identity & assets, and corporate web...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Lilian Wilfred</td>
+                        <td class="amount">₦2.7M</td>
+                        <td>3</td>
+                        <td class="amount">₦909K</td>
+                        <td>06 Mar 2026</td>
+                        <td>February Management allowance (part payement - $1,...</td>
+                        <td><span class="badge badge-yes">Yes</span></td>
+                    </tr>
+                    <tr>
+                        <td>Digital Encode Limited</td>
+                        <td class="amount">₦2.4M</td>
+                        <td>1</td>
+                        <td class="amount">₦2.4M</td>
+                        <td>30 Jan 2026</td>
+                        <td>NDPA Compliance Audit and Report filing consultanc...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Uridium Technologies Limited</td>
+                        <td class="amount">₦2.3M</td>
+                        <td>2</td>
+                        <td class="amount">₦1.1M</td>
+                        <td>06 Mar 2026</td>
+                        <td>Payment to Uridium Technologies (Ikenna Okafor )...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Friends Energy Limited</td>
+                        <td class="amount">₦2.2M</td>
+                        <td>1</td>
+                        <td class="amount">₦2.2M</td>
+                        <td>20 Mar 2026</td>
+                        <td>Diesel supply to the office...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Di-All Worthwhile Food World</td>
+                        <td class="amount">₦2.0M</td>
+                        <td>1</td>
+                        <td class="amount">₦2.0M</td>
+                        <td>06 Mar 2026</td>
+                        <td>Facilitation fee for MTN...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Shuttlers Metropolitan</td>
+                        <td class="amount">₦1.9M</td>
+                        <td>1</td>
+                        <td class="amount">₦1.9M</td>
+                        <td>15 Jan 2026</td>
+                        <td>Staff Shuttlers Services for Dec 2025...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Panorama Data Solutions</td>
+                        <td class="amount">₦1.8M</td>
+                        <td>2</td>
+                        <td class="amount">₦902K</td>
+                        <td>06 Mar 2026</td>
+                        <td>Office internet Subscription for February 2026...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Estrada Outsourcing Limited</td>
+                        <td class="amount">₦1.7M</td>
+                        <td>2</td>
+                        <td class="amount">₦871K</td>
+                        <td>06 Mar 2026</td>
+                        <td>Payment to Estrada (Emmanuel Aloha )...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>DHL International Nigeria Ltd</td>
+                        <td class="amount">₦1.7M</td>
+                        <td>1</td>
+                        <td class="amount">₦1.7M</td>
+                        <td>06 Feb 2026</td>
+                        <td>SPLIT TO DHL on UNN iTranscript Income for May - D...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Foldage Global Resources</td>
+                        <td class="amount">₦1.7M</td>
+                        <td>11</td>
+                        <td class="amount">₦153K</td>
+                        <td>20 Mar 2026</td>
+                        <td>Charging Cord replacement for sunday Nwabali...</td>
+                        <td><span class="badge badge-yes">Yes</span></td>
+                    </tr>
+                    <tr>
+                        <td>Johnbosco Obiekwe</td>
+                        <td class="amount">₦1.6M</td>
+                        <td>4</td>
+                        <td class="amount">₦400K</td>
+                        <td>13 Mar 2026</td>
+                        <td>Servicing and repairs of Generator in ESUT (Refund...</td>
+                        <td><span class="badge badge-yes">Yes</span></td>
+                    </tr>
+                    <tr>
+                        <td>Shuttlers</td>
+                        <td class="amount">₦1.6M</td>
+                        <td>1</td>
+                        <td class="amount">₦1.6M</td>
+                        <td>20 Feb 2026</td>
+                        <td>Staff Shuttlers Services for Jan 2026...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Samuel Akpaniko</td>
+                        <td class="amount">₦1.5M</td>
+                        <td>1</td>
+                        <td class="amount">₦1.5M</td>
+                        <td>30 Jan 2026</td>
+                        <td>2026 NIA CEOs Conference Sponsorship...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>K.k business company ltd</td>
+                        <td class="amount">₦1.4M</td>
+                        <td>1</td>
+                        <td class="amount">₦1.4M</td>
+                        <td>13 Feb 2026</td>
+                        <td>New motorcycle purchase...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Flyforvalue Aviation Ltd-Collection Account</td>
+                        <td class="amount">₦1.0M</td>
+                        <td>1</td>
+                        <td class="amount">₦1.0M</td>
+                        <td>20 Feb 2026</td>
+                        <td>Funding of Valuejet wallet...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Ebuka Oguno</td>
+                        <td class="amount">₦885K</td>
+                        <td>3</td>
+                        <td class="amount">₦295K</td>
+                        <td>06 Feb 2026</td>
+                        <td>BTA for Enugu trip...</td>
+                        <td><span class="badge badge-yes">Yes</span></td>
+                    </tr>
+                    <tr>
+                        <td>Frank Atube</td>
+                        <td class="amount">₦838K</td>
+                        <td>4</td>
+                        <td class="amount">₦210K</td>
+                        <td>20 Feb 2026</td>
+                        <td>Refund for expenses made during Abuja trip (21st -...</td>
+                        <td><span class="badge badge-yes">Yes</span></td>
+                    </tr>
+                    <tr>
+                        <td>Heirs General Insurance</td>
+                        <td class="amount">₦819K</td>
+                        <td>1</td>
+                        <td class="amount">₦819K</td>
+                        <td>13 Mar 2026</td>
+                        <td>Life Insurance Payment...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Andersen Tax</td>
+                        <td class="amount">₦769K</td>
+                        <td>1</td>
+                        <td class="amount">₦769K</td>
+                        <td>23 Jan 2026</td>
+                        <td>Andersen Consulting...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Workplace Plus Limited</td>
+                        <td class="amount">₦756K</td>
+                        <td>2</td>
+                        <td class="amount">₦378K</td>
+                        <td>20 Mar 2026</td>
+                        <td>Payment for workspace in Abuja for March & April...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Quickfix Engineering Ltd</td>
+                        <td class="amount">₦754K</td>
+                        <td>1</td>
+                        <td class="amount">₦754K</td>
+                        <td>20 Feb 2026</td>
+                        <td>Replacement of 5kva/48v Hybrid Inverter for the ma...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Bolt</td>
+                        <td class="amount">₦750K</td>
+                        <td>3</td>
+                        <td class="amount">₦250K</td>
+                        <td>06 Mar 2026</td>
+                        <td>Staff Bolt riders for Feb 2026...</td>
+                        <td><span class="badge badge-yes">Yes</span></td>
+                    </tr>
+                    <tr>
+                        <td>Altar Consulting</td>
+                        <td class="amount">₦712K</td>
+                        <td>1</td>
+                        <td class="amount">₦712K</td>
+                        <td>23 Jan 2026</td>
+                        <td>LIRS consultancy fee for 2025...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Yusuf Oni</td>
+                        <td class="amount">₦600K</td>
+                        <td>2</td>
+                        <td class="amount">₦300K</td>
+                        <td>13 Feb 2026</td>
+                        <td>Wedding gift...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Joseph Chu</td>
+                        <td class="amount">₦600K</td>
+                        <td>1</td>
+                        <td class="amount">₦600K</td>
+                        <td>30 Jan 2026</td>
+                        <td>Staff Loan disbursement...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Valuejet</td>
+                        <td class="amount">₦580K</td>
+                        <td>1</td>
+                        <td class="amount">₦580K</td>
+                        <td>15 Jan 2026</td>
+                        <td>Funding of the Valuejet wallet...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>James Abaaji</td>
+                        <td class="amount">₦556K</td>
+                        <td>1</td>
+                        <td class="amount">₦556K</td>
+                        <td>06 Mar 2026</td>
+                        <td>February Salary...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Vetiva Trustees Limited</td>
+                        <td class="amount">₦512K</td>
+                        <td>1</td>
+                        <td class="amount">₦512K</td>
+                        <td>13 Mar 2026</td>
+                        <td>Trustee Fee Payment for  Jun-Nov.2025...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Competency Prints</td>
+                        <td class="amount">₦490K</td>
+                        <td>1</td>
+                        <td class="amount">₦490K</td>
+                        <td>30 Jan 2026</td>
+                        <td>Printing of customized letter head and envelope (5...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Shuttlers Metropolitian Mobility co. ltd</td>
+                        <td class="amount">₦412K</td>
+                        <td>1</td>
+                        <td class="amount">₦412K</td>
+                        <td>20 Mar 2026</td>
+                        <td>Shuttlers Bill for Feb 2026...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Anoken Logistics</td>
+                        <td class="amount">₦408K</td>
+                        <td>2</td>
+                        <td class="amount">₦204K</td>
+                        <td>20 Mar 2026</td>
+                        <td>Shipment of Souvenirs to Abuja and ESUT 24th of Fe...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Joseph Sani</td>
+                        <td class="amount">₦408K</td>
+                        <td>5</td>
+                        <td class="amount">₦82K</td>
+                        <td>13 Mar 2026</td>
+                        <td>Criminal verification for seamfix staff...</td>
+                        <td><span class="badge badge-yes">Yes</span></td>
+                    </tr>
+                    <tr>
+                        <td>Okeke Amobi</td>
+                        <td class="amount">₦400K</td>
+                        <td>1</td>
+                        <td class="amount">₦400K</td>
+                        <td>08 Jan 2026</td>
+                        <td>Recruitment Fee to Okeke Amobi...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>ESTRADA OUTSOURCING LIMITED</td>
+                        <td class="amount">₦396K</td>
+                        <td>1</td>
+                        <td class="amount">₦396K</td>
+                        <td>20 Mar 2026</td>
+                        <td>Payment to Estrada for March invoice...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Orevaoghene Bernadette</td>
+                        <td class="amount">₦396K</td>
+                        <td>1</td>
+                        <td class="amount">₦396K</td>
+                        <td>06 Feb 2026</td>
+                        <td>Botswana Visa Processing fee for Frank...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Mankind Global</td>
+                        <td class="amount">₦390K</td>
+                        <td>7</td>
+                        <td class="amount">₦56K</td>
+                        <td>06 Mar 2026</td>
+                        <td>HP Charger Replacement for Chiamaka...</td>
+                        <td><span class="badge badge-yes">Yes</span></td>
+                    </tr>
+                    <tr>
+                        <td>AJS SV HOSPITALITY</td>
+                        <td class="amount">₦379K</td>
+                        <td>3</td>
+                        <td class="amount">₦126K</td>
+                        <td>20 Mar 2026</td>
+                        <td>Accomondation for Cynthia in Abua 10th -11th of Ma...</td>
+                        <td><span class="badge badge-yes">Yes</span></td>
+                    </tr>
+                    <tr>
+                        <td>Drivecare Logistics & Services Ltd</td>
+                        <td class="amount">₦360K</td>
+                        <td>2</td>
+                        <td class="amount">₦180K</td>
+                        <td>06 Mar 2026</td>
+                        <td>Salary for Frank's Driver for Jan,2026...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>B.C.Madiebo & Company Insurance Brokers Limited</td>
+                        <td class="amount">₦359K</td>
+                        <td>1</td>
+                        <td class="amount">₦359K</td>
+                        <td>30 Jan 2026</td>
+                        <td>Laptop insurance renewal...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Ademola Koledoye</td>
+                        <td class="amount">₦352K</td>
+                        <td>1</td>
+                        <td class="amount">₦352K</td>
+                        <td>20 Feb 2026</td>
+                        <td>Refund for Anthropic subscription and domain regis...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Megamba</td>
+                        <td class="amount">₦343K</td>
+                        <td>1</td>
+                        <td class="amount">₦343K</td>
+                        <td>06 Feb 2026</td>
+                        <td>20% balance payment for Purchase of Corporate Gifs...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Credit switch</td>
+                        <td class="amount">₦300K</td>
+                        <td>2</td>
+                        <td class="amount">₦150K</td>
+                        <td>06 Mar 2026</td>
+                        <td>Funding of credit switch for staff Airtime...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>kansou gbemenou Augustin</td>
+                        <td class="amount">₦290K</td>
+                        <td>1</td>
+                        <td class="amount">₦290K</td>
+                        <td>27 Feb 2026</td>
+                        <td>Transport to Benin Republic...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Ubong Victor</td>
+                        <td class="amount">₦287K</td>
+                        <td>3</td>
+                        <td class="amount">₦96K</td>
+                        <td>13 Mar 2026</td>
+                        <td>Servicing of the 17 units of split AC in the offic...</td>
+                        <td><span class="badge badge-yes">Yes</span></td>
+                    </tr>
+                    <tr>
+                        <td>B.C Madiebo & Co</td>
+                        <td class="amount">₦282K</td>
+                        <td>2</td>
+                        <td class="amount">₦141K</td>
+                        <td>06 Mar 2026</td>
+                        <td>Laptop Insurance Policy Cover...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Adebisola</td>
+                        <td class="amount">₦277K</td>
+                        <td>1</td>
+                        <td class="amount">₦277K</td>
+                        <td>30 Jan 2026</td>
+                        <td>Birthday Cakes for February celebrants...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Reliance Family Clinic Nigeria Limited</td>
+                        <td class="amount">₦253K</td>
+                        <td>2</td>
+                        <td class="amount">₦127K</td>
+                        <td>13 Feb 2026</td>
+                        <td>Reliance Pre-Employment Test fee...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Trigienlabs</td>
+                        <td class="amount">₦250K</td>
+                        <td>1</td>
+                        <td class="amount">₦250K</td>
+                        <td>08 Jan 2026</td>
+                        <td>Website landing page built for Fixiam/Wordpress we...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Obinna Uramah</td>
+                        <td class="amount">₦234K</td>
+                        <td>2</td>
+                        <td class="amount">₦117K</td>
+                        <td>06 Mar 2026</td>
+                        <td>Staff advance to Obinna Uramah for UNN operations...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Adebisola Adegboye</td>
+                        <td class="amount">₦210K</td>
+                        <td>1</td>
+                        <td class="amount">₦210K</td>
+                        <td>06 Mar 2026</td>
+                        <td>Birthday Cakes for March celebrants...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Cooperative Support Services</td>
+                        <td class="amount">₦200K</td>
+                        <td>1</td>
+                        <td class="amount">₦200K</td>
+                        <td>20 Mar 2026</td>
+                        <td>Seamfix Full-Page Advert on Event Brochure...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Bal for Todara  for 1st invoice</td>
+                        <td class="amount">₦172K</td>
+                        <td>1</td>
+                        <td class="amount">₦172K</td>
+                        <td>06 Mar 2026</td>
+                        <td>Balance Payment for Office Toilet Renovation...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Johnbosco</td>
+                        <td class="amount">₦160K</td>
+                        <td>1</td>
+                        <td class="amount">₦160K</td>
+                        <td>23 Jan 2026</td>
+                        <td>Staff Advance to Johnbosco Obiekwe for ESUT operat...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Sla Badmus & co</td>
+                        <td class="amount">₦154K</td>
+                        <td>1</td>
+                        <td class="amount">₦154K</td>
+                        <td>23 Jan 2026</td>
+                        <td>Seamfix land valuation fee...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Fagbamila Dolapo</td>
+                        <td class="amount">₦150K</td>
+                        <td>1</td>
+                        <td class="amount">₦150K</td>
+                        <td>20 Feb 2026</td>
+                        <td>2026 Radio & TV permit'...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Cynthia Onwuegbuzie</td>
+                        <td class="amount">₦150K</td>
+                        <td>1</td>
+                        <td class="amount">₦150K</td>
+                        <td>13 Mar 2026</td>
+                        <td>BTA For Cynthia Onwuegbuzie 10th - 12th March, 202...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Damilare Babalola</td>
+                        <td class="amount">₦148K</td>
+                        <td>1</td>
+                        <td class="amount">₦148K</td>
+                        <td>20 Mar 2026</td>
+                        <td>Refund for Gift to guest speaker at IWD 2026 sessi...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Yakubu Bobai Ephraim</td>
+                        <td class="amount">₦137K</td>
+                        <td>2</td>
+                        <td class="amount">₦68K</td>
+                        <td>06 Mar 2026</td>
+                        <td>NextGen Instructor's fee for February 2026...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Frank</td>
+                        <td class="amount">₦136K</td>
+                        <td>1</td>
+                        <td class="amount">₦136K</td>
+                        <td>13 Mar 2026</td>
+                        <td>Refund for London trip (27th Feb- 7th March 2026)...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>ComputerVillage NG Online Marketplace</td>
+                        <td class="amount">₦132K</td>
+                        <td>1</td>
+                        <td class="amount">₦132K</td>
+                        <td>13 Mar 2026</td>
+                        <td>Purchase of spear Battery for Sony Battery for cam...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Uramah Obinna Stephen</td>
+                        <td class="amount">₦130K</td>
+                        <td>1</td>
+                        <td class="amount">₦130K</td>
+                        <td>06 Feb 2026</td>
+                        <td>Staff advance for UNN operations...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Lateef Fadeyi</td>
+                        <td class="amount">₦120K</td>
+                        <td>1</td>
+                        <td class="amount">₦120K</td>
+                        <td>23 Jan 2026</td>
+                        <td>BTA for Abuja trip (21st - 22nd Jan 2026)...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Joseph Sanni</td>
+                        <td class="amount">₦120K</td>
+                        <td>1</td>
+                        <td class="amount">₦120K</td>
+                        <td>30 Jan 2026</td>
+                        <td>Purchase of 2 units of tyre for the pool car...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Foldage</td>
+                        <td class="amount">₦118K</td>
+                        <td>1</td>
+                        <td class="amount">₦118K</td>
+                        <td>30 Jan 2026</td>
+                        <td>Macbook pro 2016 Power IC and bios replacement for...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Reliance HMO Ltd</td>
+                        <td class="amount">₦116K</td>
+                        <td>1</td>
+                        <td class="amount">₦116K</td>
+                        <td>20 Feb 2026</td>
+                        <td>Payment to Reliance HMO...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Wisdom Johnson</td>
+                        <td class="amount">₦100K</td>
+                        <td>1</td>
+                        <td class="amount">₦100K</td>
+                        <td>23 Jan 2026</td>
+                        <td>Wedding purse...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Todara Lagso</td>
+                        <td class="amount">₦92K</td>
+                        <td>1</td>
+                        <td class="amount">₦92K</td>
+                        <td>13 Mar 2026</td>
+                        <td>Balance Payment for Office Toilet Renovation...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Elohimtech Gadgets and ICT Services</td>
+                        <td class="amount">₦88K</td>
+                        <td>2</td>
+                        <td class="amount">₦44K</td>
+                        <td>20 Feb 2026</td>
+                        <td>Replacemebt elitebook batthery and purchase of 4 m...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Doris Obiakor</td>
+                        <td class="amount">₦82K</td>
+                        <td>1</td>
+                        <td class="amount">₦82K</td>
+                        <td>13 Feb 2026</td>
+                        <td>Refund for printing of document for NIMC Expressio...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Steno Nigeria Limited</td>
+                        <td class="amount">₦72K</td>
+                        <td>3</td>
+                        <td class="amount">₦24K</td>
+                        <td>20 Mar 2026</td>
+                        <td>Water supplied to the office on the 13th of March...</td>
+                        <td><span class="badge badge-yes">Yes</span></td>
+                    </tr>
+                    <tr>
+                        <td>Chinedu Somadina Eze</td>
+                        <td class="amount">₦70K</td>
+                        <td>1</td>
+                        <td class="amount">₦70K</td>
+                        <td>13 Mar 2026</td>
+                        <td>NSITF processing fee...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Ifeanyi Ama</td>
+                        <td class="amount">₦64K</td>
+                        <td>2</td>
+                        <td class="amount">₦32K</td>
+                        <td>06 Mar 2026</td>
+                        <td>Refund to laptop repair in Abuja...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Eco Cardillax</td>
+                        <td class="amount">₦54K</td>
+                        <td>1</td>
+                        <td class="amount">₦54K</td>
+                        <td>06 Mar 2026</td>
+                        <td>Servicing of pool car MUS512GS Q1 2026...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Grace Akinwande</td>
+                        <td class="amount">₦39K</td>
+                        <td>1</td>
+                        <td class="amount">₦39K</td>
+                        <td>06 Mar 2026</td>
+                        <td>Cleaning Materials and office supply mgt meeting...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Charles Friday Ejigah</td>
+                        <td class="amount">₦35K</td>
+                        <td>1</td>
+                        <td class="amount">₦35K</td>
+                        <td>06 Feb 2026</td>
+                        <td>Servicing of 8 units of CCTV Camera in the office...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Henrich Gold Global Concept</td>
+                        <td class="amount">₦35K</td>
+                        <td>1</td>
+                        <td class="amount">₦35K</td>
+                        <td>20 Feb 2026</td>
+                        <td>Purchase of toner for the printer in ESUT...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Mankind Technologies</td>
+                        <td class="amount">₦17K</td>
+                        <td>1</td>
+                        <td class="amount">₦17K</td>
+                        <td>20 Mar 2026</td>
+                        <td>Servicing /charger replacement (Laptop for new sta...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>George Uduma</td>
+                        <td class="amount">₦13K</td>
+                        <td>1</td>
+                        <td class="amount">₦13K</td>
+                        <td>13 Mar 2026</td>
+                        <td>8th Feb - 12th Feb 2026 - Gambia...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                    <tr>
+                        <td>Chidubem Chukwu</td>
+                        <td class="amount">₦600</td>
+                        <td>1</td>
+                        <td class="amount">₦600</td>
+                        <td>13 Mar 2026</td>
+                        <td>Refund for UNN trip  (13th to 16th Jan 2026)...</td>
+                        <td><span class="badge badge-no">No</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Recurring Vendor Analysis -->
+        <div class="table-card">
+            <h3>Recurring Vendor Analysis (3+ Payments)</h3>
+            <table id="recurringVendorTable">
+                <thead>
+                    <tr>
+                        <th class="sortable" onclick="sortTable('recurringVendorTable',0,'text')">Vendor Name</th>
+                        <th class="sortable" onclick="sortTable('recurringVendorTable',1,'money')">Total YTD</th>
+                        <th class="sortable" onclick="sortTable('recurringVendorTable',2,'number')">Payments</th>
+                        <th class="sortable" onclick="sortTable('recurringVendorTable',3,'money')">Avg Payment</th>
+                        <th class="sortable" onclick="sortTable('recurringVendorTable',4,'text')">Frequency</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Lilian Wilfred</td>
+                        <td class="amount">₦2.7M</td>
+                        <td>3</td>
+                        <td class="amount">₦909K</td>
+                        <td>Every 3.7 weeks</td>
+                    </tr>
+                    <tr>
+                        <td>Foldage Global Resources</td>
+                        <td class="amount">₦1.7M</td>
+                        <td>11</td>
+                        <td class="amount">₦153K</td>
+                        <td>Every 1.0 weeks</td>
+                    </tr>
+                    <tr>
+                        <td>Johnbosco Obiekwe</td>
+                        <td class="amount">₦1.6M</td>
+                        <td>4</td>
+                        <td class="amount">₦400K</td>
+                        <td>Every 2.8 weeks</td>
+                    </tr>
+                    <tr>
+                        <td>Ebuka Oguno</td>
+                        <td class="amount">₦885K</td>
+                        <td>3</td>
+                        <td class="amount">₦295K</td>
+                        <td>Every 3.7 weeks</td>
+                    </tr>
+                    <tr>
+                        <td>Frank Atube</td>
+                        <td class="amount">₦838K</td>
+                        <td>4</td>
+                        <td class="amount">₦210K</td>
+                        <td>Every 2.8 weeks</td>
+                    </tr>
+                    <tr>
+                        <td>Bolt</td>
+                        <td class="amount">₦750K</td>
+                        <td>3</td>
+                        <td class="amount">₦250K</td>
+                        <td>Every 3.7 weeks</td>
+                    </tr>
+                    <tr>
+                        <td>Joseph Sani</td>
+                        <td class="amount">₦408K</td>
+                        <td>5</td>
+                        <td class="amount">₦82K</td>
+                        <td>Every 2.2 weeks</td>
+                    </tr>
+                    <tr>
+                        <td>Mankind Global</td>
+                        <td class="amount">₦390K</td>
+                        <td>7</td>
+                        <td class="amount">₦56K</td>
+                        <td>Every 1.6 weeks</td>
+                    </tr>
+                    <tr>
+                        <td>AJS SV HOSPITALITY</td>
+                        <td class="amount">₦379K</td>
+                        <td>3</td>
+                        <td class="amount">₦126K</td>
+                        <td>Every 3.7 weeks</td>
+                    </tr>
+                    <tr>
+                        <td>Ubong Victor</td>
+                        <td class="amount">₦287K</td>
+                        <td>3</td>
+                        <td class="amount">₦96K</td>
+                        <td>Every 3.7 weeks</td>
+                    </tr>
+                    <tr>
+                        <td>Steno Nigeria Limited</td>
+                        <td class="amount">₦72K</td>
+                        <td>3</td>
+                        <td class="amount">₦24K</td>
+                        <td>Every 3.7 weeks</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Large Payments Audit Trail -->
+        <div class="table-card">
+            <h3>Large Payment Audit Trail (>₦5M)</h3>
+            <table id="largePaymentsTable">
+                <thead>
+                    <tr>
+                        <th class="sortable" onclick="sortTable('largePaymentsTable',0,'text')">Date</th>
+                        <th class="sortable" onclick="sortTable('largePaymentsTable',1,'text')">Vendor</th>
+                        <th class="sortable" onclick="sortTable('largePaymentsTable',2,'money')">Amount</th>
+                        <th class="sortable" onclick="sortTable('largePaymentsTable',3,'text')">Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>13 Feb 2026</td>
+                        <td>Ezeaku Frederick</td>
+                        <td class="amount">₦29.1M</td>
+                        <td>UNN accumulated partner splits for 2025</td>
+                    </tr>
+                    <tr>
+                        <td>06 Mar 2026</td>
+                        <td>H.D Logistics</td>
+                        <td class="amount">₦13.2M</td>
+                        <td>70% Advance payment for Infrastructure Devices for PoC Support</td>
+                    </tr>
+                    <tr>
+                        <td>13 Mar 2026</td>
+                        <td>RELIANCE HMO LTD</td>
+                        <td class="amount">₦12.1M</td>
+                        <td>Reliance HMO March 11, 2026 – June 10, 2026</td>
+                    </tr>
+                    <tr>
+                        <td>20 Feb 2026</td>
+                        <td>Todara Lagos</td>
+                        <td class="amount">₦11.7M</td>
+                        <td>Advance payment for Office renovation project</td>
+                    </tr>
+                    <tr>
+                        <td>06 Mar 2026</td>
+                        <td>Airbroadband Limited</td>
+                        <td class="amount">₦9.8M</td>
+                        <td>Biosmart Market Development Services</td>
+                    </tr>
+                    <tr>
+                        <td>30 Jan 2026</td>
+                        <td>Adebiyi Adekunle Shehu</td>
+                        <td class="amount">₦7.3M</td>
+                        <td>Consultancy fee for Orange Liberia</td>
+                    </tr>
+                    <tr>
+                        <td>23 Jan 2026</td>
+                        <td>Ugonwa Nkemdilim Nnubia</td>
+                        <td class="amount">₦5.1M</td>
+                        <td>Retainer fee for fourth quarter (oct - Dec 2025)</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="footer" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;color:#94a3b8;font-size:12px">
+            <span>Seamfix Expense & Vendor Analysis &nbsp;·&nbsp; Powered by Claude Cowork</span>
+            <span>Available Data Range: 08 January 2026 &ndash; 20 March 2026 &nbsp;&bull;&nbsp; Generated: 23 March 2026 at 16:39 &nbsp;&bull;&nbsp; $1 = ₦1,450</span>
+        </div>
+    </div>
+
+    <script>
+        // Sort table function
+        function sortTable(tableId, colIdx, type) {
+            const table = document.getElementById(tableId);
+            const tbody = table.querySelector('tbody');
+            if (!tbody) return;
+
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            const headers = table.querySelectorAll('th.sortable');
+
+            // Determine sort direction
+            const header = headers[colIdx];
+            const isAsc = header.classList.contains('sort-asc');
+
+            // Clear previous sort indicators
+            headers.forEach(h => {
+                h.classList.remove('sort-asc', 'sort-desc');
+            });
+
+            // Sort rows
+            rows.sort((a, b) => {
+                let aVal = a.cells[colIdx].textContent.trim();
+                let bVal = b.cells[colIdx].textContent.trim();
+
+                if (type === 'money') {
+                    aVal = parseFloat(aVal.replace(/[₦$B M K(),\-]/g, '')) || 0;
+                    bVal = parseFloat(bVal.replace(/[₦$B M K(),\-]/g, '')) || 0;
+                } else if (type === 'number') {
+                    aVal = parseFloat(aVal) || 0;
+                    bVal = parseFloat(bVal) || 0;
+                } else if (type === 'status') {
+                    const statusOrder = {'On Track': 0, 'Closed': 1, 'At Risk': 2, 'Off Track': 3, 'Unknown': 4};
+                    aVal = statusOrder[aVal] ?? 4;
+                    bVal = statusOrder[bVal] ?? 4;
+                } else {
+                    aVal = aVal.toLowerCase();
+                    bVal = bVal.toLowerCase();
+                }
+
+                return isAsc ? (aVal > bVal ? 1 : -1) : (aVal < bVal ? 1 : -1);
+            });
+
+            // Re-append rows
+            rows.forEach(row => tbody.appendChild(row));
+            header.classList.add(isAsc ? 'sort-desc' : 'sort-asc');
+        }
+
+        // Filter table function
+        function filterTable(tableId, searchId) {
+            const input = document.getElementById(searchId);
+            const filter = input.value.toLowerCase();
+            const table = document.getElementById(tableId);
+            const rows = table.getElementsByTagName('tr');
+
+            for (let i = 1; i < rows.length; i++) {
+                const text = rows[i].textContent.toLowerCase();
+                rows[i].classList.toggle('hidden', !text.includes(filter));
+            }
+        }
+
+        // Category Trend Chart
+        const categoryTrendCtx = document.getElementById('categoryTrendChart').getContext('2d');
+        new Chart(categoryTrendCtx, {
+            type: 'bar',
+            data: {
+                labels: ["08 Jan", "15 Jan", "23 Jan", "30 Jan", "06 Feb", "13 Feb", "20 Feb", "27 Feb", "06 Mar", "13 Mar", "20 Mar"],
+                datasets: [{"label": "Bank & Financial", "data": [4341.8, 530.75, 420295.4229, 145285.636, 430886.4744, 646.13, 12148.63, 13252.0, 372862.276, 17721102.1248, 23963.638099999996], "backgroundColor": "#00D4AA", "borderColor": "#00D4AA", "borderWidth": 0}, {"label": "Contractors & Consultants", "data": [0, 0, 13144819.4703, 0, 0, 0, 36341100.0, 6726768.91, 0, 81962699.8465, 0], "backgroundColor": "#FF6B6B", "borderColor": "#FF6B6B", "borderWidth": 0}, {"label": "Events & Conferences", "data": [0, 569172.0, 0, 0, 17610620.593200002, 1661252.7381999998, 0, 0, 3780664.3452, 0, 0], "backgroundColor": "#4ECDC4", "borderColor": "#4ECDC4", "borderWidth": 0}, {"label": "Investment Outflows", "data": [0, 0, 63928350.00000001, 0, 0, 0, 0, 0, 0, 648065850.0, 0], "backgroundColor": "#FFE66D", "borderColor": "#FFE66D", "borderWidth": 0}, {"label": "Office Operations", "data": [0, 0, 0, 0, 92988.15000000002, 868500.0, 0, 0, 0, 0, 0], "backgroundColor": "#A8E6CF", "borderColor": "#A8E6CF", "borderWidth": 0}, {"label": "Other", "data": [0, 18629601.67, 240299.56450000004, 0, 0, 0, 1373750.0, 8388765.28, 1758800.0, 775092.0000000001, 335000.0], "backgroundColor": "#95E1D3", "borderColor": "#95E1D3", "borderWidth": 0}, {"label": "Salary & Benefits", "data": [7845508.99, 19439710.09, 710315.0, 134084351.57, 4428717.680000001, 29744390.6, 857142.86, 114768715.62, 51079917.57, 239376.0, 22799690.75], "backgroundColor": "#F38181", "borderColor": "#F38181", "borderWidth": 0}, {"label": "Software & Tools", "data": [7148805.898800001, 310013.7591, 3272074.366, 3886205.904, 3368145.5468000006, 286865.1802, 3062831.81, 3156978.98, 6702926.140500001, 2955236.0236000004, 2789427.2399999998], "backgroundColor": "#AA96DA", "borderColor": "#AA96DA", "borderWidth": 0}, {"label": "Tax & Compliance", "data": [423908.34, 0, 16150403.84, 0, 0, 0, 0, 27844761.93, 0, 0, 34201325.76], "backgroundColor": "#00D4AA", "borderColor": "#00D4AA", "borderWidth": 0}, {"label": "Travel & Accommodation", "data": [3683484.359, 1590011.6791, 1009443.6987000001, 0, 6447082.137200001, 2420995.5627, 0, 10067418.629999999, 11719727.4593, 5862754.7049, 18489833.0193], "backgroundColor": "#FF6B6B", "borderColor": "#FF6B6B", "borderWidth": 0}, {"label": "Vendor Payments", "data": [2004500.0, 11188116.27, 15034153.37, 19096359.34, 19022691.21, 34539540.42, 16039878.76, 290000.0, 39282543.49, 15115115.17, 5457599.94], "backgroundColor": "#4ECDC4", "borderColor": "#4ECDC4", "borderWidth": 0}]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'x',
+                scales: {
+                    x: { stacked: true, ticks: { color: '#94a3b8' }, grid: { color: 'rgba(100,116,139,0.1)' } },
+                    y: { stacked: true, ticks: { color: '#94a3b8' }, grid: { color: 'rgba(100,116,139,0.1)' } }
+                },
+                plugins: {
+                    legend: {
+                        labels: { color: '#94a3b8' }
+                    }
+                }
+            }
+        });
+
+        // Top Vendors Chart
+        const topVendorsCtx = document.getElementById('topVendorsChart').getContext('2d');
+        new Chart(topVendorsCtx, {
+            type: 'barH',
+            type: 'bar',
+            data: {
+                labels: ["Ezeaku Frederick", "H.D Logistics", "RELIANCE HMO LTD", "Todara Lagos", "Airbroadband Limited", "Adebiyi Adekunle Shehu", "Ini Medichem Resources", "Ugonwa Nkemdilim Nnubia", "ProDevs Technology Outsourcing Ltd", "Iplug Hareware Ltd", "Oguno Ebuka Johnbosco", "Cascia Solutions", "Microware Solutions Limited", "Ebuta Nkort-Ejik", "Lilian Wilfred"],
+                datasets: [{
+                    label: 'Total Spend',
+                    data: [29112588.42, 13167455.0, 12124643.0, 11700500.0, 9793875.0, 7285000.0, 5345183.02, 5125000.0, 4710937.5, 4597690.0, 4000000.0, 4000000.0, 3280000.0, 2945000.0, 2726500.0],
+                    backgroundColor: '#00D4AA',
+                    borderColor: '#00D4AA'
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(100,116,139,0.1)' } },
+                    y: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+                },
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+
+        // Vendor Frequency Chart
+        const vendorFreqCtx = document.getElementById('vendorFreqChart').getContext('2d');
+        new Chart(vendorFreqCtx, {
+            type: 'bar',
+            data: {
+                labels: ["1x", "2x", "3x", "4x", "5x", "7x", "11x"],
+                datasets: [{
+                    label: 'Number of Vendors',
+                    data: [66, 16, 6, 2, 1, 1, 1],
+                    backgroundColor: '#4ECDC4',
+                    borderColor: '#4ECDC4'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(100,116,139,0.1)' } },
+                    y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(100,116,139,0.1)' } }
+                },
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+
+        // Weekly Volatility Chart
+        const volatilityCtx = document.getElementById('volatilityChart').getContext('2d');
+        new Chart(volatilityCtx, {
+            type: 'line',
+            data: {
+                labels: ["08 Jan", "15 Jan", "23 Jan", "30 Jan", "06 Feb", "13 Feb", "20 Feb", "27 Feb", "06 Mar", "13 Mar", "20 Mar"],
+                datasets: [
+                    {
+                        label: 'Weekly Total',
+                        data: [21110549.387800004, 51727156.2182, 113910154.73240001, 157212202.45, 51401131.7916, 69522190.6311, 57686852.06, 171256661.35000002, 114697441.28099999, 772697225.8698, 84096840.3474],
+                        borderColor: '#FF6B6B',
+                        backgroundColor: 'rgba(255, 107, 107, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        pointBackgroundColor: '#FF6B6B',
+                        pointBorderColor: '#FF6B6B'
+                    },
+                    {
+                        label: '3-Week Moving Avg',
+                        data: [36418852.803, 62249286.77946667, 107616504.46686667, 107507829.65799999, 92711841.62423332, 59536724.82756666, 99488568.01370001, 114546984.897, 352883776.16693336, 323830502.49939996, 428397033.10859996],
+                        borderColor: '#FFE66D',
+                        backgroundColor: 'transparent',
+                        tension: 0.4,
+                        borderDash: [5, 5],
+                        pointBackgroundColor: '#FFE66D'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(100,116,139,0.1)' } },
+                    y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(100,116,139,0.1)' } }
+                },
+                plugins: {
+                    legend: { labels: { color: '#94a3b8' } }
+                }
+            }
+        });
+
+        // Category Pie Chart
+        const categoryPieCtx = document.getElementById('categoryPieChart').getContext('2d');
+        new Chart(categoryPieCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ["Bank & Financial", "Contractors & Consultants", "Events & Conferences", "Investment Outflows", "Office Operations", "Other", "Salary & Benefits", "Software & Tools", "Tax & Compliance", "Travel & Accommodation", "Vendor Payments"],
+                datasets: [{
+                    data: [19145314.8822, 138175388.2268, 23621709.6766, 711994200.0, 961488.15, 31501308.5145, 385997836.72999996, 36939510.84900001, 78620399.87, 61290751.2502, 177070497.97],
+                    backgroundColor: ['#00D4AA', '#FF6B6B', '#4ECDC4', '#FFE66D', '#A8E6CF', '#95E1D3', '#F38181', '#AA96DA', '#FCBAD3', '#A8D8EA'],
+                    borderColor: 'rgba(30, 41, 59, 0.8)'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: { color: '#94a3b8' },
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

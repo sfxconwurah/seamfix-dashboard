@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seamfix Budget vs Actual Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:linear-gradient(135deg,#0f172a,#1e293b);color:#e2e8f0;padding:0;min-height:100vh}
+.container{max-width:1600px;margin:0 auto;padding:0 28px 28px}
+.header{margin-bottom:32px;padding-bottom:20px;border-bottom:2px solid rgba(0,212,170,0.2)}
+.header h1{font-size:2.4em;font-weight:700;background:linear-gradient(135deg,#00D4AA,#4ECDC4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}
+.header .sub{color:#94a3b8;font-size:0.95em}
+.header .meta{color:#64748b;font-size:0.8em;margin-top:6px}
+.nav-tabs{display:none!important}
+.top-nav{background:#0a0f1e;border-bottom:1px solid #334155;padding:0 24px;display:flex;align-items:center;height:48px;overflow-x:auto;position:sticky;top:0;z-index:200}
+.top-nav-brand{color:#e2e8f0;font-weight:700;font-size:15px;margin-right:24px;white-space:nowrap;text-decoration:none}
+.top-nav-link{color:#94a3b8;text-decoration:none;padding:0 14px;height:48px;display:flex;align-items:center;font-size:13px;border-bottom:2px solid transparent;white-space:nowrap;transition:color .2s}
+.top-nav-link:hover{color:#e2e8f0}
+.top-nav-link.active{color:#fff;border-bottom-color:#00D4AA;font-weight:500}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-bottom:36px}
+.kpi-card{background:linear-gradient(135deg,rgba(30,41,59,0.9),rgba(15,23,42,0.9));border:1px solid rgba(0,212,170,0.15);border-radius:12px;padding:22px;transition:all 0.3s ease}
+.kpi-card:hover{border-color:rgba(0,212,170,0.4);transform:translateY(-3px);box-shadow:0 8px 30px rgba(0,212,170,0.1)}
+.kpi-label{font-size:0.78em;color:#94a3b8;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px;font-weight:600}
+.kpi-value{font-size:1.6em;font-weight:700;color:#00D4AA;margin-bottom:6px}
+.kpi-value.negative{color:#FF6B6B}
+.kpi-change{font-size:0.82em;display:flex;align-items:center;gap:4px}
+.kpi-change.positive{color:#00D4AA}
+.kpi-change.negative{color:#FF6B6B}
+.kpi-change.neutral{color:#64748b}
+.charts-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(480px,1fr));gap:20px;margin-bottom:36px}
+.chart-box{background:linear-gradient(135deg,rgba(30,41,59,0.9),rgba(15,23,42,0.9));border:1px solid rgba(0,212,170,0.15);border-radius:12px;padding:22px;min-height:380px}
+.chart-box h3{font-size:1em;font-weight:600;margin-bottom:16px;color:#cbd5e1}
+.section{background:linear-gradient(135deg,rgba(30,41,59,0.9),rgba(15,23,42,0.9));border:1px solid rgba(0,212,170,0.15);border-radius:12px;padding:24px;margin-bottom:24px}
+.section h2{font-size:1.3em;margin-bottom:16px;color:#00D4AA}
+.search-box{margin-bottom:16px;padding:12px;background:rgba(0,212,170,0.05);border:1px solid rgba(0,212,170,0.2);border-radius:8px;color:#e2e8f0;font-family:inherit;width:100%;max-width:400px}
+.search-box::placeholder{color:#64748b}
+table{width:100%;border-collapse:collapse;font-size:0.85em}
+thead{background:rgba(0,212,170,0.08)}
+th{padding:10px 12px;text-align:left;font-weight:600;color:#00D4AA;border-bottom:2px solid rgba(0,212,170,0.15)}
+td{padding:10px 12px;border-bottom:1px solid rgba(0,212,170,0.06);color:#cbd5e1}
+tbody tr:hover{background:rgba(0,212,170,0.04)}
+.positive{color:#00D4AA}
+.negative{color:#FF6B6B}
+.tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.tab-btn{padding:8px 18px;border:1px solid rgba(0,212,170,0.2);border-radius:20px;background:transparent;color:#94a3b8;cursor:pointer;font-size:0.85em;font-family:inherit;transition:all 0.2s}
+.tab-btn.active,.tab-btn:hover{background:rgba(0,212,170,0.15);color:#00D4AA;border-color:rgba(0,212,170,0.4)}
+.tab-content{display:none}
+.tab-content.active{display:block}
+.takeaways-section{margin-bottom:36px}
+.takeaways-section h2{font-size:1.4em;margin-bottom:16px;color:#FFE66D;display:flex;align-items:center;gap:10px}
+.takeaways-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(440px,1fr));gap:16px}
+.takeaway-card{background:linear-gradient(135deg,rgba(30,41,59,0.95),rgba(15,23,42,0.95));border:1px solid rgba(0,212,170,0.1);border-left:4px solid #64748b;border-radius:10px;padding:20px;transition:all 0.3s ease}
+.takeaway-card:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(0,0,0,0.2)}
+.tw-header{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.tw-icon{font-size:1.2em}
+.tw-title{font-size:0.82em;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8}
+.tw-badge{font-size:0.7em;font-weight:700;padding:3px 10px;border-radius:12px;letter-spacing:0.5px}
+.tw-headline{font-size:1.05em;font-weight:600;margin-bottom:8px;line-height:1.4}
+.tw-body{font-size:0.88em;color:#94a3b8;line-height:1.65}
+.tw-body ul{margin:6px 0 0 16px}
+.tw-body li{margin-bottom:4px}
+@media(max-width:1024px){.charts-grid{grid-template-columns:1fr}.kpi-grid{grid-template-columns:repeat(2,1fr)}.takeaways-grid{grid-template-columns:1fr}}
+@media(max-width:640px){.kpi-grid{grid-template-columns:1fr}.header h1{font-size:1.6em}.nav-tabs{flex-wrap:wrap}}
+.pdf-btn{display:none!important}
+th.sortable{cursor:pointer;user-select:none}
+th.sortable:hover{color:#FFE66D}
+th.sort-asc::after{content:' ▲';font-size:0.7em}
+th.sort-desc::after{content:' ▼';font-size:0.7em}
+
+@media print{
+.pdf-btn{display:none!important}
+*{color-adjust:exact!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+body{background:#fff!important;color:#1e293b!important;padding:12px!important;font-size:9pt!important}
+.container{max-width:100%}
+.header h1{font-size:1.6em!important;background:none!important;-webkit-text-fill-color:#0f172a!important;color:#0f172a!important}
+.header .sub{color:#475569!important}
+.header .meta{color:#64748b!important}
+.nav-tabs{display:none!important}
+.kpi-grid{grid-template-columns:repeat(4,1fr)!important;gap:8px!important;margin-bottom:16px!important}
+.kpi-card{background:#f8fafc!important;border:1px solid #e2e8f0!important;padding:12px!important;border-radius:8px!important;box-shadow:none!important;page-break-inside:avoid}
+.kpi-label{color:#475569!important;font-size:0.65em!important}
+.kpi-value{color:#0f172a!important;font-size:1.2em!important}
+.kpi-value.negative{color:#dc2626!important}
+.kpi-change{font-size:0.7em!important}
+.kpi-change.positive{color:#16a34a!important}
+.kpi-change.negative{color:#dc2626!important}
+.kpi-change.neutral{color:#64748b!important}
+.takeaways-section{margin-bottom:16px!important;page-break-inside:avoid}
+.takeaways-section h2{color:#0f172a!important;font-size:1.1em!important}
+.takeaways-grid{grid-template-columns:repeat(2,1fr)!important;gap:10px!important}
+.takeaway-card{background:#f8fafc!important;border:1px solid #e2e8f0!important;padding:14px!important;border-radius:8px!important;page-break-inside:avoid}
+.tw-title{color:#475569!important}
+.tw-body{color:#475569!important}
+.tw-headline{font-size:0.95em!important}
+.charts-grid{grid-template-columns:1fr!important;gap:12px!important;margin-bottom:16px!important}
+.chart-box{background:#fff!important;border:1px solid #e2e8f0!important;padding:14px!important;min-height:auto!important;page-break-inside:avoid}
+.chart-box h3{color:#1e293b!important;font-size:0.85em!important}
+.section{background:#f8fafc!important;border:1px solid #e2e8f0!important;padding:16px!important;page-break-inside:avoid}
+.section h2{color:#0f172a!important}
+table{font-size:0.75em!important}
+thead{background:#f1f5f9!important}
+th{color:#0f172a!important;border-bottom-color:#cbd5e1!important}
+td{color:#334155!important;border-bottom-color:#e2e8f0!important}
+.positive{color:#16a34a!important}
+.negative{color:#dc2626!important}
+.tabs{display:none!important}
+.tab-content{display:block!important}
+.search-box{display:none!important}
+tbody tr:hover{background:transparent!important}
+}
+.dashboard-footer{margin-top:48px;padding:20px 28px;border-top:1px solid #334155;color:#94a3b8;font-size:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.dashboard-footer span{color:#94a3b8}
+/* ── HEADER: match Pipeline Intelligence style ── */
+.header{padding:24px 28px 16px!important;border-bottom:1px solid #334155!important;margin-bottom:24px!important;background:none!important}
+.header h1{font-size:22px!important;font-weight:700!important;background:none!important;-webkit-background-clip:unset!important;-webkit-text-fill-color:#e2e8f0!important;color:#e2e8f0!important;margin-bottom:4px!important}
+.header .sub{font-size:13px!important;color:#94a3b8!important}
+.header .meta{font-size:12px!important;color:#94a3b8!important;margin-top:4px!important}
+.header p{font-size:13px!important;color:#94a3b8!important;margin-top:4px!important}
+</style>
+</head>
+<body>
+<nav class="top-nav"><span class="top-nav-brand">⚡ Seamfix</span><a href="dashboard.html" class="top-nav-link ">Cash Overview</a><a href="expense_dashboard.html" class="top-nav-link ">Expense &amp; Vendor</a><a href="budget_dashboard.html" class="top-nav-link active">Budget vs Actual</a><a href="revenue_dashboard.html" class="top-nav-link ">Revenue &amp; Fundability</a><a href="pipeline_dashboard.html" class="top-nav-link ">Pipeline Intelligence</a></nav>
+<!-- PDF button hidden per user request -->
+
+<div class="container">
+<div class="header">
+<h1>Seamfix Budget vs Actual</h1>
+<div class="sub">Budget Performance Dashboard &mdash; 2026</div>
+</div>
+
+<!-- old nav-tabs replaced by top-nav -->
+
+<div class="kpi-grid">
+<div class="kpi-card">
+<div class="kpi-label">Total Annual Budget</div>
+<div class="kpi-value">₦5.10B</div>
+<div class="kpi-change neutral">All 32 cost heads</div>
+</div>
+<div class="kpi-card">
+<div class="kpi-label">YTD Actual Spend</div>
+<div class="kpi-value">₦974.6M</div>
+<div class="kpi-change neutral">Operational expenses (excl. investments)</div>
+</div>
+<div class="kpi-card">
+<div class="kpi-label">YTD Budget Pace</div>
+<div class="kpi-value">₦1.18B</div>
+<div class="kpi-change neutral">12 weeks / 52 weeks</div>
+</div>
+<div class="kpi-card">
+<div class="kpi-label">Budget Variance</div>
+<div class="kpi-value ">₦202.1M</div>
+<div class="kpi-change positive">+17.2% under</div>
+</div>
+<div class="kpi-card">
+<div class="kpi-label">Projected Year-End Spend</div>
+<div class="kpi-value ">₦4.22B</div>
+<div class="kpi-change positive">▼ ₦875.9M under annual budget</div>
+</div>
+</div>
+
+<div class="takeaways-section">
+<h2>📊 Executive Takeaways</h2>
+<div class="takeaways-grid">
+<div class="takeaway-card" style="border-left-color:#00D4AA">
+<div class="tw-header">
+<span class="tw-icon">📊</span>
+<span class="tw-title">Budget Health</span>
+<span class="tw-badge" style="background:rgba(0,212,170,0.15);color:#00D4AA">HEALTHY</span>
+</div>
+<div class="tw-headline" style="color:#00D4AA">YTD Performance Assessment</div>
+<div class="tw-body">Currently 17% under YTD budget pace. Spending is well-controlled. YTD spend is ₦974.6M against a pace of ₦1.18B.</div>
+</div><div class="takeaway-card" style="border-left-color:#FF6B6B">
+<div class="tw-header">
+<span class="tw-icon">⚠️</span>
+<span class="tw-title">Top Overspend Areas</span>
+<span class="tw-badge" style="background:rgba(255,107,107,0.15);color:#FF6B6B">ACTION</span>
+</div>
+<div class="tw-headline" style="color:#FF6B6B">Categories Exceeding YTD Pace</div>
+<div class="tw-body"><ul style="margin:6px 0 0 16px;padding:0;list-style:disc"><li>Business Development Expenses: ₦34.5M over (+83%)</li><li>Professional Fees: ₦22.2M over (+81%)</li><li>Miscellaneous Expenses: ₦20.0M over </li><li>Office Expense: ₦3.9M over (+128%)</li><li>New Product Development - IAM: ₦1.2M over (+1%)</li></ul></div>
+</div><div class="takeaway-card" style="border-left-color:#00D4AA">
+<div class="tw-header">
+<span class="tw-icon">💡</span>
+<span class="tw-title">Savings Opportunities</span>
+<span class="tw-badge" style="background:rgba(0,212,170,0.15);color:#00D4AA">POSITIVE</span>
+</div>
+<div class="tw-headline" style="color:#00D4AA">Categories Under Budget Pace</div>
+<div class="tw-body"><ul style="margin:6px 0 0 16px;padding:0;list-style:disc"><li>Business License and Permit: ₦42K remaining (66% unspent)</li><li>Diesel: ₦1.6M remaining (100% unspent)</li><li>Dues & Subscriptions: ₦728K remaining (100% unspent)</li><li>Freight and Clearing: ₦2.5M remaining (91% unspent)</li><li>Hosting Expenses: ₦22.8M remaining (78% unspent)</li></ul></div>
+</div><div class="takeaway-card" style="border-left-color:#FF6B6B">
+<div class="tw-header">
+<span class="tw-icon">🚨</span>
+<span class="tw-title">Critical Alerts</span>
+<span class="tw-badge" style="background:rgba(255,107,107,0.15);color:#FF6B6B">URGENT</span>
+</div>
+<div class="tw-headline" style="color:#FF6B6B">Categories >150% of YTD Budget Pace</div>
+<div class="tw-body"><ul style="margin:6px 0 0 16px;padding:0;list-style:disc"><li>Business Development Expenses: 83% over pace</li><li>Professional Fees: 81% over pace</li></ul></div>
+</div>
+</div>
+</div>
+
+<div class="charts-grid">
+<div class="chart-box"><h3>Top 15 Budget Categories: YTD Budget Pace vs Actual Spend</h3><canvas id="budgetChart"></canvas></div>
+<div class="chart-box"><h3>Weekly Operational Spend Trend</h3><canvas id="trendChart"></canvas></div>
+</div>
+
+<div class="section">
+<h2>🎯 Strategic Spend Breakdown</h2>
+<p style="color:#94a3b8;font-size:13px;margin:-8px 0 18px">Where is the money going? Spend classified into four strategic buckets to show revenue-generating investment vs operational overhead.</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px">
+<div class="strategic-bucket" style="border-left:4px solid #10b981;background:rgba(15,23,42,0.6);border-radius:8px;padding:16px 20px;margin-bottom:12px;">
+<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">
+  <span style="font-weight:600;font-size:14px;color:#e2e8f0">Revenue-Generating</span>
+  <span style="font-size:12px;color:#94a3b8">18.6% of total spend</span>
+</div>
+<div style="display:flex;gap:20px;margin-bottom:10px;flex-wrap:wrap">
+  <div><span style="font-size:11px;color:#94a3b8">YTD Actual</span><br><span style="font-size:18px;font-weight:700;color:#10b981">₦181.1M</span></div>
+  <div><span style="font-size:11px;color:#94a3b8">Annual Budget</span><br><span style="font-size:16px;color:#cbd5e1">₦710.9M</span></div>
+  <div><span style="font-size:11px;color:#94a3b8">Remaining</span><br><span style="font-size:16px;color:#10b981">₦529.8M left</span></div>
+</div>
+<div style="background:#1e293b;border-radius:4px;height:8px;overflow:hidden">
+  <div style="height:100%;width:25.5%;background:#10b981;border-radius:4px;transition:width 0.5s"></div>
+</div>
+<div style="font-size:11px;color:#94a3b8;margin-top:4px">25.5% of annual budget consumed</div>
+</div><div class="strategic-bucket" style="border-left:4px solid #3b82f6;background:rgba(15,23,42,0.6);border-radius:8px;padding:16px 20px;margin-bottom:12px;">
+<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">
+  <span style="font-weight:600;font-size:14px;color:#e2e8f0">People Costs</span>
+  <span style="font-size:12px;color:#94a3b8">68.1% of total spend</span>
+</div>
+<div style="display:flex;gap:20px;margin-bottom:10px;flex-wrap:wrap">
+  <div><span style="font-size:11px;color:#94a3b8">YTD Actual</span><br><span style="font-size:18px;font-weight:700;color:#3b82f6">₦663.9M</span></div>
+  <div><span style="font-size:11px;color:#94a3b8">Annual Budget</span><br><span style="font-size:16px;color:#cbd5e1">₦3.42B</span></div>
+  <div><span style="font-size:11px;color:#94a3b8">Remaining</span><br><span style="font-size:16px;color:#10b981">₦2.76B left</span></div>
+</div>
+<div style="background:#1e293b;border-radius:4px;height:8px;overflow:hidden">
+  <div style="height:100%;width:19.4%;background:#3b82f6;border-radius:4px;transition:width 0.5s"></div>
+</div>
+<div style="font-size:11px;color:#94a3b8;margin-top:4px">19.4% of annual budget consumed</div>
+</div><div class="strategic-bucket" style="border-left:4px solid #8b5cf6;background:rgba(15,23,42,0.6);border-radius:8px;padding:16px 20px;margin-bottom:12px;">
+<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">
+  <span style="font-weight:600;font-size:14px;color:#e2e8f0">Technology & Infrastructure</span>
+  <span style="font-size:12px;color:#94a3b8">5.4% of total spend</span>
+</div>
+<div style="display:flex;gap:20px;margin-bottom:10px;flex-wrap:wrap">
+  <div><span style="font-size:11px;color:#94a3b8">YTD Actual</span><br><span style="font-size:18px;font-weight:700;color:#8b5cf6">₦53.0M</span></div>
+  <div><span style="font-size:11px;color:#94a3b8">Annual Budget</span><br><span style="font-size:16px;color:#cbd5e1">₦398.9M</span></div>
+  <div><span style="font-size:11px;color:#94a3b8">Remaining</span><br><span style="font-size:16px;color:#10b981">₦345.8M left</span></div>
+</div>
+<div style="background:#1e293b;border-radius:4px;height:8px;overflow:hidden">
+  <div style="height:100%;width:13.3%;background:#8b5cf6;border-radius:4px;transition:width 0.5s"></div>
+</div>
+<div style="font-size:11px;color:#94a3b8;margin-top:4px">13.3% of annual budget consumed</div>
+</div><div class="strategic-bucket" style="border-left:4px solid #f59e0b;background:rgba(15,23,42,0.6);border-radius:8px;padding:16px 20px;margin-bottom:12px;">
+<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">
+  <span style="font-weight:600;font-size:14px;color:#e2e8f0">Operations & Overhead</span>
+  <span style="font-size:12px;color:#94a3b8">7.9% of total spend</span>
+</div>
+<div style="display:flex;gap:20px;margin-bottom:10px;flex-wrap:wrap">
+  <div><span style="font-size:11px;color:#94a3b8">YTD Actual</span><br><span style="font-size:18px;font-weight:700;color:#f59e0b">₦76.6M</span></div>
+  <div><span style="font-size:11px;color:#94a3b8">Annual Budget</span><br><span style="font-size:16px;color:#cbd5e1">₦565.2M</span></div>
+  <div><span style="font-size:11px;color:#94a3b8">Remaining</span><br><span style="font-size:16px;color:#10b981">₦488.6M left</span></div>
+</div>
+<div style="background:#1e293b;border-radius:4px;height:8px;overflow:hidden">
+  <div style="height:100%;width:13.6%;background:#f59e0b;border-radius:4px;transition:width 0.5s"></div>
+</div>
+<div style="font-size:11px;color:#94a3b8;margin-top:4px">13.6% of annual budget consumed</div>
+</div>
+</div>
+</div>
+
+<div class="section">
+<h2>Budget Variance Analysis</h2>
+<div class="tabs">
+<button class="tab-btn active" onclick="showTab('variance')">Variance Table</button>
+<button class="tab-btn" onclick="showTab('deepdive')">Expense Details</button>
+<button class="tab-btn" onclick="showTab('unbudgeted')">⚠ Unbudgeted Spend (7)</button>
+</div>
+<div id="tab-variance" class="tab-content active">
+<table id="varianceTable">
+<thead><tr><th class="sortable" onclick="sortTable('varianceTable',0,'text')">Category</th><th class="sortable" onclick="sortTable('varianceTable',1,'money')">Annual Budget</th><th class="sortable" onclick="sortTable('varianceTable',2,'money')">YTD Budget</th><th class="sortable" onclick="sortTable('varianceTable',3,'money')">YTD Actual</th><th class="sortable" onclick="sortTable('varianceTable',4,'money')">Variance</th><th class="sortable" onclick="sortTable('varianceTable',5,'pct')">% Used vs YTD</th><th class="sortable" onclick="sortTable('varianceTable',6,'pct')">Annual Used %</th><th class="sortable" onclick="sortTable('varianceTable',7,'money')">Annual Remaining</th><th class="sortable" onclick="sortTable('varianceTable',8,'status')">Status</th></tr></thead>
+<tbody><tr>
+<td>Business Development Expenses</td>
+<td>₦179.9M</td>
+<td>₦41.5M</td>
+<td>₦76.0M</td>
+<td class="negative">₦34.5M</td>
+<td>183.2%</td>
+<td>42.3%</td>
+<td class="positive">₦103.8M</td>
+<td>🔴 Over Budget</td>
+</tr><tr>
+<td>Professional Fees</td>
+<td>₦118.0M</td>
+<td>₦27.2M</td>
+<td>₦49.4M</td>
+<td class="negative">₦22.2M</td>
+<td>181.3%</td>
+<td>41.8%</td>
+<td class="positive">₦68.6M</td>
+<td>🔴 Over Budget</td>
+</tr><tr>
+<td>Miscellaneous Expenses</td>
+<td>₦0</td>
+<td>₦0</td>
+<td>₦20.0M</td>
+<td class="negative">₦20.0M</td>
+<td>0.0%</td>
+<td>0.0%</td>
+<td class="negative">(₦20.0M over)</td>
+<td>🔴 Over Budget</td>
+</tr><tr>
+<td>Office Expense</td>
+<td>₦13.2M</td>
+<td>₦3.0M</td>
+<td>₦6.9M</td>
+<td class="negative">₦3.9M</td>
+<td>227.5%</td>
+<td>52.5%</td>
+<td class="positive">₦6.3M</td>
+<td>🔴 Over Budget</td>
+</tr><tr>
+<td>New Product Development - IAM</td>
+<td>₦350.0M</td>
+<td>₦80.8M</td>
+<td>₦82.0M</td>
+<td class="negative">₦1.2M</td>
+<td>101.5%</td>
+<td>23.4%</td>
+<td class="positive">₦268.0M</td>
+<td>🔴 Over Budget</td>
+</tr><tr>
+<td>Learning & Development</td>
+<td>₦94K</td>
+<td>₦22K</td>
+<td>₦569K</td>
+<td class="negative">₦547K</td>
+<td>2623.8%</td>
+<td>605.5%</td>
+<td class="negative">(₦475K over)</td>
+<td>🔴 Over Budget</td>
+</tr><tr>
+<td>Assets purchase</td>
+<td>₦45.1M</td>
+<td>₦10.4M</td>
+<td>₦6.8M</td>
+<td class="positive">₦3.6M</td>
+<td>65.5%</td>
+<td>15.1%</td>
+<td class="positive">₦38.3M</td>
+<td>🟡 On Track</td>
+</tr><tr>
+<td>Business Expansion</td>
+<td>₦0</td>
+<td>₦0</td>
+<td>₦0</td>
+<td class="positive">₦0</td>
+<td>0.0%</td>
+<td>0.0%</td>
+<td class="positive">₦0</td>
+<td>🟡 On Track</td>
+</tr><tr>
+<td>Business License and Permit</td>
+<td>₦275K</td>
+<td>₦63K</td>
+<td>₦22K</td>
+<td class="positive">₦42K</td>
+<td>33.9%</td>
+<td>7.8%</td>
+<td class="positive">₦253K</td>
+<td>🟢 Under Budget</td>
+</tr><tr>
+<td>Charitable Donations/CSR</td>
+<td>₦0</td>
+<td>₦0</td>
+<td>₦0</td>
+<td class="positive">₦0</td>
+<td>0.0%</td>
+<td>0.0%</td>
+<td class="positive">₦0</td>
+<td>🟡 On Track</td>
+</tr><tr>
+<td>Corporate Gift expense</td>
+<td>₦0</td>
+<td>₦0</td>
+<td>₦0</td>
+<td class="positive">₦0</td>
+<td>0.0%</td>
+<td>0.0%</td>
+<td class="positive">₦0</td>
+<td>🟡 On Track</td>
+</tr><tr>
+<td>Diesel</td>
+<td>₦6.9M</td>
+<td>₦1.6M</td>
+<td>₦0</td>
+<td class="positive">₦1.6M</td>
+<td>0.0%</td>
+<td>0.0%</td>
+<td class="positive">₦6.9M</td>
+<td>🟢 Under Budget</td>
+</tr><tr>
+<td>Dues & Subscriptions</td>
+<td>₦3.2M</td>
+<td>₦728K</td>
+<td>₦0</td>
+<td class="positive">₦728K</td>
+<td>0.0%</td>
+<td>0.0%</td>
+<td class="positive">₦3.2M</td>
+<td>🟢 Under Budget</td>
+</tr><tr>
+<td>Freight and Clearing</td>
+<td>₦12.0M</td>
+<td>₦2.8M</td>
+<td>₦240K</td>
+<td class="positive">₦2.5M</td>
+<td>8.7%</td>
+<td>2.0%</td>
+<td class="positive">₦11.8M</td>
+<td>🟢 Under Budget</td>
+</tr><tr>
+<td>Hosting Expenses</td>
+<td>₦127.5M</td>
+<td>₦29.4M</td>
+<td>₦6.6M</td>
+<td class="positive">₦22.8M</td>
+<td>22.5%</td>
+<td>5.2%</td>
+<td class="positive">₦120.9M</td>
+<td>🟢 Under Budget</td>
+</tr><tr>
+<td>Insurance Expenses</td>
+<td>₦13.1M</td>
+<td>₦3.0M</td>
+<td>₦0</td>
+<td class="positive">₦3.0M</td>
+<td>0.0%</td>
+<td>0.0%</td>
+<td class="positive">₦13.1M</td>
+<td>🟢 Under Budget</td>
+</tr><tr>
+<td>Marketing & Branding - Digital</td>
+<td>₦45.0M</td>
+<td>₦10.4M</td>
+<td>₦0</td>
+<td class="positive">₦10.4M</td>
+<td>0.0%</td>
+<td>0.0%</td>
+<td class="positive">₦45.0M</td>
+<td>🟢 Under Budget</td>
+</tr><tr>
+<td>Marketing & Branding - Events</td>
+<td>₦132.0M</td>
+<td>₦30.5M</td>
+<td>₦23.1M</td>
+<td class="positive">₦7.4M</td>
+<td>75.7%</td>
+<td>17.5%</td>
+<td class="positive">₦108.9M</td>
+<td>🟡 On Track</td>
+</tr><tr>
+<td>Motor Vehicle Expense</td>
+<td>₦4.9M</td>
+<td>₦1.1M</td>
+<td>₦0</td>
+<td class="positive">₦1.1M</td>
+<td>0.0%</td>
+<td>0.0%</td>
+<td class="positive">₦4.9M</td>
+<td>🟢 Under Budget</td>
+</tr><tr>
+<td>NED Fees</td>
+<td>₦13.4M</td>
+<td>₦3.1M</td>
+<td>₦0</td>
+<td class="positive">₦3.1M</td>
+<td>0.0%</td>
+<td>0.0%</td>
+<td class="positive">₦13.4M</td>
+<td>🟢 Under Budget</td>
+</tr><tr>
+<td>Others - AIF Coupon</td>
+<td>₦300.4M</td>
+<td>₦69.3M</td>
+<td>₦0</td>
+<td class="positive">₦69.3M</td>
+<td>0.0%</td>
+<td>0.0%</td>
+<td class="positive">₦300.4M</td>
+<td>🟢 Under Budget</td>
+</tr><tr>
+<td>Payroll</td>
+<td>₦2.86B</td>
+<td>₦660.6M</td>
+<td>₦647.6M</td>
+<td class="positive">₦12.9M</td>
+<td>98.0%</td>
+<td>22.6%</td>
+<td class="positive">₦2.21B</td>
+<td>🟡 On Track</td>
+</tr><tr>
+<td>Printing</td>
+<td>₦4.2M</td>
+<td>₦963K</td>
+<td>₦0</td>
+<td class="positive">₦963K</td>
+<td>0.0%</td>
+<td>0.0%</td>
+<td class="positive">₦4.2M</td>
+<td>🟢 Under Budget</td>
+</tr><tr>
+<td>Property Maintenance Expenses</td>
+<td>₦0</td>
+<td>₦0</td>
+<td>₦0</td>
+<td class="positive">₦0</td>
+<td>0.0%</td>
+<td>0.0%</td>
+<td class="positive">₦0</td>
+<td>🟡 On Track</td>
+</tr><tr>
+<td>Rental Expense</td>
+<td>₦59.5M</td>
+<td>₦13.7M</td>
+<td>₦0</td>
+<td class="positive">₦13.7M</td>
+<td>0.0%</td>
+<td>0.0%</td>
+<td class="positive">₦59.5M</td>
+<td>🟢 Under Budget</td>
+</tr><tr>
+<td>Repairs</td>
+<td>₦14.5M</td>
+<td>₦3.4M</td>
+<td>₦0</td>
+<td class="positive">₦3.4M</td>
+<td>0.0%</td>
+<td>0.0%</td>
+<td class="positive">₦14.5M</td>
+<td>🟢 Under Budget</td>
+</tr><tr>
+<td>Retreat expenses</td>
+<td>₦0</td>
+<td>₦0</td>
+<td>₦0</td>
+<td class="positive">₦0</td>
+<td>0.0%</td>
+<td>0.0%</td>
+<td class="positive">₦0</td>
+<td>🟡 On Track</td>
+</tr><tr>
+<td>Software Tools</td>
+<td>₦223.2M</td>
+<td>₦51.5M</td>
+<td>₦39.6M</td>
+<td class="positive">₦11.9M</td>
+<td>76.9%</td>
+<td>17.8%</td>
+<td class="positive">₦183.6M</td>
+<td>🟡 On Track</td>
+</tr><tr>
+<td>Staff Allowances</td>
+<td>₦7.5M</td>
+<td>₦1.7M</td>
+<td>₦0</td>
+<td class="positive">₦1.7M</td>
+<td>0.0%</td>
+<td>0.0%</td>
+<td class="positive">₦7.5M</td>
+<td>🟢 Under Budget</td>
+</tr><tr>
+<td>Staff welfare & benefits</td>
+<td>₦554.2M</td>
+<td>₦127.9M</td>
+<td>₦15.7M</td>
+<td class="positive">₦112.2M</td>
+<td>12.3%</td>
+<td>2.8%</td>
+<td class="positive">₦538.5M</td>
+<td>🟢 Under Budget</td>
+</tr><tr>
+<td>Tenders/Bids Purchase Expenses</td>
+<td>₦4.0M</td>
+<td>₦923K</td>
+<td>₦0</td>
+<td class="positive">₦923K</td>
+<td>0.0%</td>
+<td>0.0%</td>
+<td class="positive">₦4.0M</td>
+<td>🟢 Under Budget</td>
+</tr><tr>
+<td>Transport Expenses</td>
+<td>₦4.8M</td>
+<td>₦1.1M</td>
+<td>₦0</td>
+<td class="positive">₦1.1M</td>
+<td>0.0%</td>
+<td>0.0%</td>
+<td class="positive">₦4.8M</td>
+<td>🟢 Under Budget</td>
+</tr></tbody>
+</table>
+</div>
+<div id="tab-deepdive" class="tab-content">
+<input type="text" class="search-box" id="searchBox" placeholder="Search expense items (e.g. laptop, MacBook, office)...">
+<table id="deepDiveTable">
+<thead><tr><th class="sortable" onclick="sortTable('deepDiveTable',0,'text')">Date</th><th class="sortable" onclick="sortTable('deepDiveTable',1,'text')">Expense Item</th><th class="sortable" onclick="sortTable('deepDiveTable',2,'money')">Amount</th><th class="sortable" onclick="sortTable('deepDiveTable',3,'text')">Mapped Budget Category</th></tr></thead>
+<tbody><tr>
+<td>30 Jan 2026</td>
+<td>Payment Batches</td>
+<td>₦19.1M</td>
+<td>Payroll</td>
+</tr><tr>
+<td>30 Jan 2026</td>
+<td>Software Tools</td>
+<td>₦3.9M</td>
+<td>Software Tools</td>
+</tr><tr>
+<td>30 Jan 2026</td>
+<td>Salary</td>
+<td>₦115.3M</td>
+<td>Payroll</td>
+</tr><tr>
+<td>30 Jan 2026</td>
+<td>Management Allowance</td>
+<td>₦18.8M</td>
+<td>Payroll</td>
+</tr><tr>
+<td>30 Jan 2026</td>
+<td>Bank Charges</td>
+<td>₦145K</td>
+<td>Miscellaneous Expenses</td>
+</tr><tr>
+<td>27 Feb 2026</td>
+<td>Payment Batches</td>
+<td>₦290K</td>
+<td>Payroll</td>
+</tr><tr>
+<td>27 Feb 2026</td>
+<td>Software Tools</td>
+<td>₦3.2M</td>
+<td>Software Tools</td>
+</tr><tr>
+<td>27 Feb 2026</td>
+<td>Flight Ticket/Accommodation</td>
+<td>₦5.9M</td>
+<td>Business Development Expenses</td>
+</tr><tr>
+<td>27 Feb 2026</td>
+<td>Salary</td>
+<td>₦114.8M</td>
+<td>Payroll</td>
+</tr><tr>
+<td>27 Feb 2026</td>
+<td>Tatvasoft</td>
+<td>₦6.7M</td>
+<td>Professional Fees</td>
+</tr><tr>
+<td>27 Feb 2026</td>
+<td>AWS</td>
+<td>₦6.6M</td>
+<td>Hosting Expenses</td>
+</tr><tr>
+<td>27 Feb 2026</td>
+<td>BTA</td>
+<td>₦4.2M</td>
+<td>Business Development Expenses</td>
+</tr><tr>
+<td>27 Feb 2026</td>
+<td>Office Supplies, Fuel & Letter Dispatch</td>
+<td>₦1.7M</td>
+<td>Office Expense</td>
+</tr><tr>
+<td>27 Feb 2026</td>
+<td>Bank Charges</td>
+<td>₦13K</td>
+<td>Miscellaneous Expenses</td>
+</tr><tr>
+<td>23 Jan 2026</td>
+<td>Payment Batches</td>
+<td>₦15.0M</td>
+<td>Payroll</td>
+</tr><tr>
+<td>23 Jan 2026</td>
+<td>Software Tools</td>
+<td>₦3.3M</td>
+<td>Software Tools</td>
+</tr><tr>
+<td>23 Jan 2026</td>
+<td>Flight Ticket/Accommodation</td>
+<td>₦1.0M</td>
+<td>Business Development Expenses</td>
+</tr><tr>
+<td>23 Jan 2026</td>
+<td>Tatvasoft</td>
+<td>₦6.3M</td>
+<td>Professional Fees</td>
+</tr><tr>
+<td>23 Jan 2026</td>
+<td>Amazon</td>
+<td>₦6.8M</td>
+<td>Assets purchase</td>
+</tr><tr>
+<td>23 Jan 2026</td>
+<td>Management Allowance</td>
+<td>₦710K</td>
+<td>Payroll</td>
+</tr><tr>
+<td>23 Jan 2026</td>
+<td>Shipping & Freight</td>
+<td>₦240K</td>
+<td>Freight and Clearing</td>
+</tr><tr>
+<td>23 Jan 2026</td>
+<td>Bank Charges</td>
+<td>₦420K</td>
+<td>Miscellaneous Expenses</td>
+</tr><tr>
+<td>23 Jan 2026</td>
+<td>Business Premises & Dev Levy</td>
+<td>₦22K</td>
+<td>Business License and Permit</td>
+</tr><tr>
+<td>20 Mar 2026</td>
+<td>Payment Batches</td>
+<td>₦5.5M</td>
+<td>Payroll</td>
+</tr><tr>
+<td>20 Mar 2026</td>
+<td>Software Tools</td>
+<td>₦2.8M</td>
+<td>Software Tools</td>
+</tr><tr>
+<td>20 Mar 2026</td>
+<td>Flight Ticket/Accommodation</td>
+<td>₦16.3M</td>
+<td>Business Development Expenses</td>
+</tr><tr>
+<td>20 Mar 2026</td>
+<td>PAYE</td>
+<td>₦22.5M</td>
+<td>Payroll</td>
+</tr><tr>
+<td>20 Mar 2026</td>
+<td>BTA</td>
+<td>₦2.2M</td>
+<td>Business Development Expenses</td>
+</tr><tr>
+<td>20 Mar 2026</td>
+<td>Management Allowance</td>
+<td>₦272K</td>
+<td>Payroll</td>
+</tr><tr>
+<td>20 Mar 2026</td>
+<td>Bank Charges</td>
+<td>₦24K</td>
+<td>Miscellaneous Expenses</td>
+</tr><tr>
+<td>20 Mar 2026</td>
+<td>Office Supplies, Fuel & Letter Dispatch</td>
+<td>₦335K</td>
+<td>Office Expense</td>
+</tr><tr>
+<td>20 Feb 2026</td>
+<td>Payment Batches</td>
+<td>₦16.0M</td>
+<td>Payroll</td>
+</tr><tr>
+<td>20 Feb 2026</td>
+<td>Software Tools</td>
+<td>₦3.1M</td>
+<td>Software Tools</td>
+</tr><tr>
+<td>20 Feb 2026</td>
+<td>Nimc consultancy fee</td>
+<td>₦36.3M</td>
+<td>Professional Fees</td>
+</tr><tr>
+<td>20 Feb 2026</td>
+<td>Salary</td>
+<td>₦857K</td>
+<td>Payroll</td>
+</tr><tr>
+<td>20 Feb 2026</td>
+<td>Office Supplies, Fuel & Letter Dispatch</td>
+<td>₦1.4M</td>
+<td>Office Expense</td>
+</tr><tr>
+<td>20 Feb 2026</td>
+<td>Bank Charges</td>
+<td>₦12K</td>
+<td>Miscellaneous Expenses</td>
+</tr><tr>
+<td>15 Jan 2026</td>
+<td>Payment Batches</td>
+<td>₦11.2M</td>
+<td>Payroll</td>
+</tr><tr>
+<td>15 Jan 2026</td>
+<td>Software Tools</td>
+<td>₦310K</td>
+<td>Software Tools</td>
+</tr><tr>
+<td>15 Jan 2026</td>
+<td>Flight Ticket/Accommodation</td>
+<td>₦820K</td>
+<td>Business Development Expenses</td>
+</tr><tr>
+<td>15 Jan 2026</td>
+<td>NIMC -Licenses Fee</td>
+<td>₦14.8M</td>
+<td>Business Development Expenses</td>
+</tr><tr>
+<td>15 Jan 2026</td>
+<td>Exit  Salary</td>
+<td>₦3.9M</td>
+<td>Payroll</td>
+</tr><tr>
+<td>15 Jan 2026</td>
+<td>BTA</td>
+<td>₦770K</td>
+<td>Business Development Expenses</td>
+</tr><tr>
+<td>15 Jan 2026</td>
+<td>Paye</td>
+<td>₦19.4M</td>
+<td>Payroll</td>
+</tr><tr>
+<td>15 Jan 2026</td>
+<td>Training</td>
+<td>₦569K</td>
+<td>Learning & Development</td>
+</tr><tr>
+<td>15 Jan 2026</td>
+<td>Bank Charges</td>
+<td>₦531</td>
+<td>Miscellaneous Expenses</td>
+</tr><tr>
+<td>13 Mar 2026</td>
+<td>Payment Batches</td>
+<td>₦15.1M</td>
+<td>Payroll</td>
+</tr><tr>
+<td>13 Mar 2026</td>
+<td>Software Tools</td>
+<td>₦3.0M</td>
+<td>Software Tools</td>
+</tr><tr>
+<td>13 Mar 2026</td>
+<td>Flight Ticket/Accommodation</td>
+<td>₦4.8M</td>
+<td>Business Development Expenses</td>
+</tr><tr>
+<td>13 Mar 2026</td>
+<td>NSITF Contributions</td>
+<td>₦30K</td>
+<td>Staff welfare & benefits</td>
+</tr><tr>
+<td>13 Mar 2026</td>
+<td>Bind Creative</td>
+<td>₦82.0M</td>
+<td>New Product Development - IAM</td>
+</tr><tr>
+<td>13 Mar 2026</td>
+<td>BTA</td>
+<td>₦1.1M</td>
+<td>Business Development Expenses</td>
+</tr><tr>
+<td>13 Mar 2026</td>
+<td>Management Allowance</td>
+<td>₦209K</td>
+<td>Payroll</td>
+</tr><tr>
+<td>13 Mar 2026</td>
+<td>Bank Charges</td>
+<td>₦17.7M</td>
+<td>Miscellaneous Expenses</td>
+</tr><tr>
+<td>13 Mar 2026</td>
+<td>Office Supplies, Fuel & Letter Dispatch</td>
+<td>₦775K</td>
+<td>Office Expense</td>
+</tr><tr>
+<td>13 Feb 2026</td>
+<td>Payment Batches</td>
+<td>₦34.5M</td>
+<td>Payroll</td>
+</tr><tr>
+<td>13 Feb 2026</td>
+<td>Software Tools</td>
+<td>₦287K</td>
+<td>Software Tools</td>
+</tr><tr>
+<td>13 Feb 2026</td>
+<td>Management Allowance</td>
+<td>₦7.0M</td>
+<td>Payroll</td>
+</tr><tr>
+<td>13 Feb 2026</td>
+<td>MWC Registration</td>
+<td>₦1.7M</td>
+<td>Marketing & Branding - Events</td>
+</tr><tr>
+<td>13 Feb 2026</td>
+<td>Flight Ticket/Accommodation</td>
+<td>₦2.4M</td>
+<td>Business Development Expenses</td>
+</tr><tr>
+<td>13 Feb 2026</td>
+<td>PAYE</td>
+<td>₦22.7M</td>
+<td>Payroll</td>
+</tr><tr>
+<td>13 Feb 2026</td>
+<td>Office Supplies & Fuel</td>
+<td>₦868K</td>
+<td>Office Expense</td>
+</tr><tr>
+<td>13 Feb 2026</td>
+<td>Bank Charges</td>
+<td>₦646</td>
+<td>Miscellaneous Expenses</td>
+</tr><tr>
+<td>08 Jan 2026</td>
+<td>Payment Batches</td>
+<td>₦2.0M</td>
+<td>Payroll</td>
+</tr><tr>
+<td>08 Jan 2026</td>
+<td>Software Tools</td>
+<td>₦7.1M</td>
+<td>Software Tools</td>
+</tr><tr>
+<td>08 Jan 2026</td>
+<td>Flight Ticket/Accommodation</td>
+<td>₦1.9M</td>
+<td>Business Development Expenses</td>
+</tr><tr>
+<td>08 Jan 2026</td>
+<td>Pension</td>
+<td>₦7.7M</td>
+<td>Payroll</td>
+</tr><tr>
+<td>08 Jan 2026</td>
+<td>BTA</td>
+<td>₦1.8M</td>
+<td>Business Development Expenses</td>
+</tr><tr>
+<td>08 Jan 2026</td>
+<td>Paye</td>
+<td>₦111K</td>
+<td>Payroll</td>
+</tr><tr>
+<td>08 Jan 2026</td>
+<td>Bank Charges</td>
+<td>₦4K</td>
+<td>Miscellaneous Expenses</td>
+</tr><tr>
+<td>06 Mar 2026</td>
+<td>Payment Batches</td>
+<td>₦39.3M</td>
+<td>Payroll</td>
+</tr><tr>
+<td>06 Mar 2026</td>
+<td>Software Tools</td>
+<td>₦6.7M</td>
+<td>Software Tools</td>
+</tr><tr>
+<td>06 Mar 2026</td>
+<td>Flight Ticket/Accommodation</td>
+<td>₦9.7M</td>
+<td>Business Development Expenses</td>
+</tr><tr>
+<td>06 Mar 2026</td>
+<td>NSITF Contributions</td>
+<td>₦15.6M</td>
+<td>Staff welfare & benefits</td>
+</tr><tr>
+<td>06 Mar 2026</td>
+<td>ID4Africa Registration</td>
+<td>₦3.8M</td>
+<td>Marketing & Branding - Events</td>
+</tr><tr>
+<td>06 Mar 2026</td>
+<td>Pension Remittance</td>
+<td>₦23.7M</td>
+<td>Payroll</td>
+</tr><tr>
+<td>06 Mar 2026</td>
+<td>BTA</td>
+<td>₦2.0M</td>
+<td>Business Development Expenses</td>
+</tr><tr>
+<td>06 Mar 2026</td>
+<td>Management Allowance</td>
+<td>₦11.8M</td>
+<td>Payroll</td>
+</tr><tr>
+<td>06 Mar 2026</td>
+<td>Bank Charges</td>
+<td>₦373K</td>
+<td>Miscellaneous Expenses</td>
+</tr><tr>
+<td>06 Mar 2026</td>
+<td>Office Supplies, Fuel & Letter Dispatch</td>
+<td>₦1.8M</td>
+<td>Office Expense</td>
+</tr><tr>
+<td>06 Feb 2026</td>
+<td>Payment Batches</td>
+<td>₦19.0M</td>
+<td>Payroll</td>
+</tr><tr>
+<td>06 Feb 2026</td>
+<td>Software Tools</td>
+<td>₦3.4M</td>
+<td>Software Tools</td>
+</tr><tr>
+<td>06 Feb 2026</td>
+<td>Salary</td>
+<td>₦4.2M</td>
+<td>Payroll</td>
+</tr><tr>
+<td>06 Feb 2026</td>
+<td>ID4Africa</td>
+<td>₦17.6M</td>
+<td>Marketing & Branding - Events</td>
+</tr><tr>
+<td>06 Feb 2026</td>
+<td>Flight Ticket/Accommodation</td>
+<td>₦3.2M</td>
+<td>Business Development Expenses</td>
+</tr><tr>
+<td>06 Feb 2026</td>
+<td>PAYE</td>
+<td>₦257K</td>
+<td>Payroll</td>
+</tr><tr>
+<td>06 Feb 2026</td>
+<td>BTA</td>
+<td>₦3.3M</td>
+<td>Business Development Expenses</td>
+</tr><tr>
+<td>06 Feb 2026</td>
+<td>Office Supplies & Fuel</td>
+<td>₦93K</td>
+<td>Office Expense</td>
+</tr><tr>
+<td>06 Feb 2026</td>
+<td>Bank Charges</td>
+<td>₦431K</td>
+<td>Miscellaneous Expenses</td>
+</tr><tr>
+<td>01 Jan 2026</td>
+<td>Payment Batches</td>
+<td>₦33.8M</td>
+<td>Payroll</td>
+</tr><tr>
+<td>01 Jan 2026</td>
+<td>Software Tools</td>
+<td>₦2.7M</td>
+<td>Software Tools</td>
+</tr><tr>
+<td>01 Jan 2026</td>
+<td>Paye</td>
+<td>₦1.5M</td>
+<td>Payroll</td>
+</tr><tr>
+<td>01 Jan 2026</td>
+<td>Salaries</td>
+<td>₦60.4M</td>
+<td>Payroll</td>
+</tr><tr>
+<td>01 Jan 2026</td>
+<td>Management Allowance</td>
+<td>₦724K</td>
+<td>Payroll</td>
+</tr><tr>
+<td>01 Jan 2026</td>
+<td>Bank Charges</td>
+<td>₦891K</td>
+<td>Miscellaneous Expenses</td>
+</tr></tbody>
+</table>
+</div>
+<div id="tab-unbudgeted" class="tab-content">
+<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:8px;padding:14px 18px;margin-bottom:16px">
+  <strong style="color:#ef4444">⚠ Governance Flag:</strong>
+  <span style="color:#94a3b8;font-size:13px;margin-left:8px">These 7 expense line(s) totalling <strong style="color:#ef4444">₦78.7M</strong> have no matching approved budget category. They are excluded from the Variance Table above but are real cash outflows. Review and either reclassify to an existing budget heading or add a new budget line item.</span>
+</div>
+<table id="unbudgetedTable">
+<thead><tr><th class="sortable" onclick="sortTable('unbudgetedTable',0,'text')">Date</th><th class="sortable" onclick="sortTable('unbudgetedTable',1,'text')">Expense Item</th><th class="sortable" onclick="sortTable('unbudgetedTable',2,'money')">Amount</th></tr></thead>
+<tbody><tr>
+<td>20 Mar 2026</td>
+<td>VAT</td>
+<td class="negative">₦34.2M</td>
+</tr><tr>
+<td>27 Feb 2026</td>
+<td>VAT</td>
+<td class="negative">₦27.0M</td>
+</tr><tr>
+<td>23 Jan 2026</td>
+<td>VAT Remitted</td>
+<td class="negative">₦13.2M</td>
+</tr><tr>
+<td>23 Jan 2026</td>
+<td>WHT remitted</td>
+<td class="negative">₦2.9M</td>
+</tr><tr>
+<td>27 Feb 2026</td>
+<td>WHT</td>
+<td class="negative">₦882K</td>
+</tr><tr>
+<td>08 Jan 2026</td>
+<td>WHT</td>
+<td class="negative">₦424K</td>
+</tr><tr>
+<td>27 Feb 2026</td>
+<td>Refund</td>
+<td class="negative">₦69K</td>
+</tr></tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+<script>
+function sortTable(tableId, colIdx, type) {
+    const table = document.getElementById(tableId);
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    const headers = table.querySelectorAll('th.sortable');
+
+    // Determine sort direction
+    const header = headers[colIdx];
+    const isAsc = header.classList.contains('sort-asc');
+
+    // Clear previous sort indicators
+    headers.forEach(h => {
+        h.classList.remove('sort-asc', 'sort-desc');
+    });
+
+    // Sort rows
+    rows.sort((a, b) => {
+        let aVal = a.cells[colIdx].textContent.trim();
+        let bVal = b.cells[colIdx].textContent.trim();
+
+        if (type === 'money') {
+            aVal = parseFloat(aVal.replace(/[₦$B M K(),]/g, '')) || 0;
+            bVal = parseFloat(bVal.replace(/[₦$B M K(),]/g, '')) || 0;
+        } else if (type === 'pct') {
+            aVal = parseFloat(aVal) || 0;
+            bVal = parseFloat(bVal) || 0;
+        } else if (type === 'status') {
+            const statusOrder = {'On Track': 0, 'Closed': 1, 'At Risk': 2, 'Off Track': 3, 'Unknown': 4};
+            aVal = statusOrder[aVal] ?? 4;
+            bVal = statusOrder[bVal] ?? 4;
+        } else {
+            aVal = aVal.toLowerCase();
+            bVal = bVal.toLowerCase();
+        }
+
+        return isAsc ? (aVal > bVal ? 1 : -1) : (aVal < bVal ? 1 : -1);
+    });
+
+    // Re-append rows and set sort indicator
+    rows.forEach(row => tbody.appendChild(row));
+    header.classList.add(isAsc ? 'sort-desc' : 'sort-asc');
+}
+
+function showTab(id) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-'+id).classList.add('active');
+    event.target.classList.add('active');
+}
+
+// Deep dive search
+const searchBox = document.getElementById('searchBox');
+const deepDiveTable = document.getElementById('deepDiveTable');
+const allRows = deepDiveTable.innerHTML;
+
+searchBox?.addEventListener('input', function() {
+    const query = this.value.toLowerCase();
+    const rows = deepDiveTable.querySelectorAll('tr');
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(query) ? '' : 'none';
+    });
+});
+
+const C = {p:'#00D4AA',s:'#4ECDC4',a:'#FFE66D',d:'#FF6B6B',g:'rgba(0,212,170,0.08)'};
+const baseOpts = {
+    responsive:true,
+    maintainAspectRatio:true,
+    plugins:{legend:{labels:{color:'#94a3b8',font:{family:"'Inter',sans-serif",size:11}}}},
+    scales:{x:{grid:{color:C.g},ticks:{color:'#64748b',maxRotation:45}},y:{grid:{color:C.g},ticks:{color:'#64748b',callback:function(v){if(v>=1e9)return'\u20A6'+(v/1e9).toFixed(1)+'B';if(v>=1e6)return'\u20A6'+(v/1e6).toFixed(0)+'M';if(v>=1e3)return'\u20A6'+(v/1e3).toFixed(0)+'K';return'\u20A6'+v}}}}
+};
+
+new Chart(document.getElementById('budgetChart'),{
+    type:'bar',
+    data:{
+        labels:["Payroll", "Staff welfare & benefits", "New Product Development - IAM", "Others - AIF Coupon", "Software Tools", "Business Development Expenses", "Marketing & Branding - Events", "Hosting Expenses", "Professional Fees", "Rental Expense", "Assets purchase", "Marketing & Branding - Digital", "Repairs", "NED Fees", "Office Expense"],
+        datasets:[
+            {label:'YTD Budget Pace',data:[660575651.0769231, 127885639.47692306, 80769230.76923077, 69317307.6923077, 51505722.692307696, 41510769.23076923, 30461538.46153846, 29413269.230769232, 27239615.46923077, 13731919.518461538, 10403562.830769232, 10384615.384615384, 3351352.730769231, 3092307.6923076925, 3040156.5323076923],backgroundColor:'rgba(78,205,196,0.7)',borderRadius:4},
+            {label:'YTD Actual Spend',data:[647641816.0, 15673529.98, 81962699.8465, 0, 39624967.07179999, 76043686.2502, 23052537.6766, 6606530.22, 49394928.741, 0, 6817759.6393, 0, 0, 0, 6917410.15],backgroundColor:'rgba(0,212,170,0.7)',borderRadius:4}
+        ]
+    },
+    options:{...baseOpts,indexAxis:'y',scales:{x:baseOpts.scales.y,y:baseOpts.scales.x}}
+});
+
+// Weekly trend
+const weeks = ["01 Jan 2026", "08 Jan 2026", "15 Jan 2026", "23 Jan 2026", "30 Jan 2026", "06 Feb 2026", "13 Feb 2026", "20 Feb 2026", "27 Feb 2026", "06 Mar 2026", "13 Mar 2026", "20 Mar 2026"];
+const weekly_spend = [99946943.7916, 20686641.0478, 51727156.2182, 33852913.8924, 157212202.45, 51401131.791600004, 69522190.6311, 57686852.06, 143342944.35999998, 114697441.281, 124631375.86979999, 49895514.5874];
+const weekly_pace = 5099206393.904 / 52;
+
+new Chart(document.getElementById('trendChart'),{
+    type:'line',
+    data:{
+        labels:weeks,
+        datasets:[
+            {label:'Weekly Operational Spend',data:weekly_spend,borderColor:C.p,backgroundColor:'rgba(0,212,170,0.08)',borderWidth:2.5,fill:true,tension:0.3,pointRadius:4,pointBackgroundColor:C.p},
+            {label:'Weekly Budget Pace',data:Array(12).fill(weekly_pace),borderColor:C.d,borderWidth:2.5,borderDash:[5,5],fill:false,tension:0.3,pointRadius:0}
+        ]
+    },
+    options:baseOpts
+});
+
+</script>
+<div class="dashboard-footer">
+<span>Seamfix Financial Intelligence &nbsp;·&nbsp; Powered by Claude Cowork</span>
+<span>Available Data Range: 01 Jan 2026 &ndash; 20 Mar 2026 &nbsp;&bull;&nbsp; Generated: 23 Mar 2026 16:18 &nbsp;&bull;&nbsp; $1 = ₦1,450</span>
+</div>
+</body>
+</html>

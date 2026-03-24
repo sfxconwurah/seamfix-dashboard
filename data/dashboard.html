@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seamfix Cash Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:linear-gradient(135deg,#0f172a,#1e293b);color:#e2e8f0;padding:0;min-height:100vh}
+.container{max-width:1600px;margin:0 auto;padding:0 28px 28px}
+.header{margin-bottom:32px;padding-bottom:20px;border-bottom:2px solid rgba(0,212,170,0.2)}
+.header h1{font-size:2.4em;font-weight:700;background:linear-gradient(135deg,#00D4AA,#4ECDC4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}
+.header .sub{color:#94a3b8;font-size:0.95em}
+.header .meta{color:#64748b;font-size:0.8em;margin-top:6px}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-bottom:36px}
+.kpi-card{background:linear-gradient(135deg,rgba(30,41,59,0.9),rgba(15,23,42,0.9));border:1px solid rgba(0,212,170,0.15);border-radius:12px;padding:22px;transition:all 0.3s ease}
+.kpi-card:hover{border-color:rgba(0,212,170,0.4);transform:translateY(-3px);box-shadow:0 8px 30px rgba(0,212,170,0.1)}
+.kpi-label{font-size:0.78em;color:#94a3b8;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px;font-weight:600}
+.kpi-value{font-size:1.6em;font-weight:700;color:#00D4AA;margin-bottom:6px}
+.kpi-value.negative{color:#FF6B6B}
+.kpi-change{font-size:0.82em;display:flex;align-items:center;gap:4px}
+.kpi-change.positive{color:#00D4AA}
+.kpi-change.negative{color:#FF6B6B}
+.kpi-change.neutral{color:#64748b}
+.charts-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(480px,1fr));gap:20px;margin-bottom:36px}
+.chart-box{background:linear-gradient(135deg,rgba(30,41,59,0.9),rgba(15,23,42,0.9));border:1px solid rgba(0,212,170,0.15);border-radius:12px;padding:22px;min-height:380px}
+.chart-box h3{font-size:1em;font-weight:600;margin-bottom:16px;color:#cbd5e1}
+.section{background:linear-gradient(135deg,rgba(30,41,59,0.9),rgba(15,23,42,0.9));border:1px solid rgba(0,212,170,0.15);border-radius:12px;padding:24px;margin-bottom:24px}
+.section h2{font-size:1.3em;margin-bottom:16px;color:#00D4AA}
+.anomaly-section{border-color:rgba(255,107,107,0.2)}
+.anomaly-section h2{color:#FF6B6B}
+.anomaly-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.anomaly-item{background:rgba(255,107,107,0.04);border-left:3px solid #FF6B6B;padding:14px;border-radius:0 6px 6px 0}
+.anomaly-week{font-weight:600;color:#FFE66D;font-size:0.85em;margin-bottom:3px}
+.anomaly-type{font-weight:600;font-size:0.95em}
+.anomaly-detail{color:#94a3b8;font-size:0.85em;margin-top:4px}
+.insight-item{padding:10px 0;border-bottom:1px solid rgba(0,212,170,0.08);color:#cbd5e1;line-height:1.7;font-size:0.92em}
+.insight-item:last-child{border-bottom:none}
+table{width:100%;border-collapse:collapse;font-size:0.85em}
+thead{background:rgba(0,212,170,0.08)}
+th{padding:10px 12px;text-align:left;font-weight:600;color:#00D4AA;border-bottom:2px solid rgba(0,212,170,0.15)}
+td{padding:10px 12px;border-bottom:1px solid rgba(0,212,170,0.06);color:#cbd5e1}
+tbody tr:hover{background:rgba(0,212,170,0.04)}
+.positive{color:#00D4AA}
+.negative{color:#FF6B6B}
+th.sortable{cursor:pointer;user-select:none}
+th.sortable:hover{color:#FFE66D}
+th.sort-asc::after{content:' ▲';font-size:0.7em}
+th.sort-desc::after{content:' ▼';font-size:0.7em}
+.tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.tab-btn{padding:8px 18px;border:1px solid rgba(0,212,170,0.2);border-radius:20px;background:transparent;color:#94a3b8;cursor:pointer;font-size:0.85em;font-family:inherit;transition:all 0.2s}
+.tab-btn.active,.tab-btn:hover{background:rgba(0,212,170,0.15);color:#00D4AA;border-color:rgba(0,212,170,0.4)}
+.tab-content{display:none}
+.tab-content.active{display:block}
+.takeaways-section{margin-bottom:36px}
+.takeaways-section h2{font-size:1.4em;margin-bottom:16px;color:#FFE66D;display:flex;align-items:center;gap:10px}
+.takeaways-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(440px,1fr));gap:16px}
+.takeaway-card{background:linear-gradient(135deg,rgba(30,41,59,0.95),rgba(15,23,42,0.95));border:1px solid rgba(0,212,170,0.1);border-left:4px solid #64748b;border-radius:10px;padding:20px;transition:all 0.3s ease}
+.takeaway-card:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(0,0,0,0.2)}
+.tw-header{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.tw-icon{font-size:1.2em}
+.tw-title{font-size:0.82em;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8}
+.tw-badge{font-size:0.7em;font-weight:700;padding:3px 10px;border-radius:12px;letter-spacing:0.5px}
+.tw-headline{font-size:1.05em;font-weight:600;margin-bottom:8px;line-height:1.4}
+.tw-body{font-size:0.88em;color:#94a3b8;line-height:1.65}
+.tw-body ul{margin:6px 0 0 16px}
+.tw-body li{margin-bottom:4px}
+.nav-bar{display:none!important}
+
+@media(max-width:1024px){.charts-grid{grid-template-columns:1fr}.kpi-grid{grid-template-columns:repeat(2,1fr)}.takeaways-grid{grid-template-columns:1fr}.anomaly-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:640px){.kpi-grid{grid-template-columns:1fr}.header h1{font-size:1.6em}.anomaly-grid{grid-template-columns:1fr}.nav-bar{flex-wrap:wrap}}
+.top-nav{background:#0a0f1e;border-bottom:1px solid #334155;padding:0 24px;display:flex;align-items:center;height:48px;overflow-x:auto;position:sticky;top:0;z-index:200}
+.top-nav-brand{color:#e2e8f0;font-weight:700;font-size:15px;margin-right:24px;white-space:nowrap;text-decoration:none}
+.top-nav-link{color:#94a3b8;text-decoration:none;padding:0 14px;height:48px;display:flex;align-items:center;font-size:13px;border-bottom:2px solid transparent;white-space:nowrap;transition:color .2s}
+.top-nav-link:hover{color:#e2e8f0}
+.top-nav-link.active{color:#fff;border-bottom-color:#00D4AA;font-weight:500}
+.pdf-btn{display:none!important}
+@media print{
+.pdf-btn{display:none!important}
+*{color-adjust:exact!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+body{background:#fff!important;color:#1e293b!important;padding:12px!important;font-size:9pt!important}
+.container{max-width:100%}
+.header h1{font-size:1.6em!important;background:none!important;-webkit-text-fill-color:#0f172a!important;color:#0f172a!important}
+.header .sub{color:#475569!important}
+.header .meta{color:#64748b!important}
+.nav-bar{display:none!important}
+.kpi-grid{grid-template-columns:repeat(6,1fr)!important;gap:8px!important;margin-bottom:16px!important}
+.kpi-card{background:#f8fafc!important;border:1px solid #e2e8f0!important;padding:12px!important;border-radius:8px!important;box-shadow:none!important;page-break-inside:avoid}
+.kpi-label{color:#475569!important;font-size:0.65em!important}
+.kpi-value{color:#0f172a!important;font-size:1.2em!important}
+.kpi-value.negative{color:#dc2626!important}
+.kpi-change{font-size:0.7em!important}
+.kpi-change.positive{color:#16a34a!important}
+.kpi-change.negative{color:#dc2626!important}
+.kpi-change.neutral{color:#64748b!important}
+.takeaways-section{margin-bottom:16px!important;page-break-inside:avoid}
+.takeaways-section h2{color:#0f172a!important;font-size:1.1em!important}
+.takeaways-grid{grid-template-columns:repeat(2,1fr)!important;gap:10px!important}
+.takeaway-card{background:#f8fafc!important;border:1px solid #e2e8f0!important;padding:14px!important;border-radius:8px!important;page-break-inside:avoid}
+.tw-title{color:#475569!important}
+.tw-body{color:#475569!important}
+.tw-headline{font-size:0.95em!important}
+.charts-grid{grid-template-columns:repeat(2,1fr)!important;gap:12px!important;margin-bottom:16px!important}
+.chart-box{background:#fff!important;border:1px solid #e2e8f0!important;padding:14px!important;min-height:auto!important;page-break-inside:avoid}
+.chart-box h3{color:#1e293b!important;font-size:0.85em!important}
+.section{background:#f8fafc!important;border:1px solid #e2e8f0!important;padding:16px!important;page-break-inside:avoid}
+.section h2{color:#0f172a!important}
+.anomaly-section{border-color:#fca5a5!important}
+.anomaly-section h2{color:#dc2626!important}
+.anomaly-grid{grid-template-columns:repeat(3,1fr)!important;gap:8px!important}
+.anomaly-item{background:#fef2f2!important;padding:10px!important}
+.anomaly-week{color:#92400e!important}
+.anomaly-type{color:#dc2626!important}
+.anomaly-detail{color:#475569!important}
+.insight-item{color:#475569!important;border-bottom-color:#e2e8f0!important}
+table{font-size:0.75em!important}
+thead{background:#f1f5f9!important}
+th{color:#0f172a!important;border-bottom-color:#cbd5e1!important}
+td{color:#334155!important;border-bottom-color:#e2e8f0!important}
+.positive{color:#16a34a!important}
+.negative{color:#dc2626!important}
+.tabs{display:none!important}
+.tab-content{display:block!important}
+tbody tr:hover{background:transparent!important}
+}
+.dashboard-footer{margin-top:48px;padding:20px 28px;border-top:1px solid #334155;color:#94a3b8;font-size:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.dashboard-footer span{color:#94a3b8}
+/* ── HEADER: match Pipeline Intelligence style ── */
+.header{padding:24px 28px 16px!important;border-bottom:1px solid #334155!important;margin-bottom:24px!important;background:none!important}
+.header h1{font-size:22px!important;font-weight:700!important;background:none!important;-webkit-background-clip:unset!important;-webkit-text-fill-color:#e2e8f0!important;color:#e2e8f0!important;margin-bottom:4px!important}
+.header .sub{font-size:13px!important;color:#94a3b8!important}
+.header .meta{font-size:12px!important;color:#94a3b8!important;margin-top:4px!important}
+.header p{font-size:13px!important;color:#94a3b8!important;margin-top:4px!important}
+</style>
+</head>
+<body>
+<nav class="top-nav"><span class="top-nav-brand">⚡ Seamfix</span><a href="dashboard.html" class="top-nav-link active">Cash Overview</a><a href="expense_dashboard.html" class="top-nav-link ">Expense &amp; Vendor</a><a href="budget_dashboard.html" class="top-nav-link ">Budget vs Actual</a><a href="revenue_dashboard.html" class="top-nav-link ">Revenue &amp; Fundability</a><a href="pipeline_dashboard.html" class="top-nav-link ">Pipeline Intelligence</a></nav>
+<!-- PDF button hidden per user request -->
+<div class="container">
+<div class="header">
+<h1>Seamfix Cash Dashboard</h1>
+<div class="sub">Executive Financial Monitoring &mdash; Weekly Cash Reports 2026</div>
+</div>
+
+<!-- old nav-bar replaced by top-nav -->
+
+
+<div class="kpi-grid">
+<div class="kpi-card">
+<div class="kpi-label">Total Position (incl. Investments)</div>
+<div class="kpi-value">₦2.42B</div>
+<div class="kpi-change negative">&#9660; 7.0% vs prior week</div>
+</div>
+<div class="kpi-card">
+<div class="kpi-label">Weekly Inflow</div>
+<div class="kpi-value">₦60.0M</div>
+<div class="kpi-change negative">&#9660; 73.9% vs prior week</div>
+</div>
+<div class="kpi-card">
+<div class="kpi-label">Weekly Outflow</div>
+<div class="kpi-value">₦84.1M</div>
+<div class="kpi-change positive">&#9660; 89.1% vs prior week</div>
+</div>
+<div class="kpi-card">
+<div class="kpi-label">Net Cash Flow</div>
+<div class="kpi-value negative">-₦24.1M</div>
+<div class="kpi-change neutral">this week</div>
+</div>
+<div class="kpi-card">
+<div class="kpi-label">Operational Runway</div>
+<div class="kpi-value">28 weeks</div>
+<div class="kpi-change neutral">(6 months at op. burn excl. investments)</div>
+</div>
+<div class="kpi-card">
+<div class="kpi-label">Revenue Concentration</div>
+<div class="kpi-value negative">98%</div>
+<div class="kpi-change neutral">Nimc Income (latest week)</div>
+</div>
+<div class="kpi-card">
+<div class="kpi-label">4-Week Cash Forecast</div>
+<div class="kpi-value ">₦2.50B</div>
+<div class="kpi-change neutral">+3.5% — expected, based on avg weekly inflows &amp; burn</div>
+<div style="margin-top:6px;font-size:0.78em;color:#94a3b8">Floor if revenue stops: ₦2.07B (-14.5%)</div>
+</div>
+</div>
+
+<div class="takeaways-section">
+<h2>📋 Executive Takeaways</h2>
+<div class="takeaways-grid">
+<div class="takeaway-card" style="border-left-color:#64748b">
+<div class="tw-header"><span class="tw-icon">💰</span><span class="tw-title">Cash Position & Trajectory</span><span class="tw-badge" style="background:rgba(100,116,139,0.15);color:#94a3b8">INFO</span></div>
+<div class="tw-headline" style="color:#64748b">Total position at ₦2.42B (contracted 7.0% WoW)</div>
+<div class="tw-body">Over the full reporting period, total position has grown 8% from ₦2.24B. Volatility band: ₦2.24B to ₦2.72B. </div>
+</div><div class="takeaway-card" style="border-left-color:#FF6B6B">
+<div class="tw-header"><span class="tw-icon">⚠️</span><span class="tw-title">Revenue Concentration Risk</span><span class="tw-badge" style="background:rgba(255,107,107,0.15);color:#FF6B6B">NEEDS ACTION</span></div>
+<div class="tw-headline" style="color:#FF6B6B">Nimc Income represents 65% of total revenue — critical concentration risk</div>
+<div class="tw-body">Across the period, 6 meaningful revenue streams identified. Recently emerged: Glo Income. These need nurturing to reduce dependency on Nimc Income. This week: Nimc Income was 98% of inflows.</div>
+</div><div class="takeaway-card" style="border-left-color:#00D4AA">
+<div class="tw-header"><span class="tw-icon">📉</span><span class="tw-title">Expense Control</span><span class="tw-badge" style="background:rgba(0,212,170,0.15);color:#00D4AA">HEALTHY</span></div>
+<div class="tw-headline" style="color:#00D4AA">Operational outflows decreased 33% to ₦84.1M — improved cost control</div>
+<div class="tw-body">Expense spikes this week: Flight Ticket/Accommodation: ₦16.3M vs avg ₦5.1M (3.2x). </div>
+</div><div class="takeaway-card" style="border-left-color:#00D4AA">
+<div class="tw-header"><span class="tw-icon">🚨</span><span class="tw-title">Liquidity & Runway</span><span class="tw-badge" style="background:rgba(0,212,170,0.15);color:#00D4AA">HEALTHY</span></div>
+<div class="tw-headline" style="color:#00D4AA">Healthy runway of 28 weeks (6 months) at operational burn rate</div>
+<div class="tw-body">Total position: ₦2.42B (liquid: ₦700.4M, investments: ₦1.72B). Operational burn (excl. investment transfers): ₦87.8M/week. </div>
+</div><div class="takeaway-card" style="border-left-color:#64748b">
+<div class="tw-header"><span class="tw-icon">👀</span><span class="tw-title">Watch List for Next Week</span><span class="tw-badge" style="background:rgba(100,116,139,0.15);color:#94a3b8">INFO</span></div>
+<div class="tw-headline" style="color:#64748b">Action items requiring attention</div>
+<div class="tw-body"><ul style='margin:8px 0 0 16px;padding:0;list-style:disc'><li>Salary batch likely due in the next 1-2 weeks — ensure sufficient NGN liquidity.</li><li>Operational cash flow was negative in 2 of the last 3 weeks — this trend needs to reverse.</li><li>Track whether Nimc Income payments arrive on schedule — any delay directly threatens operating cash.</li><li>Confirm Flight Ticket/Accommodation payment of ₦16.3M was authorized and is non-recurring.</li></ul></div>
+</div>
+</div>
+</div>
+
+<div class="charts-grid">
+<div class="chart-box"><h3>Total Cash Position (NGN Equivalent)</h3><canvas id="cashChart"></canvas></div>
+<div class="chart-box"><h3>Weekly Inflows vs Outflows</h3><canvas id="flowChart"></canvas></div>
+<div class="chart-box"><h3>Revenue Source Mix</h3><canvas id="revChart"></canvas></div>
+<div class="chart-box"><h3>Expense Category Breakdown</h3><canvas id="expChart"></canvas></div>
+<div class="chart-box"><h3>NGN vs USD Cash Split</h3><canvas id="splitChart"></canvas></div>
+<div class="chart-box"><h3>USD/NGN Exchange Rate</h3><canvas id="fxChart"></canvas></div>
+</div>
+
+<div class="section anomaly-section"><h2>Anomaly Alerts</h2><div class="anomaly-grid"><div class="anomaly-item" style="border-left-color:#FF6B6B"><div class="anomaly-week">13 Mar 2026</div><div class="anomaly-type" style="color:#FF6B6B">Negative Net Flow</div><div class="anomaly-detail">Outflows (₦772.7M) exceeded inflows (₦230.2M) by ₦542.5M</div></div><div class="anomaly-item" style="border-left-color:#FFE66D"><div class="anomaly-week">13 Mar 2026</div><div class="anomaly-type" style="color:#FFE66D">Expense Spike: Bank Charges</div><div class="anomaly-detail">₦17.7M vs average ₦1.7M (10.6x)</div></div><div class="anomaly-item" style="border-left-color:#FFE66D"><div class="anomaly-week">13 Mar 2026</div><div class="anomaly-type" style="color:#FFE66D">Bank Charge Spike</div><div class="anomaly-detail">₦17.7M vs prior week ₦373K (47.5x increase) (likely SCB investment fee on ₦648.1M transaction)</div></div><div class="anomaly-item" style="border-left-color:#FF6B6B"><div class="anomaly-week">13 Mar 2026</div><div class="anomaly-type" style="color:#FF6B6B">Inflow Drop</div><div class="anomaly-detail">₦230.2M vs prior ₦757.6M (70% decrease)</div></div><div class="anomaly-item" style="border-left-color:#4ECDC4"><div class="anomaly-week">13 Mar 2026</div><div class="anomaly-type" style="color:#4ECDC4">New Revenue Stream</div><div class="anomaly-detail">Glo Income: ₦156.7M (first appearance)</div></div><div class="anomaly-item" style="border-left-color:#FF6B6B"><div class="anomaly-week">20 Mar 2026</div><div class="anomaly-type" style="color:#FF6B6B">Negative Net Flow</div><div class="anomaly-detail">Outflows (₦84.1M) exceeded inflows (₦60.0M) by ₦24.1M</div></div><div class="anomaly-item" style="border-left-color:#FFE66D"><div class="anomaly-week">20 Mar 2026</div><div class="anomaly-type" style="color:#FFE66D">Expense Spike: Flight Ticket/Accommodation</div><div class="anomaly-detail">₦16.3M vs average ₦5.1M (3.2x)</div></div><div class="anomaly-item" style="border-left-color:#FF6B6B"><div class="anomaly-week">20 Mar 2026</div><div class="anomaly-type" style="color:#FF6B6B">Inflow Drop</div><div class="anomaly-detail">₦60.0M vs prior ₦230.2M (74% decrease)</div></div></div></div>
+
+<div class="section">
+<h2>Detailed Views</h2>
+<div class="tabs">
+<button class="tab-btn active" onclick="showTab('summary')">Weekly Summary</button>
+<button class="tab-btn" onclick="showTab('inflows')">Inflow Details</button>
+<button class="tab-btn" onclick="showTab('outflows')">Outflow Details</button>
+</div>
+<div id="tab-summary" class="tab-content active">
+<table id="summaryTable">
+<thead><tr><th class="sortable" onclick="sortTable('summaryTable',0,'text')">Week Of</th><th class="sortable" onclick="sortTable('summaryTable',1,'money')">Cash Position</th><th class="sortable" onclick="sortTable('summaryTable',2,'money')">Inflow</th><th class="sortable" onclick="sortTable('summaryTable',3,'money')">Outflow</th><th class="sortable" onclick="sortTable('summaryTable',4,'money')">Net Flow</th><th class="sortable" onclick="sortTable('summaryTable',5,'number')">FX Rate</th></tr></thead>
+<tbody><tr><td>01 Jan 2026</td><td>₦2.24B</td><td class="positive">₦26.0M</td><td class="negative">₦99.9M</td><td class="negative">-₦73.9M</td><td>1,447.42</td></tr><tr><td>08 Jan 2026</td><td>₦2.24B</td><td class="positive">₦55.1M</td><td class="negative">₦21.1M</td><td class="positive">₦34.0M</td><td>1,426.19</td></tr><tr><td>15 Jan 2026</td><td>₦2.36B</td><td class="positive">₦44.2M</td><td class="negative">₦51.7M</td><td class="negative">-₦7.5M</td><td>1,422.93</td></tr><tr><td>23 Jan 2026</td><td>₦2.38B</td><td class="positive">₦225.9M</td><td class="negative">₦113.9M</td><td class="positive">₦112.0M</td><td>1,420.63</td></tr><tr><td>30 Jan 2026</td><td>₦2.34B</td><td class="positive">₦162.9M</td><td class="negative">₦157.2M</td><td class="positive">₦5.7M</td><td>1,391.20</td></tr><tr><td>06 Feb 2026</td><td>₦2.40B</td><td class="positive">₦141.0M</td><td class="negative">₦51.4M</td><td class="positive">₦89.6M</td><td>1,367.88</td></tr><tr><td>13 Feb 2026</td><td>₦2.45B</td><td class="positive">₦151.2M</td><td class="negative">₦69.5M</td><td class="positive">₦81.7M</td><td>1,353.01</td></tr><tr><td>20 Feb 2026</td><td>₦2.43B</td><td class="positive">₦32.3M</td><td class="negative">₦57.7M</td><td class="negative">-₦25.4M</td><td>1,343.51</td></tr><tr><td>27 Feb 2026</td><td>₦2.72B</td><td class="positive">₦449.8M</td><td class="negative">₦171.3M</td><td class="positive">₦278.6M</td><td>1,352.06</td></tr><tr><td>06 Mar 2026</td><td>₦2.62B</td><td class="positive">₦757.6M</td><td class="negative">₦114.7M</td><td class="positive">₦642.9M</td><td>1,384.23</td></tr><tr><td>13 Mar 2026</td><td>₦2.60B</td><td class="positive">₦230.2M</td><td class="negative">₦772.7M</td><td class="negative">-₦542.5M</td><td>1,393.69</td></tr><tr><td>20 Mar 2026</td><td>₦2.42B</td><td class="positive">₦60.0M</td><td class="negative">₦84.1M</td><td class="negative">-₦24.1M</td><td>1,359.37</td></tr></tbody>
+</table>
+</div>
+<div id="tab-inflows" class="tab-content">
+<table id="inflowsTable">
+<thead><tr><th class="sortable" onclick="sortTable('inflowsTable',0,'text')">Week Of</th><th class="sortable" onclick="sortTable('inflowsTable',1,'money')">Total Inflow</th><th class="sortable" onclick="sortTable('inflowsTable',2,'text')">Top Sources</th></tr></thead>
+<tbody><tr><td>01 Jan 2026</td><td>₦26.0M</td><td style="font-size:0.85em">Nimc Income: ₦25.6M, iTranscript Income: ₦372K, IDQR Income: ₦10K, Refund/Reversal: ₦350</td></tr><tr><td>08 Jan 2026</td><td>₦55.1M</td><td style="font-size:0.85em">Nimc Income: ₦51.4M, Loan Repayment: ₦2.1M, Refund/Reversal: ₦1.4M, iTranscript Income: ₦237K, IDQR Income: ₦4K</td></tr><tr><td>15 Jan 2026</td><td>₦44.2M</td><td style="font-size:0.85em">Nimc Income: ₦41.0M, iTranscript Income: ₦1.7M, Refund/Reversal: ₦1.5M</td></tr><tr><td>23 Jan 2026</td><td>₦225.9M</td><td style="font-size:0.85em">Nimc Income: ₦140.7M, Investment Withdrawal: ₦85.2M</td></tr><tr><td>30 Jan 2026</td><td>₦162.9M</td><td style="font-size:0.85em">Nimc Income: ₦99.5M, Orange Liberia Income: ₦62.0M, Insurance Claim: ₦794K, Refund/Reversal: ₦627K, IDQR Income: ₦5K</td></tr><tr><td>06 Feb 2026</td><td>₦141.0M</td><td style="font-size:0.85em">Nimc Income: ₦140.3M, iTranscript Income: ₦523K, Refund/Reversal: ₦155K, IDQR Income: ₦16K</td></tr><tr><td>13 Feb 2026</td><td>₦151.2M</td><td style="font-size:0.85em">Nimc Income: ₦66.9M, MTN NG Income: ₦47.7M, MTN CIV Income: ₦35.9M, iTranscript Income: ₦528K, Refund/Reversal: ₦196K</td></tr><tr><td>20 Feb 2026</td><td>₦32.3M</td><td style="font-size:0.85em">Nimc Income: ₦29.1M, Staff Loan Repayment: ₦3.2M</td></tr><tr><td>27 Feb 2026</td><td>₦449.8M</td><td style="font-size:0.85em">Investment Liquidation: ₦252.2M, Lebara Income: ₦137.0M, Nimc Income: ₦60.2M, Refund/Reversal: ₦327K, Donations: ₦159K</td></tr><tr><td>06 Mar 2026</td><td>₦757.6M</td><td style="font-size:0.85em">Investment withdrawal: ₦692.1M, Nimc Income: ₦64.8M, Refund/Reversal: ₦393K, Int'l Weman Day Donations: ₦275K, IDQR Income: ₦10K</td></tr><tr><td>13 Mar 2026</td><td>₦230.2M</td><td style="font-size:0.85em">Glo Income: ₦156.7M, Nimc Income: ₦73.1M, Int'l Weman Day Donations: ₦195K, iTranscript Income: ₦142K, IDQR Income: ₦11K</td></tr><tr><td>20 Mar 2026</td><td>₦60.0M</td><td style="font-size:0.85em">Nimc Income: ₦58.5M, Refund/Reversal: ₦1.5M, iTranscript Income: ₦7K</td></tr></tbody>
+</table>
+</div>
+<div id="tab-outflows" class="tab-content">
+<table id="outflowsTable">
+<thead><tr><th class="sortable" onclick="sortTable('outflowsTable',0,'text')">Week Of</th><th class="sortable" onclick="sortTable('outflowsTable',1,'money')">Total Outflow</th><th class="sortable" onclick="sortTable('outflowsTable',2,'text')">Top Categories</th></tr></thead>
+<tbody><tr><td>01 Jan 2026</td><td>₦99.9M</td><td style="font-size:0.85em">Salaries: ₦60.4M, Payment Batches: ₦33.8M, Software Tools: ₦2.7M, Paye: ₦1.5M, Bank Charges: ₦891K</td></tr><tr><td>08 Jan 2026</td><td>₦21.1M</td><td style="font-size:0.85em">Pension: ₦7.7M, Software Tools: ₦7.1M, Payment Batches: ₦2.0M, Flight Ticket/Accommodation: ₦1.9M, BTA: ₦1.8M</td></tr><tr><td>15 Jan 2026</td><td>₦51.7M</td><td style="font-size:0.85em">Paye: ₦19.4M, NIMC -Licenses Fee: ₦14.8M, Payment Batches: ₦11.2M, Exit  Salary: ₦3.9M, Flight Ticket/Accommodation: ₦820K</td></tr><tr><td>23 Jan 2026</td><td>₦113.9M</td><td style="font-size:0.85em">Seamfix UAE funding: ₦63.9M, Payment Batches: ₦15.0M, VAT Remitted: ₦13.2M, Amazon: ₦6.8M, Tatvasoft: ₦6.3M</td></tr><tr><td>30 Jan 2026</td><td>₦157.2M</td><td style="font-size:0.85em">Salary: ₦115.3M, Payment Batches: ₦19.1M, Management Allowance: ₦18.8M, Software Tools: ₦3.9M, Bank Charges: ₦145K</td></tr><tr><td>06 Feb 2026</td><td>₦51.4M</td><td style="font-size:0.85em">Payment Batches: ₦19.0M, ID4Africa: ₦17.6M, Salary: ₦4.2M, Software Tools: ₦3.4M, BTA: ₦3.3M</td></tr><tr><td>13 Feb 2026</td><td>₦69.5M</td><td style="font-size:0.85em">Payment Batches: ₦34.5M, PAYE: ₦22.7M, Management Allowance: ₦7.0M, Flight Ticket/Accommodation: ₦2.4M, MWC Registration: ₦1.7M</td></tr><tr><td>20 Feb 2026</td><td>₦57.7M</td><td style="font-size:0.85em">Nimc consultancy fee: ₦36.3M, Payment Batches: ₦16.0M, Software Tools: ₦3.1M, Office Supplies, Fuel & Letter Dispatch: ₦1.4M, Salary: ₦857K</td></tr><tr><td>27 Feb 2026</td><td>₦171.3M</td><td style="font-size:0.85em">Salary: ₦114.8M, VAT: ₦27.0M, Tatvasoft: ₦6.7M, AWS: ₦6.6M, Flight Ticket/Accommodation: ₦5.9M</td></tr><tr><td>06 Mar 2026</td><td>₦114.7M</td><td style="font-size:0.85em">Payment Batches: ₦39.3M, Pension Remittance: ₦23.7M, NSITF Contributions: ₦15.6M, Management Allowance: ₦11.8M, Flight Ticket/Accommodation: ₦9.7M</td></tr><tr><td>13 Mar 2026</td><td>₦772.7M</td><td style="font-size:0.85em">Investment in SCB USD mutua fund: ₦648.1M, Bind Creative: ₦82.0M, Bank Charges: ₦17.7M, Payment Batches: ₦15.1M, Flight Ticket/Accommodation: ₦4.8M</td></tr><tr><td>20 Mar 2026</td><td>₦84.1M</td><td style="font-size:0.85em">VAT: ₦34.2M, PAYE: ₦22.5M, Flight Ticket/Accommodation: ₦16.3M, Payment Batches: ₦5.5M, Software Tools: ₦2.8M</td></tr></tbody>
+</table>
+</div>
+</div>
+</div>
+
+<script>
+function sortTable(tableId, colIdx, type) {
+    const table = document.getElementById(tableId);
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    const headers = table.querySelectorAll('th.sortable');
+
+    // Determine sort direction
+    const header = headers[colIdx];
+    const isAsc = header.classList.contains('sort-asc');
+
+    // Clear previous sort indicators
+    headers.forEach(h => {
+        h.classList.remove('sort-asc', 'sort-desc');
+    });
+
+    // Sort rows
+    rows.sort((a, b) => {
+        let aVal = a.cells[colIdx].textContent.trim();
+        let bVal = b.cells[colIdx].textContent.trim();
+
+        if (type === 'money') {
+            aVal = parseFloat(aVal.replace(/[₦$B M K(),\-]/g, '')) || 0;
+            bVal = parseFloat(bVal.replace(/[₦$B M K(),\-]/g, '')) || 0;
+        } else if (type === 'number') {
+            aVal = parseFloat(aVal) || 0;
+            bVal = parseFloat(bVal) || 0;
+        } else if (type === 'status') {
+            const statusOrder = {'On Track': 0, 'Closed': 1, 'At Risk': 2, 'Off Track': 3, 'Unknown': 4};
+            aVal = statusOrder[aVal] ?? 4;
+            bVal = statusOrder[bVal] ?? 4;
+        } else {
+            aVal = aVal.toLowerCase();
+            bVal = bVal.toLowerCase();
+        }
+
+        return isAsc ? (aVal > bVal ? 1 : -1) : (aVal < bVal ? 1 : -1);
+    });
+
+    // Re-append rows
+    rows.forEach(row => tbody.appendChild(row));
+    header.classList.add(isAsc ? 'sort-desc' : 'sort-asc');
+}
+
+function showTab(id) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-'+id).classList.add('active');
+    event.target.classList.add('active');
+}
+
+const C = {p:'#00D4AA',s:'#4ECDC4',a:'#FFE66D',d:'#FF6B6B',g:'rgba(0,212,170,0.08)'};
+const baseOpts = {
+    responsive:true,
+    maintainAspectRatio:true,
+    plugins:{legend:{labels:{color:'#94a3b8',font:{family:"'Inter',sans-serif",size:11}}}},
+    scales:{x:{grid:{color:C.g},ticks:{color:'#64748b',maxRotation:45}},y:{grid:{color:C.g},ticks:{color:'#64748b',callback:function(v){if(v>=1e9)return'\u20A6'+(v/1e9).toFixed(1)+'B';if(v>=1e6)return'\u20A6'+(v/1e6).toFixed(0)+'M';if(v>=1e3)return'\u20A6'+(v/1e3).toFixed(0)+'K';return'\u20A6'+v}}}}
+};
+
+const dates = ["01 Jan 2026", "08 Jan 2026", "15 Jan 2026", "23 Jan 2026", "30 Jan 2026", "06 Feb 2026", "13 Feb 2026", "20 Feb 2026", "27 Feb 2026", "06 Mar 2026", "13 Mar 2026", "20 Mar 2026"];
+
+new Chart(document.getElementById('cashChart'),{
+    type:'line',
+    data:{labels:dates,datasets:[{label:'Total Cash (NGN eq.)',data:[2236116117.9418, 2238760697.4351, 2357189445.1919003, 2380520983.7729, 2340583209.346, 2395289128.4904003, 2453836377.1983004, 2425710432.8054, 2718972458.1823997, 2617326377.0236998, 2600349907.8911, 2418045655.0302997],borderColor:C.p,backgroundColor:'rgba(0,212,170,0.08)',borderWidth:2.5,fill:true,tension:0.3,pointRadius:4,pointBackgroundColor:C.p}]},
+    options:baseOpts
+});
+
+new Chart(document.getElementById('flowChart'),{
+    type:'bar',
+    data:{labels:dates,datasets:[
+        {label:'Inflow',data:[26019143.04, 55148294.95, 44229492.44, 225914739.0, 162944748.6, 140995974.0, 151206028.5, 32321507.01, 449842703.3, 757555337.5, 230231623.9, 59993191.76],backgroundColor:'rgba(0,212,170,0.7)',borderRadius:4},
+        {label:'Outflow',data:[99946943.79, 21110549.39, 51727156.22, 113910154.7, 157212202.5, 51401131.79, 69522190.63, 57686852.06, 171256661.4, 114697441.3, 772697225.9, 84096840.35],backgroundColor:'rgba(255,107,107,0.7)',borderRadius:4},
+        {label:'Net Flow',data:[-73927800.75, 34037745.56, -7497663.780000001, 112004584.3, 5732546.099999994, 89594842.21000001, 81683837.87, -25365345.05, 278586041.9, 642857896.2, -542465602.0, -24103648.589999996],type:'line',borderColor:C.a,backgroundColor:'transparent',borderWidth:2,pointRadius:3,tension:0.3}
+    ]},
+    options:baseOpts
+});
+
+new Chart(document.getElementById('revChart'),{
+    type:'bar',
+    data:{labels:dates,datasets:[{label:"Donations",data:[0, 0, 0, 0, 0, 0, 0, 0, 159000.0, 0, 0, 0],backgroundColor:"#00D4AA"},{label:"Glo Income",data:[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 156735000.0, 0],backgroundColor:"#4ECDC4"},{label:"IDQR Income",data:[10000.0, 4000.0, 0, 0, 5491.75, 15984.34, 10993.48, 0, 0, 10000.7, 11483.5, 0],backgroundColor:"#FFE66D"},{label:"Insurance Claim",data:[0, 0, 0, 0, 793800.0, 0, 0, 0, 0, 0, 0, 0],backgroundColor:"#FF6B6B"},{label:"Int'l Weman Day Donations",data:[0, 0, 0, 0, 0, 0, 0, 0, 0, 275000.0, 195000.0, 0],backgroundColor:"#A8E6CF"},{label:"Interest Earned",data:[0, 0, 0, 0, 1446.8480000000002, 0, 0, 0, 0, 1301.1761999999999, 0, 0],backgroundColor:"#95E1D3"},{label:"Investment Liquidation",data:[0, 0, 0, 0, 0, 0, 0, 0, 252206000.0, 0, 0, 0],backgroundColor:"#F38181"},{label:"Investment Withdrawal",data:[0, 0, 0, 85237800.0, 0, 0, 0, 0, 0, 0, 0, 0],backgroundColor:"#AA96DA"},{label:"Investment withdrawal",data:[0, 0, 0, 0, 0, 0, 0, 0, 0, 692066551.95, 0, 0],backgroundColor:"#FCbad3"},{label:"Lebara Income",data:[0, 0, 0, 0, 0, 0, 0, 0, 136955000.0, 0, 0, 0],backgroundColor:"#FFFFD2"},{label:"Loan Repayment",data:[0, 2100694.45, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],backgroundColor:"#B5EAD7"},{label:"MTN CIV Income",data:[0, 0, 0, 0, 0, 0, 35884531.22, 0, 0, 0, 0, 0],backgroundColor:"#C7CEEA"},{label:"MTN NG Income",data:[0, 0, 0, 0, 0, 0, 47728988.0, 0, 0, 0, 0, 0],backgroundColor:"#00D4AA"},{label:"Nimc Income",data:[25636479.361199997, 51444856.0, 41013886.0, 140676939.0, 99469200.0, 140302145.20000002, 66857989.0, 29146507.01, 60195888.89, 64809947.0, 73143608.0, 58530046.0],backgroundColor:"#4ECDC4"},{label:"Orange Liberia Income",data:[0, 0, 0, 0, 62047520.0, 0, 0, 0, 0, 0, 0, 0],backgroundColor:"#FFE66D"},{label:"Refund/Reversal",data:[350.0, 1362100.0, 1517937.6400000001, 0, 627290.0, 154698.7152, 195663.50269999998, 0, 326814.4, 392536.72000000003, 5020.0, 1455945.7563999998],backgroundColor:"#FF6B6B"},{label:"Staff Loan Repayment",data:[0, 0, 0, 0, 0, 0, 0, 3175000.0, 0, 0, 0, 0],backgroundColor:"#A8E6CF"},{label:"iTranscript Income",data:[372313.68, 236644.5, 1697668.801, 0, 0, 523145.706, 527863.3214, 0, 0, 0, 141512.3841, 7200.0],backgroundColor:"#95E1D3"}]},
+    options:{...baseOpts,scales:{...baseOpts.scales,x:{...baseOpts.scales.x,stacked:true},y:{...baseOpts.scales.y,stacked:true}}}
+});
+
+new Chart(document.getElementById('expChart'),{
+    type:'bar',
+    data:{labels:dates,datasets:[{label:"Salary",data:[60382360.57, 0, 3876666.67, 0, 115303151.57, 4172034.0000000005, 0, 857142.86, 114768715.62, 0, 0, 0],backgroundColor:"#FF6B6B"},{label:"Payment Batches",data:[33777665.14, 2004500.0, 11188116.27, 15034153.37, 19096359.34, 19022691.21, 34539540.42, 16039878.76, 290000.0, 39282543.49, 15115115.17, 5457599.94],backgroundColor:"#FFE66D"},{label:"Software Tools",data:[2685456.2228, 7148805.898800001, 310013.7591, 3272074.366, 3886205.904, 3368145.5468000006, 286865.1802, 3062831.81, 3156978.98, 6702926.140500001, 2955236.0236000004, 2789427.2399999998],backgroundColor:"#00D4AA"},{label:"Travel & Flights",data:[0, 3683484.359, 1590011.6791, 1009443.6987000001, 0, 6447082.137200001, 2420995.5627, 0, 10067418.629999999, 11719727.4593, 5862754.7049, 18489833.0193],backgroundColor:"#4ECDC4"},{label:"Bank Charges",data:[891142.9587999999, 4341.8, 530.75, 420295.4229, 145285.636, 430886.4744, 646.13, 12148.63, 13252.0, 372862.276, 17721102.1248, 23963.638099999996],backgroundColor:"#A8E6CF"},{label:"Tax & Statutory",data:[1486608.9, 8269417.33, 19439710.09, 16150403.84, 0, 256683.68, 22731380.6, 0, 27844761.93, 39313962.57, 30322.5, 56729142.51],backgroundColor:"#F38181"},{label:"Management Allowance",data:[723710.0, 0, 0, 710315.0, 18781200.0, 0, 7013010.0, 0, 0, 11765955.0, 209053.5, 271874.0],backgroundColor:"#AA96DA"},{label:"Office & Supplies",data:[0, 0, 0, 0, 0, 92988.15000000002, 868500.0, 1373750.0, 1713280.0, 1758800.0, 775092.0000000001, 335000.0],backgroundColor:"#FCbad3"},{label:"Vendors & Contractors",data:[0, 0, 0, 13144819.4703, 0, 0, 0, 36341100.0, 6726768.91, 0, 81962699.8465, 0],backgroundColor:"#95E1D3"},{label:"Conferences & Events",data:[0, 0, 569172.0, 0, 0, 17610620.593200002, 1661252.7381999998, 0, 0, 3780664.3452, 0, 0],backgroundColor:"#B5EAD7"},{label:"Investment Outflows",data:[0, 0, 0, 63928350.00000001, 0, 0, 0, 0, 0, 0, 648065850.0, 0],backgroundColor:"#C7CEEA"},{label:"Other",data:[0, 0, 14752935.0, 240299.56450000004, 0, 0, 0, 0, 6675485.279999999, 0, 0, 0],backgroundColor:"#FFFFD2"}]},
+    options:{...baseOpts,scales:{...baseOpts.scales,x:{...baseOpts.scales.x,stacked:true},y:{...baseOpts.scales.y,stacked:true}}}
+});
+
+new Chart(document.getElementById('splitChart'),{
+    type:'bar',
+    data:{labels:dates,datasets:[
+        {label:'NGN Balances',data:[97775772.08, 123066897.8, 97560755.77, 127340965.7, 59350535.65, 103956764.3, 115213964.8, 67365732.29, 204619623.0, 162678590.2, 341088930.2, 210055092.8],backgroundColor:'rgba(0,212,170,0.7)',borderRadius:4},
+        {label:'USD Balances (NGN eq.)',data:[60023610.0, 66048142.47, 84361023.24, 166469934.8, 235227921.8, 277651352.2, 345524482.3, 365581310.4, 509706325.6, 1206485497.0, 493987803.9, 485752749.1],backgroundColor:'rgba(100,116,139,0.55)',borderRadius:4}
+    ]},
+    options:{...baseOpts,scales:{...baseOpts.scales,x:{...baseOpts.scales.x,stacked:true},y:{...baseOpts.scales.y,stacked:true}}}
+});
+
+new Chart(document.getElementById('fxChart'),{
+    type:'line',
+    data:{labels:dates,datasets:[{label:'USD/NGN',data:[1447.42, 1426.19, 1422.93, 1420.63, 1391.2, 1367.88, 1353.01, 1343.51, 1352.06, 1384.23, 1393.69, 1359.37],borderColor:C.s,backgroundColor:'rgba(78,205,196,0.08)',borderWidth:2.5,fill:true,tension:0.3,pointRadius:4}]},
+    options:{...baseOpts,scales:{...baseOpts.scales,y:{...baseOpts.scales.y,ticks:{color:'#64748b',callback:function(v){return'\u20A6'+v.toLocaleString()}}}}}
+});
+</script>
+<div class="dashboard-footer">
+<span>Seamfix Financial Intelligence &nbsp;·&nbsp; Powered by Claude Cowork</span>
+<span>Available Data Range: 01 Jan 2026 &ndash; 20 Mar 2026 &nbsp;&bull;&nbsp; Generated: 23 Mar 2026 15:59 &nbsp;&bull;&nbsp; $1 = ₦1,450</span>
+</div>
+</body>
+</html>

@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seamfix — Pipeline Intelligence Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:        #0f172a;
+    --surface:   #1e293b;
+    --surface2:  #263348;
+    --border:    #334155;
+    --text:      #e2e8f0;
+    --muted:     #94a3b8;
+    --green:     #10b981;
+    --yellow:    #f59e0b;
+    --red:       #ef4444;
+    --blue:      #3b82f6;
+    --purple:    #8b5cf6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 15px; line-height: 1.5; }
+
+  /* NAV */
+  .nav { background: #0a0f1e; border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; align-items: center; gap: 0; height: 48px; overflow-x: auto; position: sticky; top: 0; z-index: 200; }
+  .nav-brand { color: var(--text); font-weight: 700; font-size: 15px; margin-right: 24px; white-space: nowrap; }
+  .nav-link { color: var(--muted); text-decoration: none; padding: 0 14px; height: 48px; display: flex; align-items: center; font-size: 13px; border-bottom: 2px solid transparent; white-space: nowrap; transition: color .2s; }
+  .nav-link:hover { color: var(--text); }
+  .nav-link.active { color: #fff; border-bottom-color: var(--blue); font-weight: 500; }
+
+  /* HEADER */
+  .page-header { padding: 28px 28px 0; max-width: 1600px; margin: 0 auto; }
+  .page-title { font-size: 22px; font-weight: 700; }
+  .page-sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .generated { color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+  /* SECTION */
+  .section { padding: 24px 28px 0; max-width: 1600px; margin: 0 auto; }
+  .section-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .section-title::after { content:''; flex:1; height:1px; background: var(--border); }
+
+  /* STATUS CARDS */
+  .status-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  @media (max-width: 900px) { .status-grid { grid-template-columns: repeat(2, 1fr); } }
+  .status-card { background: var(--surface); border-radius: 12px; padding: 20px; border: 1px solid var(--border); position: relative; overflow: hidden; }
+  .status-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; }
+  .status-card.on-track::before  { background: var(--green);  }
+  .status-card.at-risk::before   { background: var(--yellow); }
+  .status-card.off-track::before { background: var(--red);    }
+  .status-card.closed::before    { background: var(--blue);   }
+  .status-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 10px; }
+  .status-card.on-track  .status-label { color: var(--green);  }
+  .status-card.at-risk   .status-label { color: var(--yellow); }
+  .status-card.off-track .status-label { color: var(--red);    }
+  .status-card.closed    .status-label { color: var(--blue);   }
+  .status-value { font-size: 28px; font-weight: 800; line-height: 1; margin-bottom: 4px; }
+  .status-count { font-size: 12px; color: var(--muted); }
+  .status-naira { font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+  /* PROJECTION / LANDING ZONE */
+  .lz-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 900px) { .lz-grid { grid-template-columns: 1fr; } }
+  .lz-card { background: var(--surface); border-radius: 12px; padding: 24px; border: 1px solid var(--border); }
+  .lz-title { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 18px; }
+  .lz-scenario { margin-bottom: 18px; }
+  .lz-scenario-header { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; }
+  .lz-scenario-label { color: var(--text); font-weight: 500; }
+  .lz-scenario-value { font-weight: 700; }
+  .lz-bar-track { background: var(--border); border-radius: 4px; height: 10px; overflow: hidden; }
+  .lz-bar-fill { height: 100%; border-radius: 4px; transition: width .8s ease; }
+  .lz-scenario-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .lz-insight { background: var(--surface2); border-radius: 8px; padding: 14px; margin-top: 4px; font-size: 13px; line-height: 1.6; color: var(--text); }
+  .lz-insight strong { color: var(--yellow); }
+
+  /* STALLED ALERT */
+  .alert-box { background: #1c1007; border: 1px solid #78350f; border-radius: 12px; padding: 20px; }
+  .alert-box-title { color: #fbbf24; font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+  .alert-box-sub { color: #94a3b8; font-size: 12px; margin-bottom: 16px; }
+
+  /* TABLES */
+  .table-wrap { background: var(--surface); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th { background: var(--surface2); padding: 11px 14px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border-bottom: 1px solid var(--border); }
+  tbody tr { border-bottom: 1px solid #1e293b; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: #263348; }
+  tbody td { padding: 11px 14px; font-size: 13px; vertical-align: middle; }
+  td.amount { text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* BADGE */
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+
+  /* CHARTS */
+  .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 900px) { .chart-grid { grid-template-columns: 1fr; } }
+  .chart-card { background: var(--surface); border-radius: 12px; padding: 20px; border: 1px solid var(--border); }
+  .chart-title { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 16px; }
+
+  /* RISK CARDS */
+  .risk-card { background: var(--surface); border-radius: 12px; border: 1px solid var(--border); border-left: 4px solid var(--yellow); margin-bottom: 16px; overflow: hidden; }
+  .risk-card-header { background: var(--surface2); padding: 16px 20px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .risk-deal-name { font-size: 15px; font-weight: 700; }
+  .risk-deal-meta { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .risk-amount { font-size: 22px; font-weight: 800; color: var(--yellow); white-space: nowrap; }
+  .risk-card-body { padding: 16px 20px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  @media (max-width: 900px) { .risk-card-body { grid-template-columns: 1fr; } }
+  .risk-section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 8px; }
+  .risk-comment { font-size: 12px; color: var(--text); line-height: 1.6; background: var(--surface2); padding: 10px; border-radius: 6px; }
+  .rec-list { list-style: none; padding: 0; }
+  .rec-list li { font-size: 12px; color: var(--text); padding: 6px 0 6px 18px; position: relative; line-height: 1.5; border-bottom: 1px solid var(--border); }
+  .rec-list li:last-child { border-bottom: none; }
+  .rec-list li::before { content: '→'; position: absolute; left: 0; color: var(--yellow); font-weight: 700; }
+
+  /* FOOTER */
+  .footer { padding: 20px 28px; color: #94a3b8; font-size: 12px; border-top: 1px solid var(--border); margin-top: 32px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; max-width: 1600px; margin-left: auto; margin-right: auto; }
+
+  /* SUMMARY BAR */
+  .summary-bar { background: var(--surface2); border-radius: 12px; padding: 16px 20px; display: flex; gap: 32px; flex-wrap: wrap; margin-bottom: 0; border: 1px solid var(--border); }
+  .summary-item { display: flex; flex-direction: column; gap: 2px; }
+  .summary-item-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .summary-item-value { font-size: 18px; font-weight: 700; }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-brand">⚡ Seamfix</div>
+  <a href="dashboard.html"         class="nav-link">Cash Overview</a>
+  <a href="expense_dashboard.html" class="nav-link">Expense &amp; Vendor</a>
+  <a href="budget_dashboard.html"  class="nav-link">Budget vs Actual</a>
+  <a href="revenue_dashboard.html" class="nav-link">Revenue &amp; Fundability</a>
+  <a href="pipeline_dashboard.html" class="nav-link active">Pipeline Intelligence</a>
+</nav>
+
+<!-- HEADER -->
+<div class="page-header">
+  <div class="page-title">Pipeline Intelligence</div>
+  <div class="page-sub">Deal-level momentum tracking, landing zone analysis, and action recommendations</div>
+</div>
+
+<!-- QUICK SUMMARY BAR -->
+<div class="section">
+  <div class="summary-bar">
+    <div class="summary-item">
+      <span class="summary-item-label">Annual Target</span>
+      <span class="summary-item-value">$10.00M</span>
+    </div>
+    <div class="summary-item">
+      <span class="summary-item-label">Q1 YTD Actual</span>
+      <span class="summary-item-value" style="color:var(--green)">$1.22M</span>
+    </div>
+    <div class="summary-item">
+      <span class="summary-item-label">Realistic Projection</span>
+      <span class="summary-item-value" style="color:var(--yellow)">$7.97M</span>
+    </div>
+    <div class="summary-item">
+      <span class="summary-item-label">Realistic Gap to Target</span>
+      <span class="summary-item-value" style="color:var(--yellow)">$2.03M</span>
+    </div>
+    <div class="summary-item">
+      <span class="summary-item-label">Stalled On-Track Deals</span>
+      <span class="summary-item-value" style="color:var(--yellow)">16 deals / $3.93M</span>
+    </div>
+    <div class="summary-item">
+      <span class="summary-item-label">Q1 Annualised Run Rate</span>
+      <span class="summary-item-value" style="color:var(--purple)">$5.81M</span>
+    </div>
+  </div>
+</div>
+
+<!-- STATUS CARDS -->
+<div class="section">
+  <div class="section-title">Pipeline Status Breakdown</div>
+  <div class="status-grid">
+    <div class="status-card on-track">
+      <div class="status-label">✅ On Track</div>
+      <div class="status-value" style="color:var(--green)">$5.6M</div>
+      <div class="status-count">29 deals &nbsp;·&nbsp; 56% of target</div>
+      <div class="status-naira">≈ ₦8.16B at ₦1,450/$</div>
+    </div>
+    <div class="status-card at-risk">
+      <div class="status-label">⚠️ At Risk</div>
+      <div class="status-value" style="color:var(--yellow)">$3.7M</div>
+      <div class="status-count">10 deals &nbsp;·&nbsp; 37% of target</div>
+      <div class="status-naira">≈ ₦5.37B at ₦1,450/$</div>
+    </div>
+    <div class="status-card off-track">
+      <div class="status-label">🔴 Off Track</div>
+      <div class="status-value" style="color:var(--red)">$82.5K</div>
+      <div class="status-count">3 deals &nbsp;·&nbsp; 1% of target</div>
+      <div class="status-naira">≈ ₦119.7M at ₦1,450/$</div>
+    </div>
+    <div class="status-card closed">
+      <div class="status-label">🔒 Closed / Secured</div>
+      <div class="status-value" style="color:var(--blue)">$254.3K</div>
+      <div class="status-count">3 deals &nbsp;·&nbsp; 3% of target</div>
+      <div class="status-naira">≈ ₦368.8M at ₦1,450/$</div>
+    </div>
+  </div>
+</div>
+
+<!-- CLIENT CONCENTRATION -->
+<div class="section">
+  <div class="section-title">🎯 Client Concentration Risk</div>
+  <div style="background:var(--surface);border-radius:12px;border:1px solid var(--border);padding:24px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:18px">
+      <span style="font-size:13px;color:var(--muted)">Top 5 clients by pipeline value — total pipeline: <strong style="color:var(--text)">$10.00M</strong></span>
+      <span style="font-size:11px;color:var(--muted)">Risk: &gt;25% = HIGH &nbsp;·&nbsp; 15–25% = MEDIUM &nbsp;·&nbsp; &lt;15% = LOW</span>
+    </div>
+    
+    <div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+        <span style="font-size:13px;font-weight:500;color:#e2e8f0">New Business Opportunities</span>
+        <span style="display:flex;align-items:center;gap:10px">
+          <span style="color:#94a3b8;font-size:11px">LOW</span>
+          <span style="font-size:13px;color:#94a3b8">$1.46M</span>
+          <span style="font-size:13px;font-weight:700;color:#3b82f6">14.6%</span>
+        </span>
+      </div>
+      <div style="background:#334155;border-radius:4px;height:8px;overflow:hidden">
+        <div style="width:14.6%;height:100%;background:#3b82f6;border-radius:4px"></div>
+      </div>
+    </div>
+    <div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+        <span style="font-size:13px;font-weight:500;color:#e2e8f0">Fixiam</span>
+        <span style="display:flex;align-items:center;gap:10px">
+          <span style="color:#94a3b8;font-size:11px">LOW</span>
+          <span style="font-size:13px;color:#94a3b8">$792.5K</span>
+          <span style="font-size:13px;font-weight:700;color:#3b82f6">7.9%</span>
+        </span>
+      </div>
+      <div style="background:#334155;border-radius:4px;height:8px;overflow:hidden">
+        <div style="width:7.9%;height:100%;background:#3b82f6;border-radius:4px"></div>
+      </div>
+    </div>
+    <div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+        <span style="font-size:13px;font-weight:500;color:#e2e8f0">NCC SIM-NIN Linkage management Solution</span>
+        <span style="display:flex;align-items:center;gap:10px">
+          <span style="color:#94a3b8;font-size:11px">LOW</span>
+          <span style="font-size:13px;color:#94a3b8">$777.8K</span>
+          <span style="font-size:13px;font-weight:700;color:#3b82f6">7.8%</span>
+        </span>
+      </div>
+      <div style="background:#334155;border-radius:4px;height:8px;overflow:hidden">
+        <div style="width:7.8%;height:100%;background:#3b82f6;border-radius:4px"></div>
+      </div>
+    </div>
+    <div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+        <span style="font-size:13px;font-weight:500;color:#e2e8f0">NIMC License direct sales - NGN</span>
+        <span style="display:flex;align-items:center;gap:10px">
+          <span style="color:#94a3b8;font-size:11px">LOW</span>
+          <span style="font-size:13px;color:#94a3b8">$723.3K</span>
+          <span style="font-size:13px;font-weight:700;color:#3b82f6">7.2%</span>
+        </span>
+      </div>
+      <div style="background:#334155;border-radius:4px;height:8px;overflow:hidden">
+        <div style="width:7.2%;height:100%;background:#3b82f6;border-radius:4px"></div>
+      </div>
+    </div>
+    <div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+        <span style="font-size:13px;font-weight:500;color:#e2e8f0">ARTCI CIV</span>
+        <span style="display:flex;align-items:center;gap:10px">
+          <span style="color:#94a3b8;font-size:11px">LOW</span>
+          <span style="font-size:13px;color:#94a3b8">$651.5K</span>
+          <span style="font-size:13px;font-weight:700;color:#3b82f6">6.5%</span>
+        </span>
+      </div>
+      <div style="background:#334155;border-radius:4px;height:8px;overflow:hidden">
+        <div style="width:6.5%;height:100%;background:#3b82f6;border-radius:4px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LANDING ZONE -->
+<div class="section">
+  <div class="section-title">Landing Zone Analysis</div>
+  <div class="lz-grid">
+    <div class="lz-card">
+      <div class="lz-title">Revenue Projections vs $10M Landing Zone</div>
+
+      <!-- Annual target reference line -->
+      <div class="lz-scenario" style="margin-bottom:22px">
+        <div class="lz-scenario-header">
+          <span class="lz-scenario-label" style="color:var(--blue)">🎯 Annual Target (Landing Zone)</span>
+          <span class="lz-scenario-value" style="color:var(--blue)">$10.00M</span>
+        </div>
+        <div class="lz-bar-track"><div class="lz-bar-fill" style="width:100%;background:var(--blue)"></div></div>
+      </div>
+
+      <div class="lz-scenario">
+        <div class="lz-scenario-header">
+          <span class="lz-scenario-label">Realistic (50% of At-Risk closes)</span>
+          <span class="lz-scenario-value" style="color:var(--green)">$7.97M &nbsp;<span style="font-weight:400;font-size:12px;color:var(--muted)">80%</span></span>
+        </div>
+        <div class="lz-bar-track"><div class="lz-bar-fill" style="width:79.7%;background:var(--green)"></div></div>
+        <div class="lz-scenario-sub">Gap to landing zone: <strong style="color:var(--yellow)">$2.03M</strong></div>
+      </div>
+
+      <div class="lz-scenario" style="margin-top:16px">
+        <div class="lz-scenario-header">
+          <span class="lz-scenario-label">Conservative (At-Risk &amp; Off-Track unresolved)</span>
+          <span class="lz-scenario-value" style="color:var(--red)">$6.05M &nbsp;<span style="font-weight:400;font-size:12px;color:var(--muted)">60%</span></span>
+        </div>
+        <div class="lz-bar-track"><div class="lz-bar-fill" style="width:60.5%;background:var(--red)"></div></div>
+        <div class="lz-scenario-sub">Gap to landing zone: <strong style="color:var(--red)">$3.95M</strong></div>
+      </div>
+
+      <div class="lz-scenario" style="margin-top:16px">
+        <div class="lz-scenario-header">
+          <span class="lz-scenario-label" style="color:var(--purple)">Q1 Run Rate (Annualised)</span>
+          <span class="lz-scenario-value" style="color:var(--purple)">$5.81M &nbsp;<span style="font-weight:400;font-size:12px;color:var(--muted)">58%</span></span>
+        </div>
+        <div class="lz-bar-track"><div class="lz-bar-fill" style="width:58.1%;background:var(--purple)"></div></div>
+        <div class="lz-scenario-sub" style="color:var(--muted)">Based on Jan + Feb + scaled March (×31/13)</div>
+      </div>
+    </div>
+
+    <div class="lz-card">
+      <div class="lz-title">What This Means</div>
+      <div class="lz-insight">
+        <p style="margin-bottom:12px">The <strong>realistic projection of $7.97M</strong> assumes all On Track deals deliver in full and 50% of At Risk deals close. This puts Seamfix at <strong>80% of the $10M landing zone</strong>, leaving a gap of <strong>$2.03M</strong>.</p>
+        <p style="margin-bottom:12px">If At Risk and Off Track deals are not resolved, the conservative outcome of <strong style="color:var(--red)">$6.05M</strong> represents a shortfall of <strong style="color:var(--red)">$3.95M</strong> — which is 40% of the annual target unfunded.</p>
+        <p style="margin-bottom:12px">The Q1 annualised run rate of <strong style="color:var(--purple)">$5.81M</strong> is below the needed pace, which means later-stage deals (currently at $0 actuals) <em>must</em> convert to close the gap.</p>
+        <p><strong>The 16 On Track deals showing zero Q1 revenue ($3.93M combined)</strong> are the most important item to verify. If even 40% of those activate, the realistic projection improves materially.</p>
+      </div>
+      <div style="margin-top:16px">
+        <canvas id="donutChart" height="180"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MOMENTUM TRACKER — shown first per request -->
+<div class="section">
+  <div class="section-title">Month-on-Month Momentum (17 active deals)</div>
+  <div class="chart-card" style="margin-bottom:16px">
+    <div class="chart-title">Top Revenue Movers — Jan / Feb / Mar Actuals (USD)</div>
+    <canvas id="momentumChart" height="180"></canvas>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="min-width:130px;max-width:160px">Deal</th><th>Status</th>
+          <th style="text-align:right">Jan</th>
+          <th style="text-align:right">Feb</th>
+          <th style="text-align:right">Mar (partial)</th>
+          <th style="text-align:right">YTD Total</th>
+          <th>Trend</th>
+          <th style="min-width:180px">Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="">
+            <td style="max-width:160px;white-space:normal;word-break:break-word">NIMC License sales - BNPL (NGN)</td>
+            <td><span class="badge" style="background:#6b728020;color:#6b7280;border:1px solid #6b728040">Unknown</span></td>
+            <td class="amount">$128.3K</td>
+            <td class="amount">$207.2K</td>
+            <td class="amount" style="color:#94a3b8">– <span style="font-size:10px">(partial)</span></td>
+            <td class="amount"><strong>$335.5K</strong></td>
+            <td><span style="color:#10b981">▲ Growing</span></td>
+            <td style="color:#475569;font-size:12px">—</td>
+        </tr>
+        <tr style="">
+            <td style="max-width:160px;white-space:normal;word-break:break-word">NIMC License direct sales - USD</td>
+            <td><span class="badge" style="background:#6b728020;color:#6b7280;border:1px solid #6b728040">Unknown</span></td>
+            <td class="amount">$99.0K</td>
+            <td class="amount">$110.3K</td>
+            <td class="amount" style="color:#94a3b8">$29.0K <span style="font-size:10px">(partial)</span></td>
+            <td class="amount"><strong>$238.3K</strong></td>
+            <td><span style="color:#10b981">▲ Growing</span></td>
+            <td style="color:#475569;font-size:12px">—</td>
+        </tr>
+        <tr style="background:rgba(59,130,246,0.06)">
+            <td style="max-width:160px;white-space:normal;word-break:break-word">NIMC License direct sales - NGN</td>
+            <td><span class="badge" style="background:#3b82f620;color:#3b82f6;border:1px solid #3b82f640">On Track</span></td>
+            <td class="amount">$116.4K</td>
+            <td class="amount">$72.1K</td>
+            <td class="amount" style="color:#94a3b8">$37.6K <span style="font-size:10px">(partial)</span></td>
+            <td class="amount"><strong>$226.1K</strong></td>
+            <td><span style="color:#10b981">✓ Consistent</span></td>
+            <td style="color:#475569;font-size:12px">—</td>
+        </tr>
+        <tr style="background:rgba(59,130,246,0.06)">
+            <td style="max-width:160px;white-space:normal;word-break:break-word">Existing contactless licenses</td>
+            <td><span class="badge" style="background:#3b82f620;color:#3b82f6;border:1px solid #3b82f640">On Track</span></td>
+            <td class="amount">$53.2K</td>
+            <td class="amount">$53.2K</td>
+            <td class="amount" style="color:#94a3b8">$40.6K <span style="font-size:10px">(partial)</span></td>
+            <td class="amount"><strong>$147.0K</strong></td>
+            <td><span style="color:#10b981">✓ Consistent</span></td>
+            <td style="color:#475569;font-size:12px">—</td>
+        </tr>
+        <tr style="background:rgba(59,130,246,0.06)">
+            <td style="max-width:160px;white-space:normal;word-break:break-word">MTN AMC & Workforce IAM ( Jan - Mar 2026)</td>
+            <td><span class="badge" style="background:#3b82f620;color:#3b82f6;border:1px solid #3b82f640">On Track</span></td>
+            <td class="amount">$34.9K</td>
+            <td class="amount">$34.9K</td>
+            <td class="amount" style="color:#94a3b8">$34.9K <span style="font-size:10px">(partial)</span></td>
+            <td class="amount"><strong>$104.7K</strong></td>
+            <td><span style="color:#10b981">✓ Consistent</span></td>
+            <td style="color:#475569;font-size:12px">—</td>
+        </tr>
+        <tr style="background:rgba(59,130,246,0.06)">
+            <td style="max-width:160px;white-space:normal;word-break:break-word">BSX</td>
+            <td><span class="badge" style="background:#3b82f620;color:#3b82f6;border:1px solid #3b82f640">On Track</span></td>
+            <td class="amount">$13.5K</td>
+            <td class="amount">$13.5K</td>
+            <td class="amount" style="color:#94a3b8">$13.5K <span style="font-size:10px">(partial)</span></td>
+            <td class="amount"><strong>$40.5K</strong></td>
+            <td><span style="color:#10b981">✓ Consistent</span></td>
+            <td style="color:#475569;font-size:12px">—</td>
+        </tr>
+        <tr style="background:rgba(59,130,246,0.06)">
+            <td style="max-width:160px;white-space:normal;word-break:break-word">AI Capabilities</td>
+            <td><span class="badge" style="background:#3b82f620;color:#3b82f6;border:1px solid #3b82f640">On Track</span></td>
+            <td class="amount">$19.5K</td>
+            <td class="amount">$11.7K</td>
+            <td class="amount" style="color:#94a3b8">– <span style="font-size:10px">(partial)</span></td>
+            <td class="amount"><strong>$31.2K</strong></td>
+            <td><span style="color:#f59e0b">⚠ Stalled Mar</span></td>
+            <td style="font-size:12px;color:#94a3b8;font-style:italic;max-width:220px">Had revenue in Jan/Feb but nothing recorded in March yet. Could be timing; monitor closely.</td>
+        </tr>
+        <tr style="background:rgba(245,158,11,0.07)">
+            <td style="max-width:160px;white-space:normal;word-break:break-word">UNN- iTranscript & IDQR</td>
+            <td><span class="badge" style="background:#f59e0b20;color:#f59e0b;border:1px solid #f59e0b40">At Risk</span></td>
+            <td class="amount">$2.2K</td>
+            <td class="amount">$20.5K</td>
+            <td class="amount" style="color:#94a3b8">$225 <span style="font-size:10px">(partial)</span></td>
+            <td class="amount"><strong>$23.0K</strong></td>
+            <td><span style="color:#10b981">▲ Growing</span></td>
+            <td style="font-size:12px;color:#94a3b8;font-style:italic;max-width:220px">Revenue is growing month-on-month, but the deal is flagged At Risk — likely because the contract or agreement is not yet fully formalised. Verify whether the risk label needs updating.</td>
+        </tr>
+        <tr style="background:rgba(59,130,246,0.06)">
+            <td style="max-width:160px;white-space:normal;word-break:break-word">MFA Benin (e-Pass and Fixiam)</td>
+            <td><span class="badge" style="background:#3b82f620;color:#3b82f6;border:1px solid #3b82f640">On Track</span></td>
+            <td class="amount">$9.9K</td>
+            <td class="amount">$7.4K</td>
+            <td class="amount" style="color:#94a3b8">$4.3K <span style="font-size:10px">(partial)</span></td>
+            <td class="amount"><strong>$21.5K</strong></td>
+            <td><span style="color:#10b981">✓ Consistent</span></td>
+            <td style="color:#475569;font-size:12px">—</td>
+        </tr>
+        <tr style="background:rgba(59,130,246,0.06)">
+            <td style="max-width:160px;white-space:normal;word-break:break-word">MTN NIMC Support Yearly Renewal -  4K (Nov 2025-Feb 2026)</td>
+            <td><span class="badge" style="background:#3b82f620;color:#3b82f6;border:1px solid #3b82f640">On Track</span></td>
+            <td class="amount">$8.4K</td>
+            <td class="amount">$8.4K</td>
+            <td class="amount" style="color:#94a3b8">– <span style="font-size:10px">(partial)</span></td>
+            <td class="amount"><strong>$16.7K</strong></td>
+            <td><span style="color:#f59e0b">⚠ Stalled Mar</span></td>
+            <td style="font-size:12px;color:#94a3b8;font-style:italic;max-width:220px">Had revenue in Jan/Feb but nothing recorded in March yet. Could be timing; monitor closely.</td>
+        </tr>
+        <tr style="background:rgba(59,130,246,0.06)">
+            <td style="max-width:160px;white-space:normal;word-break:break-word">ESUT iTranscript</td>
+            <td><span class="badge" style="background:#3b82f620;color:#3b82f6;border:1px solid #3b82f640">On Track</span></td>
+            <td class="amount">$4.1K</td>
+            <td class="amount">$2.5K</td>
+            <td class="amount" style="color:#94a3b8">$1.3K <span style="font-size:10px">(partial)</span></td>
+            <td class="amount"><strong>$7.9K</strong></td>
+            <td><span style="color:#10b981">✓ Consistent</span></td>
+            <td style="color:#475569;font-size:12px">—</td>
+        </tr>
+        <tr style="background:rgba(16,185,129,0.07)">
+            <td style="max-width:160px;white-space:normal;word-break:break-word">Managed Services</td>
+            <td><span class="badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">Closed</span></td>
+            <td class="amount">–</td>
+            <td class="amount">–</td>
+            <td class="amount" style="color:#94a3b8">$7.0K <span style="font-size:10px">(partial)</span></td>
+            <td class="amount"><strong>$7.0K</strong></td>
+            <td><span style="color:#3b82f6">✦ New</span></td>
+            <td style="font-size:12px;color:#94a3b8;font-style:italic;max-width:220px">Deal is closed/secured and revenue just started in March — expected pattern for a recently closed deal.</td>
+        </tr>
+        <tr style="background:rgba(59,130,246,0.06)">
+            <td style="max-width:160px;white-space:normal;word-break:break-word">Implementation of NCC - 96 hour barring</td>
+            <td><span class="badge" style="background:#3b82f620;color:#3b82f6;border:1px solid #3b82f640">On Track</span></td>
+            <td class="amount">$6.9K</td>
+            <td class="amount">–</td>
+            <td class="amount" style="color:#94a3b8">– <span style="font-size:10px">(partial)</span></td>
+            <td class="amount"><strong>$6.9K</strong></td>
+            <td><span style="color:#ef4444">▼ Dropped</span></td>
+            <td style="font-size:12px;color:#94a3b8;font-style:italic;max-width:220px">Status says On Track but revenue has stopped since Jan. Verify deal health with the account manager — status may be stale.</td>
+        </tr>
+        <tr style="background:rgba(59,130,246,0.06)">
+            <td style="max-width:160px;white-space:normal;word-break:break-word">Hardware sales -IB Kojak</td>
+            <td><span class="badge" style="background:#3b82f620;color:#3b82f6;border:1px solid #3b82f640">On Track</span></td>
+            <td class="amount">$577</td>
+            <td class="amount">$5.6K</td>
+            <td class="amount" style="color:#94a3b8">– <span style="font-size:10px">(partial)</span></td>
+            <td class="amount"><strong>$6.2K</strong></td>
+            <td><span style="color:#10b981">▲ Growing</span></td>
+            <td style="color:#475569;font-size:12px">—</td>
+        </tr>
+        <tr style="background:rgba(59,130,246,0.06)">
+            <td style="max-width:160px;white-space:normal;word-break:break-word">Change Requests</td>
+            <td><span class="badge" style="background:#3b82f620;color:#3b82f6;border:1px solid #3b82f640">On Track</span></td>
+            <td class="amount">$3.6K</td>
+            <td class="amount">–</td>
+            <td class="amount" style="color:#94a3b8">– <span style="font-size:10px">(partial)</span></td>
+            <td class="amount"><strong>$3.6K</strong></td>
+            <td><span style="color:#ef4444">▼ Dropped</span></td>
+            <td style="font-size:12px;color:#94a3b8;font-style:italic;max-width:220px">Status says On Track but revenue has stopped since Jan. Verify deal health with the account manager — status may be stale.</td>
+        </tr>
+        <tr style="background:rgba(59,130,246,0.06)">
+            <td style="max-width:160px;white-space:normal;word-break:break-word">Veremark</td>
+            <td><span class="badge" style="background:#3b82f620;color:#3b82f6;border:1px solid #3b82f640">On Track</span></td>
+            <td class="amount">$677</td>
+            <td class="amount">$1.9K</td>
+            <td class="amount" style="color:#94a3b8">– <span style="font-size:10px">(partial)</span></td>
+            <td class="amount"><strong>$2.6K</strong></td>
+            <td><span style="color:#10b981">▲ Growing</span></td>
+            <td style="color:#475569;font-size:12px">—</td>
+        </tr>
+        <tr style="background:rgba(59,130,246,0.06)">
+            <td style="max-width:160px;white-space:normal;word-break:break-word">NG Ride</td>
+            <td><span class="badge" style="background:#3b82f620;color:#3b82f6;border:1px solid #3b82f640">On Track</span></td>
+            <td class="amount">$70</td>
+            <td class="amount">$70</td>
+            <td class="amount" style="color:#94a3b8">$70 <span style="font-size:10px">(partial)</span></td>
+            <td class="amount"><strong>$209</strong></td>
+            <td><span style="color:#10b981">✓ Consistent</span></td>
+            <td style="color:#475569;font-size:12px">—</td>
+        </tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- STALLED ON TRACK -->
+<div class="section">
+  <div class="section-title">⚠️ On Track — But No Revenue Yet (16 deals, $3.93M at stake)</div>
+  <div class="alert-box" style="margin-bottom:16px">
+    <div class="alert-box-title">Verification Required</div>
+    <div class="alert-box-sub">These deals are labelled "On Track" but have recorded $0 revenue in January, February, and March. They may be pre-revenue (future start dates) or genuinely stalled. Each should be confirmed this week.</div>
+  </div>
+  <div class="table-wrap" style="border-left:4px solid #3b82f6">
+    <table>
+      <thead><tr><th>Deal</th><th>Rail</th><th style="text-align:right">Annual Value</th><th>Status Notes</th></tr></thead>
+      <tbody>
+        <tr>
+            <td>NCC SIM-NIN Linkage management Solution</td>
+            <td>Compliance</td>
+            <td class="amount">$777.8K</td>
+            <td style="color:#94a3b8;font-style:italic;font-size:12px">poc done. Post POC work items ongoing. We are pushing for a meeting with NCC this week. We are on tr…</td>
+        </tr>
+        <tr>
+            <td>PAPSS (P-GATE):</td>
+            <td>Compliance</td>
+            <td class="amount">$12.3K</td>
+            <td style="color:#94a3b8;font-style:italic;font-size:12px">Development work has started</td>
+        </tr>
+        <tr>
+            <td>SNEDAI/CIV Passport Renewal</td>
+            <td>Data Capture</td>
+            <td class="amount">$275.0K</td>
+            <td style="color:#94a3b8;font-style:italic;font-size:12px">—</td>
+        </tr>
+        <tr>
+            <td>PNL/MVNO_NCC Central KYC Multiple Tenancy Platform  Fee & Transaction fee</td>
+            <td>Compliance</td>
+            <td class="amount">$196.1K</td>
+            <td style="color:#94a3b8;font-style:italic;font-size:12px">The ISPs are still pushing back on price. We need to find who their champions are and facilitate it …</td>
+        </tr>
+        <tr>
+            <td>NIA Ekyc Solution</td>
+            <td>Data Capture</td>
+            <td class="amount">$589.5K</td>
+            <td style="color:#94a3b8;font-style:italic;font-size:12px">Commercial negotiation stage: we sent them the final pricing on Monday and they are currently review…</td>
+        </tr>
+        <tr>
+            <td>NIMC Enrolment transaction fees - recurring</td>
+            <td>Data Capture</td>
+            <td class="amount">$64.2K</td>
+            <td style="color:#94a3b8;font-style:italic;font-size:12px">—</td>
+        </tr>
+        <tr>
+            <td>BioSmart-X License - 23k units 3 year subscription</td>
+            <td>Data Capture</td>
+            <td class="amount">$138.0K</td>
+            <td style="color:#94a3b8;font-style:italic;font-size:12px">They still have interest to purchase 5k licenses from the 23k. By Q3, we will start pushing for the …</td>
+        </tr>
+        <tr>
+            <td>MTN NIMC Support Yearly Renewal -  4K (Mar 2026-Feb 2027)</td>
+            <td>Data Capture</td>
+            <td class="amount">$86.9K</td>
+            <td style="color:#94a3b8;font-style:italic;font-size:12px">We have engaged the client on this. Awaiting their feedback</td>
+        </tr>
+        <tr>
+            <td>Change Requests</td>
+            <td>Data Capture</td>
+            <td class="amount">$300.1K</td>
+            <td style="color:#94a3b8;font-style:italic;font-size:12px">We expect engagement from the Procurement team on this
+
+We recieved a PO of 10k for an urgent change…</td>
+        </tr>
+        <tr>
+            <td>Fixiam</td>
+            <td>Identity</td>
+            <td class="amount">$260.0K</td>
+            <td style="color:#94a3b8;font-style:italic;font-size:12px">Commercial proposal submitted; awaiting feedback from procurement on the status.</td>
+        </tr>
+        <tr>
+            <td>AMPRT Mali</td>
+            <td>Data Capture</td>
+            <td class="amount">$156.2K</td>
+            <td style="color:#94a3b8;font-style:italic;font-size:12px">Commercial proposal submitted.
+Currently awaiting engagement from the procurement team for the next …</td>
+        </tr>
+        <tr>
+            <td>ARTCI CIV</td>
+            <td>Data Capture</td>
+            <td class="amount">$651.5K</td>
+            <td style="color:#94a3b8;font-style:italic;font-size:12px">Commercial proposal submitted.
+Awaiting procurement feedback regarding the status of the commercial.</td>
+        </tr>
+        <tr>
+            <td>PENCOM IAM Solution</td>
+            <td>Identity</td>
+            <td class="amount">$64.6K</td>
+            <td style="color:#94a3b8;font-style:italic;font-size:12px">We are waiting on the tender response/outcome</td>
+        </tr>
+        <tr>
+            <td>Sun King - Self-Service Implementation for ID verification services.</td>
+            <td>API</td>
+            <td class="amount">$93.1K</td>
+            <td style="color:#94a3b8;font-style:italic;font-size:12px">Invoice shared with the customer. Payment expected</td>
+        </tr>
+        <tr>
+            <td>NIBSS IAM opportunity</td>
+            <td>Identity</td>
+            <td class="amount">$60.4K</td>
+            <td style="color:#94a3b8;font-style:italic;font-size:12px">—</td>
+        </tr>
+        <tr>
+            <td>One Telco Regulator (NCA, PURA, BOCRA, TCRA, INCM)</td>
+            <td>Data Capture</td>
+            <td class="amount">$200.0K</td>
+            <td style="color:#94a3b8;font-style:italic;font-size:12px">For PURA, we have commenced commercial review yesterday, we presented the client finance model like …</td>
+        </tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- AT RISK -->
+<div class="section">
+  <div class="section-title">🔴 At-Risk Deals — 10 deals / $3.70M at stake</div>
+  <p style="color:var(--muted);font-size:13px;margin-bottom:16px">
+    Resolving all At Risk deals recovers up to $3.70M — narrowing the landing zone gap from $3.95M to $2.03M.
+  </p>
+  
+        <div class="risk-card">
+            <div class="risk-card-header">
+                <div>
+                    <div class="risk-deal-name">New Business Opportunities</div>
+                    <div class="risk-deal-meta">Other &nbsp;·&nbsp; Annual value: <strong>$1.46M</strong> (₦2.12B)</div>
+                </div>
+                <div class="risk-amount">$1.46M</div>
+            </div>
+            <div class="risk-card-body">
+                <div class="risk-section">
+                    <div class="risk-section-title">📋 Current Status Note</div>
+                    <div class="risk-comment">No notes recorded.</div>
+                </div>
+                <div class="risk-section">
+                    <div class="risk-section-title">📊 Q1 Revenue Recorded</div>
+                    <div style="margin-top:6px"><span style="color:#ef4444">$0 — No Q1 revenue</span></div>
+                    <div style="display:flex;gap:16px;margin-top:8px">
+                        <span>Jan: –</span>
+                        <span>Feb: –</span>
+                        <span>Mar: – <em style="font-size:10px">(partial)</em></span>
+                    </div>
+                </div>
+                <div class="risk-section">
+                    <div class="risk-section-title">🎯 Recommended Actions</div>
+                    <ul class="rec-list"><li>This is a high-value deal ($1.46M) — assign a dedicated deal champion and weekly executive review.</li><li>No revenue recorded in Q1. Urgently clarify whether the deal is still live or needs to be re-scoped/removed from the pipeline.</li></ul>
+                </div>
+            </div>
+        </div>
+        <div class="risk-card">
+            <div class="risk-card-header">
+                <div>
+                    <div class="risk-deal-name">MTN Benin - Fixiam & AI Capabilities</div>
+                    <div class="risk-deal-meta">Identity &nbsp;·&nbsp; Annual value: <strong>$532.2K</strong> (₦771.7M)</div>
+                </div>
+                <div class="risk-amount">$532.2K</div>
+            </div>
+            <div class="risk-card-body">
+                <div class="risk-section">
+                    <div class="risk-section-title">📋 Current Status Note</div>
+                    <div class="risk-comment">Opportunity placed on hold for the moment.
+Currently reconfirming the components they intend to integrate, as they deployed an OCR solution with another vendor in December.  We will have a new demo with the customer service and technical team next week for this item</div>
+                </div>
+                <div class="risk-section">
+                    <div class="risk-section-title">📊 Q1 Revenue Recorded</div>
+                    <div style="margin-top:6px"><span style="color:#ef4444">$0 — No Q1 revenue</span></div>
+                    <div style="display:flex;gap:16px;margin-top:8px">
+                        <span>Jan: –</span>
+                        <span>Feb: –</span>
+                        <span>Mar: – <em style="font-size:10px">(partial)</em></span>
+                    </div>
+                </div>
+                <div class="risk-section">
+                    <div class="risk-section-title">🎯 Recommended Actions</div>
+                    <ul class="rec-list"><li>Reactivate engagement: schedule a senior-level call this week to understand the blocker and agree a revised timeline.</li><li>This is a high-value deal ($532.2K) — assign a dedicated deal champion and weekly executive review.</li><li>No revenue recorded in Q1. Urgently clarify whether the deal is still live or needs to be re-scoped/removed from the pipeline.</li></ul>
+                </div>
+            </div>
+        </div>
+        <div class="risk-card">
+            <div class="risk-card-header">
+                <div>
+                    <div class="risk-deal-name">BTC Botswana</div>
+                    <div class="risk-deal-meta">Data Capture &nbsp;·&nbsp; Annual value: <strong>$440.0K</strong> (₦638.0M)</div>
+                </div>
+                <div class="risk-amount">$440.0K</div>
+            </div>
+            <div class="risk-card-body">
+                <div class="risk-section">
+                    <div class="risk-section-title">📋 Current Status Note</div>
+                    <div class="risk-comment">BTC Botswana is at risk, We have a competitor and someone internal with vested interest, the plan to make a physical visit to them.</div>
+                </div>
+                <div class="risk-section">
+                    <div class="risk-section-title">📊 Q1 Revenue Recorded</div>
+                    <div style="margin-top:6px"><span style="color:#ef4444">$0 — No Q1 revenue</span></div>
+                    <div style="display:flex;gap:16px;margin-top:8px">
+                        <span>Jan: –</span>
+                        <span>Feb: –</span>
+                        <span>Mar: – <em style="font-size:10px">(partial)</em></span>
+                    </div>
+                </div>
+                <div class="risk-section">
+                    <div class="risk-section-title">🎯 Recommended Actions</div>
+                    <ul class="rec-list"><li>Conduct competitive analysis and prepare differentiation brief for the client — price alone won't win this.</li><li>Push for a signed LOI or purchase order to lock commitment before further slippage. Offer implementation support as sweetener.</li><li>This is a high-value deal ($440.0K) — assign a dedicated deal champion and weekly executive review.</li><li>No revenue recorded in Q1. Urgently clarify whether the deal is still live or needs to be re-scoped/removed from the pipeline.</li></ul>
+                </div>
+            </div>
+        </div>
+        <div class="risk-card">
+            <div class="risk-card-header">
+                <div>
+                    <div class="risk-deal-name">Fixiam</div>
+                    <div class="risk-deal-meta">Identity &nbsp;·&nbsp; Annual value: <strong>$300.0K</strong> (₦435.0M)</div>
+                </div>
+                <div class="risk-amount">$300.0K</div>
+            </div>
+            <div class="risk-card-body">
+                <div class="risk-section">
+                    <div class="risk-section-title">📋 Current Status Note</div>
+                    <div class="risk-comment">No notes recorded.</div>
+                </div>
+                <div class="risk-section">
+                    <div class="risk-section-title">📊 Q1 Revenue Recorded</div>
+                    <div style="margin-top:6px"><span style="color:#ef4444">$0 — No Q1 revenue</span></div>
+                    <div style="display:flex;gap:16px;margin-top:8px">
+                        <span>Jan: –</span>
+                        <span>Feb: –</span>
+                        <span>Mar: – <em style="font-size:10px">(partial)</em></span>
+                    </div>
+                </div>
+                <div class="risk-section">
+                    <div class="risk-section-title">🎯 Recommended Actions</div>
+                    <ul class="rec-list"><li>No revenue recorded in Q1. Urgently clarify whether the deal is still live or needs to be re-scoped/removed from the pipeline.</li></ul>
+                </div>
+            </div>
+        </div>
+        <div class="risk-card">
+            <div class="risk-card-header">
+                <div>
+                    <div class="risk-deal-name">Telekom Networks (TNM)</div>
+                    <div class="risk-deal-meta">Data Capture &nbsp;·&nbsp; Annual value: <strong>$212.0K</strong> (₦307.4M)</div>
+                </div>
+                <div class="risk-amount">$212.0K</div>
+            </div>
+            <div class="risk-card-body">
+                <div class="risk-section">
+                    <div class="risk-section-title">📋 Current Status Note</div>
+                    <div class="risk-comment">They responded to say they need the contactless licenses but not immediately. We will keep following up</div>
+                </div>
+                <div class="risk-section">
+                    <div class="risk-section-title">📊 Q1 Revenue Recorded</div>
+                    <div style="margin-top:6px"><span style="color:#ef4444">$0 — No Q1 revenue</span></div>
+                    <div style="display:flex;gap:16px;margin-top:8px">
+                        <span>Jan: –</span>
+                        <span>Feb: –</span>
+                        <span>Mar: – <em style="font-size:10px">(partial)</em></span>
+                    </div>
+                </div>
+                <div class="risk-section">
+                    <div class="risk-section-title">🎯 Recommended Actions</div>
+                    <ul class="rec-list"><li>Escalate the follow-up — set a clear deadline with the client and involve a senior executive to accelerate response.</li><li>Push for a signed LOI or purchase order to lock commitment before further slippage. Offer implementation support as sweetener.</li><li>No revenue recorded in Q1. Urgently clarify whether the deal is still live or needs to be re-scoped/removed from the pipeline.</li></ul>
+                </div>
+            </div>
+        </div>
+        <div class="risk-card">
+            <div class="risk-card-header">
+                <div>
+                    <div class="risk-deal-name">Fixiam</div>
+                    <div class="risk-deal-meta">Identity &nbsp;·&nbsp; Annual value: <strong>$202.5K</strong> (₦293.6M)</div>
+                </div>
+                <div class="risk-amount">$202.5K</div>
+            </div>
+            <div class="risk-card-body">
+                <div class="risk-section">
+                    <div class="risk-section-title">📋 Current Status Note</div>
+                    <div class="risk-comment">No notes recorded.</div>
+                </div>
+                <div class="risk-section">
+                    <div class="risk-section-title">📊 Q1 Revenue Recorded</div>
+                    <div style="margin-top:6px"><span style="color:#ef4444">$0 — No Q1 revenue</span></div>
+                    <div style="display:flex;gap:16px;margin-top:8px">
+                        <span>Jan: –</span>
+                        <span>Feb: –</span>
+                        <span>Mar: – <em style="font-size:10px">(partial)</em></span>
+                    </div>
+                </div>
+                <div class="risk-section">
+                    <div class="risk-section-title">🎯 Recommended Actions</div>
+                    <ul class="rec-list"><li>No revenue recorded in Q1. Urgently clarify whether the deal is still live or needs to be re-scoped/removed from the pipeline.</li></ul>
+                </div>
+            </div>
+        </div>
+        <div class="risk-card">
+            <div class="risk-card-header">
+                <div>
+                    <div class="risk-deal-name">One Immigration body / Ministry of Foreign Affairs / Interior</div>
+                    <div class="risk-deal-meta">Data Capture &nbsp;·&nbsp; Annual value: <strong>$200.0K</strong> (₦290.0M)</div>
+                </div>
+                <div class="risk-amount">$200.0K</div>
+            </div>
+            <div class="risk-card-body">
+                <div class="risk-section">
+                    <div class="risk-section-title">📋 Current Status Note</div>
+                    <div class="risk-comment">No notes recorded.</div>
+                </div>
+                <div class="risk-section">
+                    <div class="risk-section-title">📊 Q1 Revenue Recorded</div>
+                    <div style="margin-top:6px"><span style="color:#ef4444">$0 — No Q1 revenue</span></div>
+                    <div style="display:flex;gap:16px;margin-top:8px">
+                        <span>Jan: –</span>
+                        <span>Feb: –</span>
+                        <span>Mar: – <em style="font-size:10px">(partial)</em></span>
+                    </div>
+                </div>
+                <div class="risk-section">
+                    <div class="risk-section-title">🎯 Recommended Actions</div>
+                    <ul class="rec-list"><li>No revenue recorded in Q1. Urgently clarify whether the deal is still live or needs to be re-scoped/removed from the pipeline.</li></ul>
+                </div>
+            </div>
+        </div>
+        <div class="risk-card">
+            <div class="risk-card-header">
+                <div>
+                    <div class="risk-deal-name">UNN- iTranscript & IDQR</div>
+                    <div class="risk-deal-meta">Others &nbsp;·&nbsp; Annual value: <strong>$165.5K</strong> (₦240.0M)</div>
+                </div>
+                <div class="risk-amount">$165.5K</div>
+            </div>
+            <div class="risk-card-body">
+                <div class="risk-section">
+                    <div class="risk-section-title">📋 Current Status Note</div>
+                    <div class="risk-comment">Contract review is being finalized for presentation to the school</div>
+                </div>
+                <div class="risk-section">
+                    <div class="risk-section-title">📊 Q1 Revenue Recorded</div>
+                    <div style="margin-top:6px">$23.0K</div>
+                    <div style="display:flex;gap:16px;margin-top:8px">
+                        <span>Jan: $2.2K</span>
+                        <span>Feb: $20.5K</span>
+                        <span>Mar: $225 <em style="font-size:10px">(partial)</em></span>
+                    </div>
+                </div>
+                <div class="risk-section">
+                    <div class="risk-section-title">🎯 Recommended Actions</div>
+                    <ul class="rec-list"><li>Schedule an urgent client review call this week to re-confirm interest and reset delivery expectations.</li><li>Identify the single biggest blocker and assign a named owner with a resolution deadline.</li></ul>
+                </div>
+            </div>
+        </div>
+        <div class="risk-card">
+            <div class="risk-card-header">
+                <div>
+                    <div class="risk-deal-name">Ministry of Agriculture</div>
+                    <div class="risk-deal-meta">Data Capture &nbsp;·&nbsp; Annual value: <strong>$157.5K</strong> (₦228.4M)</div>
+                </div>
+                <div class="risk-amount">$157.5K</div>
+            </div>
+            <div class="risk-card-body">
+                <div class="risk-section">
+                    <div class="risk-section-title">📋 Current Status Note</div>
+                    <div class="risk-comment">A meeting with the president and consultant will happen this week on next steps</div>
+                </div>
+                <div class="risk-section">
+                    <div class="risk-section-title">📊 Q1 Revenue Recorded</div>
+                    <div style="margin-top:6px"><span style="color:#ef4444">$0 — No Q1 revenue</span></div>
+                    <div style="display:flex;gap:16px;margin-top:8px">
+                        <span>Jan: –</span>
+                        <span>Feb: –</span>
+                        <span>Mar: – <em style="font-size:10px">(partial)</em></span>
+                    </div>
+                </div>
+                <div class="risk-section">
+                    <div class="risk-section-title">🎯 Recommended Actions</div>
+                    <ul class="rec-list"><li>Convert the scheduled meeting into a concrete agreement — come with a proposal, timeline, and next-step commitments.</li><li>No revenue recorded in Q1. Urgently clarify whether the deal is still live or needs to be re-scoped/removed from the pipeline.</li></ul>
+                </div>
+            </div>
+        </div>
+        <div class="risk-card">
+            <div class="risk-card-header">
+                <div>
+                    <div class="risk-deal-name">Fixiam</div>
+                    <div class="risk-deal-meta">Identity &nbsp;·&nbsp; Annual value: <strong>$30.0K</strong> (₦43.5M)</div>
+                </div>
+                <div class="risk-amount">$30.0K</div>
+            </div>
+            <div class="risk-card-body">
+                <div class="risk-section">
+                    <div class="risk-section-title">📋 Current Status Note</div>
+                    <div class="risk-comment">No notes recorded.</div>
+                </div>
+                <div class="risk-section">
+                    <div class="risk-section-title">📊 Q1 Revenue Recorded</div>
+                    <div style="margin-top:6px"><span style="color:#ef4444">$0 — No Q1 revenue</span></div>
+                    <div style="display:flex;gap:16px;margin-top:8px">
+                        <span>Jan: –</span>
+                        <span>Feb: –</span>
+                        <span>Mar: – <em style="font-size:10px">(partial)</em></span>
+                    </div>
+                </div>
+                <div class="risk-section">
+                    <div class="risk-section-title">🎯 Recommended Actions</div>
+                    <ul class="rec-list"><li>No revenue recorded in Q1. Urgently clarify whether the deal is still live or needs to be re-scoped/removed from the pipeline.</li></ul>
+                </div>
+            </div>
+        </div>
+</div>
+
+<!-- OFF TRACK -->
+<div class="section">
+  <div class="section-title">⛔ Off-Track Deals — 3 deals / $82.5K at stake</div>
+  
+        <div class="risk-card" style="border-left-color:#ef4444">
+            <div class="risk-card-header">
+                <div>
+                    <div class="risk-deal-name">AMC - BSX Upgrade</div>
+                    <div class="risk-deal-meta">Data Capture &nbsp;·&nbsp; Annual value: <strong>$50.0K</strong></div>
+                </div>
+                <div class="risk-amount" style="color:#ef4444">$50.0K</div>
+            </div>
+            <div class="risk-card-body">
+                <div class="risk-section">
+                    <div class="risk-section-title">📋 Status Note</div>
+                    <div class="risk-comment">No notes recorded.</div>
+                </div>
+                <div class="risk-section">
+                    <div class="risk-section-title">🎯 Recommended Actions</div>
+                    <ul class="rec-list"><li>Assess whether this deal is recoverable in 2026 or should be moved to 2027 pipeline to improve forecast accuracy.</li><li>Get written confirmation from the client on status — internal assumptions should not drive pipeline numbers.</li></ul>
+                </div>
+            </div>
+        </div>
+        <div class="risk-card" style="border-left-color:#ef4444">
+            <div class="risk-card-header">
+                <div>
+                    <div class="risk-deal-name">MTN Liberia Biosmart X implementation</div>
+                    <div class="risk-deal-meta">Data Capture &nbsp;·&nbsp; Annual value: <strong>$24.5K</strong></div>
+                </div>
+                <div class="risk-amount" style="color:#ef4444">$24.5K</div>
+            </div>
+            <div class="risk-card-body">
+                <div class="risk-section">
+                    <div class="risk-section-title">📋 Status Note</div>
+                    <div class="risk-comment">The entire project is suspended because of cash constraints</div>
+                </div>
+                <div class="risk-section">
+                    <div class="risk-section-title">🎯 Recommended Actions</div>
+                    <ul class="rec-list"><li>Confirm whether the project is permanently cancelled or suspended — avoid carrying dead pipeline value.</li><li>Explore if there's a minimal viable scope that can proceed within their cash constraints.</li></ul>
+                </div>
+            </div>
+        </div>
+        <div class="risk-card" style="border-left-color:#ef4444">
+            <div class="risk-card-header">
+                <div>
+                    <div class="risk-deal-name">Change Request_Biosmart Enhancement</div>
+                    <div class="risk-deal-meta">Data Capture &nbsp;·&nbsp; Annual value: <strong>$8.1K</strong></div>
+                </div>
+                <div class="risk-amount" style="color:#ef4444">$8.1K</div>
+            </div>
+            <div class="risk-card-body">
+                <div class="risk-section">
+                    <div class="risk-section-title">📋 Status Note</div>
+                    <div class="risk-comment">Pending on the infrastructure purchase by MTN CIV</div>
+                </div>
+                <div class="risk-section">
+                    <div class="risk-section-title">🎯 Recommended Actions</div>
+                    <ul class="rec-list"><li>Identify what Seamfix can control (e.g., documentation, staging prep) and move those forward while awaiting the blocker.</li></ul>
+                </div>
+            </div>
+        </div>
+</div>
+
+<!-- CLOSED / SECURED -->
+<div class="section">
+  <div class="section-title">🔒 Closed / Secured — 3 deals / $254.3K</div>
+  <p style="color:var(--muted);font-size:13px;margin-bottom:16px">Deals confirmed and secured. Revenue is fully counted in projections.</p>
+  <div class="table-wrap" style="border-left:4px solid #10b981">
+    <table>
+      <thead><tr><th>Deal</th><th>Rail</th><th style="text-align:right">Annual Value</th><th style="text-align:right">Q1 Actual</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr>
+            <td>Lebara Biosmart X Solution</td>
+            <td>Data Capture</td>
+            <td class="amount">$125.5K</td>
+            <td class="amount" style="color:#10b981">—</td>
+            <td style="color:#94a3b8;font-style:italic;font-size:12px">Implementation has commenced. Payment received</td>
+        </tr>
+        <tr>
+            <td>Annual Maintenance Services (BioSmart-X)</td>
+            <td>Data Capture</td>
+            <td class="amount">$100.8K</td>
+            <td class="amount" style="color:#10b981">—</td>
+            <td style="color:#94a3b8;font-style:italic;font-size:12px">We have now received the PO and have sent out the BL for their signature</td>
+        </tr>
+        <tr>
+            <td>Managed Services</td>
+            <td>Data Capture</td>
+            <td class="amount">$28.0K</td>
+            <td class="amount" style="color:#10b981">$7.0K</td>
+            <td style="color:#94a3b8;font-style:italic;font-size:12px">We have now invoiced for Q1 Managed services</td>
+        </tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- UNKNOWN / UNTAGGED -->
+<div class="section">
+  <div class="section-title">❓ Untagged Deals — 2 deals / $335.5K</div>
+  <div class="alert-box" style="margin-bottom:16px;border-color:#4b2900;background:#1a1000">
+    <div class="alert-box-title" style="color:#f59e0b">Status Missing</div>
+    <div class="alert-box-sub">These deals have no status assigned in the revenue file. Some have Q1 actuals already flowing. The revenue team should tag each with On Track / At Risk / Off Track / Closed to ensure they are correctly counted in projections.</div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Deal</th><th>Rail</th><th style="text-align:right">Annual Value</th><th style="text-align:right">Q1 Actual</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr>
+            <td>NIMC License sales - BNPL (NGN)</td>
+            <td>Data Capture</td>
+            <td class="amount">$335.5K</td>
+            <td class="amount" style="color:#94a3b8">$335.5K</td>
+            <td style="color:#94a3b8;font-style:italic;font-size:12px">—</td>
+        </tr>
+        <tr>
+            <td>NIMC License direct sales - USD</td>
+            <td>Data Capture</td>
+            <td class="amount">$0</td>
+            <td class="amount" style="color:#94a3b8">$238.3K</td>
+            <td style="color:#94a3b8;font-style:italic;font-size:12px">—</td>
+        </tr></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="footer" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+  <span>Seamfix Pipeline Intelligence &nbsp;·&nbsp; Powered by Claude Cowork</span>
+  <span>Generated: 23 Mar 2026, 16:42 &nbsp;&bull;&nbsp; $1 = ₦1,450</span>
+</div>
+
+<script>
+// ── DONUT CHART ─────────────────────────────────
+const donutCtx = document.getElementById('donutChart').getContext('2d');
+new Chart(donutCtx, {
+  type: 'doughnut',
+  data: {
+    labels: ["On Track", "At Risk", "Off Track", "Closed", "Unknown"],
+    datasets: [{
+      data: [5625457.573186668, 3702126.5682758624, 82549.2, 254341.4014, 335525.2606],
+      backgroundColor: ['#10b981','#f59e0b','#ef4444','#3b82f6','#6b7280'],
+      borderWidth: 0, borderRadius: 3,
+    }]
+  },
+  options: {
+    responsive: true, cutout: '70%',
+    plugins: {
+      legend: { position:'right', labels: { color:'#94a3b8', boxWidth:12, padding:12, font:{ size:12 } } },
+      tooltip: {
+        callbacks: {
+          label: ctx => ` ${ctx.label}: ${(ctx.parsed/1e6).toFixed(2)}M (${(ctx.parsed/10000000*100).toFixed(0)}%)`
+        }
+      }
+    }
+  }
+});
+
+// ── MOMENTUM CHART ───────────────────────────────
+const momCtx = document.getElementById('momentumChart').getContext('2d');
+new Chart(momCtx, {
+  type: 'bar',
+  data: {
+    labels: ["NIMC License sales - BNPL\u2026", "NIMC License direct sales\u2026", "NIMC License direct sales\u2026", "Existing contactless lice\u2026", "MTN AMC & Workforce IAM (\u2026", "BSX", "AI Capabilities", "UNN- iTranscript & IDQR", "MFA Benin (e-Pass and Fix\u2026", "MTN NIMC Support Yearly R\u2026"],
+    datasets: [
+      { label:'January',     data:[128307.9391, 98976.74, 116411.3553, 53220.47241, 34905.73586, 13500.0, 19513.68, 2246.21, 9870.43, 8373.505],  backgroundColor:'#3b82f680', borderColor:'#3b82f6', borderWidth:1, borderRadius:3 },
+      { label:'February',    data:[207217.3216, 110325.58, 72071.85245, 53220.47241, 34905.73586, 13500.0, 11699.06108, 20540.98552, 7357.689999999999, 8373.505],  backgroundColor:'#10b98180', borderColor:'#10b981', borderWidth:1, borderRadius:3 },
+      { label:'March (partial)', data:[0.0, 28980.47, 37569.92462, 40551.06005, 34905.73586, 13500.0, 0.0, 224.85, 4307.03, 0.0], backgroundColor:'#8b5cf680', borderColor:'#8b5cf6', borderWidth:1, borderRadius:3 },
+    ]
+  },
+  options: {
+    responsive:true, indexAxis:'y',
+    plugins: {
+      legend: { labels:{ color:'#94a3b8', font:{ size:12 } } },
+      tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.x.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})}` } }
+    },
+    scales: {
+      x: { grid:{color:'#1e293b'}, ticks:{ color:'#94a3b8', callback: v => '$'+v.toLocaleString() } },
+      y: { grid:{display:false}, ticks:{ color:'#94a3b8', font:{ size:11 } } }
+    }
+  }
+});
+</script>
+</body>
+</html>
