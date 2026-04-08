@@ -701,7 +701,7 @@ tbody tr:hover{{background:transparent!important}}
 <div class="kpi-label">YTD Actual Revenue</div>
 <div class="kpi-value">{fmt_usd(ytd_actual_revenue_usd)}</div>
 <div class="kpi-secondary">{fmt_naira(ytd_actual_revenue_usd * FX_RATE)}</div>
-<div class="kpi-change">Through 13 Mar 2026</div>
+<div class="kpi-change">Jan – Apr 2026 (Apr partial)</div>
 </div>
 <div class="kpi-card">
 <div class="kpi-label">Annual Progress</div>
