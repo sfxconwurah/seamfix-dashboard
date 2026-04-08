@@ -380,10 +380,15 @@ def generate_html(revenues, output_path):
             trend_key = 'mixed'
             trend = '<span style="color:#94a3b8">– Mixed</span>'
 
-        # ── CONTRAST COMMENT ─────────────────────────────────────────
+        # ── INSIGHT NOTE ──────────────────────────────────────────────
+        # Always produce a note: divergence cases get a strong flag,
+        # aligned cases get Claude's rationale for what the data shows.
+        excel_comment = r.get('comment', '').strip()
         contrast = ''
+
+        # ── DIVERGENCE: status and trend contradict ──────────────────
         if status == 'At Risk' and trend_key == 'growing':
-            contrast = 'Revenue is growing month-on-month, but the deal is flagged At Risk — contract may not yet be fully formalised. Verify whether the risk label needs updating.'
+            contrast = 'Revenue is growing month-on-month, but flagged At Risk — contract may not yet be formalised. Verify whether the risk label needs updating.'
         elif status == 'At Risk' and trend_key == 'consistent':
             contrast = 'Revenue is flowing consistently despite At Risk label. Confirm whether the risk has been resolved and status needs updating.'
         elif status == 'On Track' and trend_key == 'dropped':
@@ -399,7 +404,51 @@ def generate_html(revenues, output_path):
         elif status == 'Off Track' and trend_key in ('growing', 'consistent'):
             contrast = 'Revenue is actually flowing despite Off Track label. Status may need to be revised upward.'
 
-        comment_cell = f'<td style="font-size:12px;color:#94a3b8;font-style:italic;max-width:220px">{contrast}</td>' if contrast else '<td style="color:#475569;font-size:12px">—</td>'
+        # ── ALIGNED: status and trend are consistent — explain what we see ──
+        elif status == 'At Risk' and trend_key == 'stalled_apr':
+            contrast = 'At Risk status is consistent with the data — revenue stopped in April after some activity in March. Needs urgent follow-up.'
+        elif status == 'At Risk' and trend_key == 'dropped':
+            contrast = 'At Risk status confirmed by revenue data — revenue recorded earlier has since stopped entirely. Escalate or reclassify.'
+        elif status == 'At Risk' and trend_key == 'new':
+            contrast = 'At Risk but revenue just appeared — early signal that the deal may be activating. Monitor whether it sustains.'
+        elif status == 'At Risk' and trend_key == 'mixed':
+            contrast = 'At Risk with irregular revenue pattern. Deal health is unclear — needs direct client contact to clarify outlook.'
+        elif status == 'On Track' and trend_key == 'growing':
+            contrast = 'Strong alignment — On Track status confirmed by growing revenue. Keep momentum.'
+        elif status == 'On Track' and trend_key == 'consistent':
+            contrast = 'Healthy pattern — On Track status backed by steady monthly revenue. No action needed.'
+        elif status == 'On Track' and trend_key == 'new':
+            contrast = 'On Track and revenue just started flowing — early but positive. Confirm invoicing cadence is established.'
+        elif status == 'On Track' and trend_key == 'mixed':
+            contrast = 'On Track but revenue pattern is uneven. Check if delivery or invoicing timing explains the irregularity.'
+        elif status == 'Closed' and trend_key == 'consistent':
+            contrast = 'Closed and delivering steadily — performing as expected.'
+        elif status == 'Closed' and trend_key == 'growing':
+            contrast = 'Closed and revenue is increasing — may indicate expanded scope or usage-based growth.'
+        elif status == 'Off Track' and trend_key == 'dropped':
+            contrast = 'Off Track confirmed — revenue has stopped. Decide whether to invest in recovery or write off.'
+        elif status == 'Off Track' and trend_key == 'stalled_apr':
+            contrast = 'Off Track and stalled in April — deal appears to be winding down.'
+        elif status == 'Off Track' and trend_key == 'mixed':
+            contrast = 'Off Track with sporadic revenue. Unclear if the deal has residual value — clarify with the client.'
+        elif status == 'Unknown':
+            if r['ytd'] > 0:
+                contrast = f'No status assigned but ${r["ytd"]:,.0f} collected YTD. Revenue team should classify this deal immediately.'
+            else:
+                contrast = 'No status and no revenue. Confirm whether this deal is still in the pipeline.'
+
+        # ── FALLBACK: generic note if none of the above matched ──────
+        if not contrast:
+            if r['ytd'] == 0:
+                contrast = f'No revenue recorded YTD against {fmt_usd(r["annual_usd"])} annual target. Confirm deal is still active.'
+            else:
+                contrast = f'YTD revenue of {fmt_usd(r["ytd"])} against {fmt_usd(r["annual_usd"])} annual target ({r["ytd"]/r["annual_usd"]*100:.0f}% collected).'
+
+        # Append Excel comment if present (user context from the sheet)
+        if excel_comment:
+            contrast += f' <span style="color:#64748b">[Sheet note: {excel_comment}]</span>'
+
+        comment_cell = f'<td style="font-size:12px;color:#94a3b8;font-style:italic;max-width:280px">{contrast}</td>'
 
         # ── ROW BACKGROUND by status ──────────────────────────────────
         row_bg = {
