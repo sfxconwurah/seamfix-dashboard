@@ -191,7 +191,7 @@ def build_recommendations(deal):
         if annual > 400_000:
             recs.append(f"This is a high-value deal ({fmt_usd(annual)}) — assign a dedicated deal champion and weekly executive review.")
         if ytd == 0:
-            recs.append("No revenue recorded in Q1. Urgently clarify whether the deal is still live or needs to be re-scoped/removed from the pipeline.")
+            recs.append("No revenue recorded YTD. Urgently clarify whether the deal is still live or needs to be re-scoped/removed from the pipeline.")
         # Generic fallbacks if no specific context
         if not recs:
             recs.append("Schedule an urgent client review call this week to re-confirm interest and reset delivery expectations.")
@@ -435,7 +435,7 @@ def generate_html(revenues, output_path):
         recs = build_recommendations(r)
         recs_html = ''.join(f'<li>{rec}</li>' for rec in recs)
         comment_display = r['comment'] if r['comment'] else 'No notes recorded.'
-        ytd_display = fmt_usd(r['ytd']) if r['ytd'] > 0 else '<span style="color:#ef4444">$0 — No Q1 revenue</span>'
+        ytd_display = fmt_usd(r['ytd']) if r['ytd'] > 0 else '<span style="color:#ef4444">$0 — No YTD revenue</span>'
         at_risk_cards += f"""
         <div class="risk-card">
             <div class="risk-card-header">
@@ -451,12 +451,13 @@ def generate_html(revenues, output_path):
                     <div class="risk-comment">{comment_display}</div>
                 </div>
                 <div class="risk-section">
-                    <div class="risk-section-title">📊 Q1 Revenue Recorded</div>
+                    <div class="risk-section-title">📊 YTD Revenue Recorded</div>
                     <div style="margin-top:6px">{ytd_display}</div>
-                    <div style="display:flex;gap:16px;margin-top:8px">
+                    <div style="display:flex;gap:16px;margin-top:8px;flex-wrap:wrap">
                         <span>Jan: {fmt_usd(r['jan']) if r['jan'] else '–'}</span>
                         <span>Feb: {fmt_usd(r['feb']) if r['feb'] else '–'}</span>
-                        <span>Mar: {fmt_usd(r['mar']) if r['mar'] else '–'} <em style="font-size:10px">(partial)</em></span>
+                        <span>Mar: {fmt_usd(r['mar']) if r['mar'] else '–'}</span>
+                        <span>Apr: {fmt_usd(r['apr']) if r['apr'] else '–'} <em style="font-size:10px">(partial)</em></span>
                     </div>
                 </div>
                 <div class="risk-section">
@@ -693,7 +694,7 @@ def generate_html(revenues, output_path):
       <span class="summary-item-value" style="color:var(--yellow)">{len(stalled)} deals / {fmt_usd(stalled_value)}</span>
     </div>
     <div class="summary-item">
-      <span class="summary-item-label">Q1 Annualised Run Rate</span>
+      <span class="summary-item-label">YTD Annualised Run Rate</span>
       <span class="summary-item-value" style="color:var(--purple)">{fmt_usd(annual_run_rate)}</span>
     </div>
   </div>
@@ -791,8 +792,8 @@ def generate_html(revenues, output_path):
       <div class="lz-insight">
         <p style="margin-bottom:12px">The <strong>realistic projection of {fmt_usd(realistic_proj)}</strong> assumes all On Track deals deliver in full and 50% of At Risk deals close. This puts Seamfix at <strong>{realistic_pct:.0f}% of the ${LANDING_ZONE/1_000_000:.0f}M landing zone</strong>, leaving a gap of <strong>{fmt_usd(realistic_gap)}</strong>.</p>
         <p style="margin-bottom:12px">If At Risk and Off Track deals are not resolved, the conservative outcome of <strong style="color:var(--red)">{fmt_usd(conservative_proj)}</strong> represents a shortfall of <strong style="color:var(--red)">{fmt_usd(conservative_gap)}</strong> — which is {conservative_gap/LANDING_ZONE*100:.0f}% of the annual target unfunded.</p>
-        <p style="margin-bottom:12px">The Q1 annualised run rate of <strong style="color:var(--purple)">{fmt_usd(annual_run_rate)}</strong> is below the needed pace, which means later-stage deals (currently at $0 actuals) <em>must</em> convert to close the gap.</p>
-        <p><strong>The {len(stalled)} On Track deals showing zero Q1 revenue ({fmt_usd(stalled_value)} combined)</strong> are the most important item to verify. If even 40% of those activate, the realistic projection improves materially.</p>
+        <p style="margin-bottom:12px">The YTD annualised run rate of <strong style="color:var(--purple)">{fmt_usd(annual_run_rate)}</strong> is below the needed pace, which means later-stage deals (currently at $0 actuals) <em>must</em> convert to close the gap.</p>
+        <p><strong>The {len(stalled)} On Track deals showing zero YTD revenue ({fmt_usd(stalled_value)} combined)</strong> are the most important item to verify. If even 40% of those activate, the realistic projection improves materially.</p>
       </div>
       <div style="margin-top:16px">
         <canvas id="donutChart" height="180"></canvas>
@@ -874,7 +875,7 @@ def generate_html(revenues, output_path):
   <div class="section-title">❓ Untagged Deals — {unknown_count} deals / {fmt_usd(unknown_val)}</div>
   <div class="alert-box" style="margin-bottom:16px;border-color:#4b2900;background:#1a1000">
     <div class="alert-box-title" style="color:#f59e0b">Status Missing</div>
-    <div class="alert-box-sub">These deals have no status assigned in the revenue file. Some have Q1 actuals already flowing. The revenue team should tag each with On Track / At Risk / Off Track / Closed to ensure they are correctly counted in projections.</div>
+    <div class="alert-box-sub">These deals have no status assigned in the revenue file. Some have YTD actuals already flowing. The revenue team should tag each with On Track / At Risk / Off Track / Closed to ensure they are correctly counted in projections.</div>
   </div>
   <div class="table-wrap">
     <table>
