@@ -112,25 +112,28 @@ def extract_revenue_data(filepath):
         jan = sf(d.get('M'))
         feb = sf(d.get('N'))
         mar = sf(d.get('O'))
-        ytd = jan + feb + mar
+        apr = sf(d.get('P'))
+        ytd = jan + feb + mar + apr
 
         # Only include rows with meaningful data
         if annual == 0 and ytd == 0:
             continue
 
-        # Determine momentum
+        # Determine momentum using most recent 2 months (Mar→Apr)
+        prev = mar  # second-most-recent complete month
+        latest = apr  # most recent month
         if ytd == 0:
             momentum = 'zero'
-        elif jan > 0 and feb == 0 and mar == 0:
-            momentum = 'stalled'
-        elif feb > 0 and mar == 0 and jan == 0:
-            momentum = 'stalled'
-        elif jan == 0 and feb == 0 and mar > 0:
+        elif jan == 0 and feb == 0 and mar == 0 and apr > 0:
             momentum = 'new'
-        elif feb > jan * 1.1:
+        elif prev > 0 and latest > prev * 1.1:
             momentum = 'growing'
-        elif mar > 0 and mar < feb * 0.5:
-            momentum = 'slowing'   # Mar is partial month so treat cautiously
+        elif latest == 0 and prev > 0:
+            momentum = 'stalled'
+        elif (jan > 0 or feb > 0) and mar == 0 and apr == 0:
+            momentum = 'stalled'
+        elif feb > jan * 1.1 and apr == 0 and mar == 0:
+            momentum = 'growing'  # older growth signal
         else:
             momentum = 'steady'
 
@@ -148,6 +151,7 @@ def extract_revenue_data(filepath):
             'jan': jan,
             'feb': feb,
             'mar': mar,
+            'apr': apr,
             'ytd': ytd,
             'momentum': momentum,
             'stalled_on_track': stalled_on_track,
@@ -246,17 +250,26 @@ def generate_html(revenues, output_path):
     realistic_pct     = realistic_proj / LANDING_ZONE * 100
     conservative_pct  = conservative_proj / LANDING_ZONE * 100
 
-    # YTD actuals
+    # YTD actuals (Jan–Apr)
     ytd_jan = sum(r['jan'] for r in revenues)
     ytd_feb = sum(r['feb'] for r in revenues)
     ytd_mar = sum(r['mar'] for r in revenues)
-    ytd_total = ytd_jan + ytd_feb + ytd_mar
+    ytd_apr = sum(r['apr'] for r in revenues)
+    ytd_total = ytd_jan + ytd_feb + ytd_mar + ytd_apr
 
-    # Q1 run rate (extrapolate: Mar is partial ~13 days out of 31 → scale ×31/13 ≈ 2.38)
-    mar_scaled = ytd_mar * (31 / 13)
-    q1_run_rate = (ytd_jan + ytd_feb + mar_scaled) / 3
-    annual_run_rate = q1_run_rate * 12
+    # Determine most recent month with data for run-rate and labelling
+    # April is early-month partial; use Jan–Mar as complete months for run rate
+    # and scale April by days elapsed (today = 8 Apr → 8/30)
+    apr_days_elapsed = 8
+    apr_scaled = ytd_apr * (30 / apr_days_elapsed) if ytd_apr > 0 else 0
+    complete_months_avg = (ytd_jan + ytd_feb + ytd_mar) / 3  # clean 3-month avg
+    # Blend: if April is tracking above the 3-month avg, reflect that; otherwise hold
+    monthly_run_rate = max(complete_months_avg, (ytd_jan + ytd_feb + ytd_mar + apr_scaled) / 4)
+    annual_run_rate = monthly_run_rate * 12
     run_rate_pct = annual_run_rate / LANDING_ZONE * 100
+
+    # Label for most recent actual data period
+    ytd_label = 'Jan – Apr 2026'
 
     # ── STALLED ON TRACK ────────────────────────────────────────────
     stalled = [r for r in revenues if r['stalled_on_track']]
@@ -277,9 +290,10 @@ def generate_html(revenues, output_path):
     momentum_jan    = [r['jan'] for r in top_movers]
     momentum_feb    = [r['feb'] for r in top_movers]
     momentum_mar    = [r['mar'] for r in top_movers]
+    momentum_apr    = [r['apr'] for r in top_movers]
 
     # Projection bar data
-    proj_labels = ['Annual Target', 'Realistic\nProjection', 'Conservative\n(If Risk Stays)', 'Q1 Run Rate\n(Annualised)']
+    proj_labels = ['Annual Target', 'Realistic\nProjection', 'Conservative\n(If Risk Stays)', 'Run Rate\n(Annualised)']
     proj_values = [LANDING_ZONE, realistic_proj, conservative_proj, annual_run_rate]
     proj_colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6']
 
@@ -337,22 +351,28 @@ def generate_html(revenues, output_path):
 
     movers_rows = ""
     for r in sorted(movers, key=lambda x: -x['ytd']):
-        jan, feb, mar, status = r['jan'], r['feb'], r['mar'], r['status']
+        jan, feb, mar, apr, status = r['jan'], r['feb'], r['mar'], r['apr'], r['status']
 
-        # ── TREND LABEL ──────────────────────────────────────────────
-        if jan == 0 and feb == 0 and mar > 0:
+        # ── TREND LABEL (uses Apr as latest, Mar as previous) ────────
+        if jan == 0 and feb == 0 and mar == 0 and apr > 0:
             trend_key = 'new'
             trend = '<span style="color:#3b82f6">✦ New</span>'
-        elif feb > jan * 1.05 and jan > 0:
+        elif jan == 0 and feb == 0 and mar > 0:
+            trend_key = 'new'
+            trend = '<span style="color:#3b82f6">✦ New</span>'
+        elif mar > 0 and apr > mar * 1.05:
             trend_key = 'growing'
             trend = '<span style="color:#10b981">▲ Growing</span>'
-        elif mar == 0 and feb > 0:
-            trend_key = 'stalled_mar'
-            trend = '<span style="color:#f59e0b">⚠ Stalled Mar</span>'
-        elif jan > 0 and feb == 0:
+        elif feb > 0 and mar == 0 and apr == 0:
             trend_key = 'dropped'
             trend = '<span style="color:#ef4444">▼ Dropped</span>'
-        elif jan > 0 and feb > 0 and mar > 0:
+        elif mar > 0 and apr == 0:
+            trend_key = 'stalled_apr'
+            trend = '<span style="color:#f59e0b">⚠ Stalled Apr</span>'
+        elif jan > 0 and feb > 0 and mar > 0 and apr > 0:
+            trend_key = 'consistent'
+            trend = '<span style="color:#10b981">✓ Consistent</span>'
+        elif (jan > 0 or feb > 0) and (mar > 0 or apr > 0):
             trend_key = 'consistent'
             trend = '<span style="color:#10b981">✓ Consistent</span>'
         else:
@@ -360,23 +380,21 @@ def generate_html(revenues, output_path):
             trend = '<span style="color:#94a3b8">– Mixed</span>'
 
         # ── CONTRAST COMMENT ─────────────────────────────────────────
-        # Flag meaningful divergences between the human-assigned Status (col K)
-        # and the computed revenue Trend (col M/N/O actuals)
         contrast = ''
         if status == 'At Risk' and trend_key == 'growing':
-            contrast = 'Revenue is growing month-on-month, but the deal is flagged At Risk — likely because the contract or agreement is not yet fully formalised. Verify whether the risk label needs updating.'
+            contrast = 'Revenue is growing month-on-month, but the deal is flagged At Risk — contract may not yet be fully formalised. Verify whether the risk label needs updating.'
         elif status == 'At Risk' and trend_key == 'consistent':
             contrast = 'Revenue is flowing consistently despite At Risk label. Confirm whether the risk has been resolved and status needs updating.'
         elif status == 'On Track' and trend_key == 'dropped':
-            contrast = 'Status says On Track but revenue has stopped since Jan. Verify deal health with the account manager — status may be stale.'
-        elif status == 'On Track' and trend_key == 'stalled_mar':
-            contrast = 'Had revenue in Jan/Feb but nothing recorded in March yet. Could be timing; monitor closely.'
+            contrast = 'Status says On Track but revenue has stopped. Verify deal health with the account manager — status may be stale.'
+        elif status == 'On Track' and trend_key == 'stalled_apr':
+            contrast = 'Had revenue through March but nothing recorded in April yet. Could be timing; monitor closely.'
         elif status == 'Closed' and trend_key == 'new':
-            contrast = 'Deal is closed/secured and revenue just started in March — expected pattern for a recently closed deal.'
+            contrast = 'Deal is closed/secured and revenue just started recently — expected pattern for a recently closed deal.'
         elif status == 'Closed' and trend_key == 'mixed':
             contrast = 'Deal is closed but monthly revenue is irregular. Check invoice schedule or delivery milestones.'
         elif status == 'Closed' and trend_key == 'dropped':
-            contrast = 'Closed deal had revenue in Jan but has since stopped. Verify whether all invoices have been settled.'
+            contrast = 'Closed deal had revenue earlier but has since stopped. Verify whether all invoices have been settled.'
         elif status == 'Off Track' and trend_key in ('growing', 'consistent'):
             contrast = 'Revenue is actually flowing despite Off Track label. Status may need to be revised upward.'
 
@@ -384,18 +402,18 @@ def generate_html(revenues, output_path):
 
         # ── ROW BACKGROUND by status ──────────────────────────────────
         row_bg = {
-            'On Track':  'background:rgba(59,130,246,0.06)',   # blue tint
-            'At Risk':   'background:rgba(245,158,11,0.07)',   # orange tint
-            'Off Track': 'background:rgba(239,68,68,0.07)',    # red tint
-            'Closed':    'background:rgba(16,185,129,0.07)',   # green tint
+            'On Track':  'background:rgba(59,130,246,0.06)',
+            'At Risk':   'background:rgba(245,158,11,0.07)',
+            'Off Track': 'background:rgba(239,68,68,0.07)',
+            'Closed':    'background:rgba(16,185,129,0.07)',
         }.get(status, '')
 
         # ── BADGE COLOURS ─────────────────────────────────────────────
         status_badge_color = {
-            'On Track':  '#3b82f6',   # blue
-            'At Risk':   '#f59e0b',   # orange
-            'Off Track': '#ef4444',   # red
-            'Closed':    '#10b981',   # green
+            'On Track':  '#3b82f6',
+            'At Risk':   '#f59e0b',
+            'Off Track': '#ef4444',
+            'Closed':    '#10b981',
         }.get(status, '#6b7280')
 
         movers_rows += f"""
@@ -404,7 +422,8 @@ def generate_html(revenues, output_path):
             <td><span class="badge" style="background:{status_badge_color}20;color:{status_badge_color};border:1px solid {status_badge_color}40">{status}</span></td>
             <td class="amount">{fmt_usd(jan) if jan else '–'}</td>
             <td class="amount">{fmt_usd(feb) if feb else '–'}</td>
-            <td class="amount" style="color:#94a3b8">{fmt_usd(mar) if mar else '–'} <span style="font-size:10px">(partial)</span></td>
+            <td class="amount">{fmt_usd(mar) if mar else '–'}</td>
+            <td class="amount" style="color:#94a3b8">{fmt_usd(apr) if apr else '–'} <span style="font-size:10px">(partial)</span></td>
             <td class="amount"><strong>{fmt_usd(r['ytd'])}</strong></td>
             <td>{trend}</td>
             {comment_cell}
@@ -646,6 +665,7 @@ def generate_html(revenues, output_path):
 <div class="page-header">
   <div class="page-title">Pipeline Intelligence</div>
   <div class="page-sub">Deal-level momentum tracking, landing zone analysis, and action recommendations</div>
+  <div class="generated" style="margin-top:6px">Data as of: <strong style="color:#e2e8f0">{ytd_label}</strong> &nbsp;·&nbsp; Generated: {generated_at}</div>
 </div>
 
 <!-- QUICK SUMMARY BAR -->
@@ -656,7 +676,7 @@ def generate_html(revenues, output_path):
       <span class="summary-item-value">{fmt_usd(LANDING_ZONE)}</span>
     </div>
     <div class="summary-item">
-      <span class="summary-item-label">Q1 YTD Actual</span>
+      <span class="summary-item-label">YTD Actual (Jan–Apr)</span>
       <span class="summary-item-value" style="color:var(--green)">{fmt_usd(ytd_total)}</span>
     </div>
     <div class="summary-item">
@@ -757,11 +777,11 @@ def generate_html(revenues, output_path):
 
       <div class="lz-scenario" style="margin-top:16px">
         <div class="lz-scenario-header">
-          <span class="lz-scenario-label" style="color:var(--purple)">Q1 Run Rate (Annualised)</span>
+          <span class="lz-scenario-label" style="color:var(--purple)">Run Rate (Annualised)</span>
           <span class="lz-scenario-value" style="color:var(--purple)">{fmt_usd(annual_run_rate)} &nbsp;<span style="font-weight:400;font-size:12px;color:var(--muted)">{run_rate_pct:.0f}%</span></span>
         </div>
         <div class="lz-bar-track"><div class="lz-bar-fill" style="width:{run_rate_bar_w:.1f}%;background:var(--purple)"></div></div>
-        <div class="lz-scenario-sub" style="color:var(--muted)">Based on Jan + Feb + scaled March (×31/13)</div>
+        <div class="lz-scenario-sub" style="color:var(--muted)">Based on Jan–Mar average; Apr scaled for days elapsed</div>
       </div>
     </div>
 
@@ -784,7 +804,7 @@ def generate_html(revenues, output_path):
 <div class="section">
   <div class="section-title">Month-on-Month Momentum ({len(movers)} active deals)</div>
   <div class="chart-card" style="margin-bottom:16px">
-    <div class="chart-title">Top Revenue Movers — Jan / Feb / Mar Actuals (USD)</div>
+    <div class="chart-title">Top Revenue Movers — Jan / Feb / Mar / Apr Actuals (USD)</div>
     <canvas id="momentumChart" height="180"></canvas>
   </div>
   <div class="table-wrap">
@@ -794,7 +814,8 @@ def generate_html(revenues, output_path):
           <th style="min-width:130px;max-width:160px">Deal</th><th>Status</th>
           <th style="text-align:right">Jan</th>
           <th style="text-align:right">Feb</th>
-          <th style="text-align:right">Mar (partial)</th>
+          <th style="text-align:right">Mar</th>
+          <th style="text-align:right">Apr (partial)</th>
           <th style="text-align:right">YTD Total</th>
           <th>Trend</th>
           <th style="min-width:180px">Notes</th>
@@ -810,7 +831,7 @@ def generate_html(revenues, output_path):
   <div class="section-title">⚠️ On Track — But No Revenue Yet ({len(stalled)} deals, {fmt_usd(stalled_value)} at stake)</div>
   <div class="alert-box" style="margin-bottom:16px">
     <div class="alert-box-title">Verification Required</div>
-    <div class="alert-box-sub">These deals are labelled "On Track" but have recorded $0 revenue in January, February, and March. They may be pre-revenue (future start dates) or genuinely stalled. Each should be confirmed this week.</div>
+    <div class="alert-box-sub">These deals are labelled "On Track" but have recorded $0 revenue through April. They may be pre-revenue (future start dates) or genuinely stalled. Each should be confirmed this week.</div>
   </div>
   <div class="table-wrap" style="border-left:4px solid #3b82f6">
     <table>
@@ -841,7 +862,7 @@ def generate_html(revenues, output_path):
   <p style="color:var(--muted);font-size:13px;margin-bottom:16px">Deals confirmed and secured. Revenue is fully counted in projections.</p>
   <div class="table-wrap" style="border-left:4px solid #10b981">
     <table>
-      <thead><tr><th>Deal</th><th>Rail</th><th style="text-align:right">Annual Value</th><th style="text-align:right">Q1 Actual</th><th>Notes</th></tr></thead>
+      <thead><tr><th>Deal</th><th>Rail</th><th style="text-align:right">Annual Value</th><th style="text-align:right">YTD Actual</th><th>Notes</th></tr></thead>
       <tbody>{closed_rows}</tbody>
     </table>
   </div>
@@ -856,7 +877,7 @@ def generate_html(revenues, output_path):
   </div>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Deal</th><th>Rail</th><th style="text-align:right">Annual Value</th><th style="text-align:right">Q1 Actual</th><th>Notes</th></tr></thead>
+      <thead><tr><th>Deal</th><th>Rail</th><th style="text-align:right">Annual Value</th><th style="text-align:right">YTD Actual</th><th>Notes</th></tr></thead>
       <tbody>{unknown_rows}</tbody>
     </table>
   </div>
@@ -902,7 +923,8 @@ new Chart(momCtx, {{
     datasets: [
       {{ label:'January',     data:{json.dumps(momentum_jan)},  backgroundColor:'#3b82f680', borderColor:'#3b82f6', borderWidth:1, borderRadius:3 }},
       {{ label:'February',    data:{json.dumps(momentum_feb)},  backgroundColor:'#10b98180', borderColor:'#10b981', borderWidth:1, borderRadius:3 }},
-      {{ label:'March (partial)', data:{json.dumps(momentum_mar)}, backgroundColor:'#8b5cf680', borderColor:'#8b5cf6', borderWidth:1, borderRadius:3 }},
+      {{ label:'March',       data:{json.dumps(momentum_mar)},  backgroundColor:'#8b5cf680', borderColor:'#8b5cf6', borderWidth:1, borderRadius:3 }},
+      {{ label:'April (partial)', data:{json.dumps(momentum_apr)}, backgroundColor:'#f59e0b80', borderColor:'#f59e0b', borderWidth:1, borderRadius:3 }},
     ]
   }},
   options: {{

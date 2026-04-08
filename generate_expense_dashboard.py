@@ -930,6 +930,7 @@ def generate_html(all_weekly_data, all_vendors, all_categories_by_week, kpis, ou
         <div class="header">
             <h1>Seamfix Expense & Vendor Analysis</h1>
             <p class="sub">Detailed Outflow & Vendor Tracking &mdash; Weekly Cash Reports 2026</p>
+            <p class="meta">Data as of: <strong>{latest_date}</strong> &nbsp;&bull;&nbsp; Generated: {generated_at}</p>
         </div>
 
         <!-- old nav-bar replaced -->

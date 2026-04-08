@@ -735,6 +735,7 @@ tbody tr:hover{{background:transparent!important}}
 <div class="header">
 <h1>Seamfix Budget vs Actual</h1>
 <div class="sub">Budget Performance Dashboard &mdash; 2026</div>
+<div class="meta">Data as of: <strong>{latest_date}</strong> &nbsp;&bull;&nbsp; Generated: {generated_at}</div>
 </div>
 
 <!-- old nav-tabs replaced by top-nav -->

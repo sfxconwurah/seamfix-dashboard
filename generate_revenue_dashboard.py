@@ -135,8 +135,8 @@ def extract_revenue_data(revenue_file):
         # Get annual revenue (USD)
         annual_usd = sf(cells.get('E'))
 
-        # Get actuals to check if row has any data
-        has_actuals = any(sf(cells.get(col)) != 0 for col in ['M', 'N', 'O'])
+        # Get actuals to check if row has any data (Jan–Apr)
+        has_actuals = any(sf(cells.get(col)) != 0 for col in ['M', 'N', 'O', 'P'])
 
         # Include rows with annual target OR actual revenue data
         if annual_usd == 0 and not has_actuals:
@@ -156,30 +156,30 @@ def extract_revenue_data(revenue_file):
         status = cells.get('K')
         status = str(status).strip() if status else 'Unknown'
 
-        # Get actuals (USD)
+        # Get monthly actuals (USD) — Jan=M, Feb=N, Mar=O, Apr=P
         actual_jan = sf(cells.get('M'))
         actual_feb = sf(cells.get('N'))
         actual_mar = sf(cells.get('O'))
+        actual_apr = sf(cells.get('P'))
 
-        # Get deficit (P) and surplus (Q) from sheet
-        deficit = sf(cells.get('P'))
-        surplus = sf(cells.get('Q'))
+        # Deficit=Y, Surplus=Z (Finance added Apr–Dec columns, shifting these right)
+        deficit = sf(cells.get('Y'))
+        surplus = sf(cells.get('Z'))
 
-        ytd_actual = actual_jan + actual_feb + actual_mar
+        ytd_actual = actual_jan + actual_feb + actual_mar + actual_apr
 
-        # Calculate YTD target pace based on ACTUAL start date
-        # Only count months the stream should be active in Q1 (Jan-Mar)
-        q1_months_active = 3  # default: assume active all of Q1
+        # Calculate YTD target pace based on ACTUAL start date (Jan–Apr = 4 months)
+        months_active = 4  # default: assume active all of Jan–Apr
         if start_date and hasattr(start_date, 'month'):
-            if start_date.year == 2026 and start_date.month > 3:
-                q1_months_active = 0  # starts after Q1
+            if start_date.year == 2026 and start_date.month > 4:
+                months_active = 0  # starts after April
             elif start_date.year == 2026 and start_date.month >= 1:
-                q1_months_active = max(0, 4 - start_date.month)  # partial Q1
-            # else: started before 2026 or in Jan = full 3 months
+                months_active = max(0, 5 - start_date.month)  # partial Jan–Apr
+            # else: started before 2026 = full 4 months
         elif start_date_str in ('Closed', 'Closed - Dec 31', 'Closed - Aug 31'):
-            q1_months_active = 3  # already active
+            months_active = 4  # already active
 
-        ytd_target_pace = annual_usd * q1_months_active / 12
+        ytd_target_pace = annual_usd * months_active / 12
 
         # Achievement percentage
         achievement_pct = (ytd_actual / ytd_target_pace * 100) if ytd_target_pace > 0 else 0
@@ -197,6 +197,7 @@ def extract_revenue_data(revenue_file):
             'actual_jan': actual_jan,
             'actual_feb': actual_feb,
             'actual_mar': actual_mar,
+            'actual_apr': actual_apr,
             'ytd_actual': ytd_actual,
             'ytd_target_pace': ytd_target_pace,
             'achievement_pct': achievement_pct,
@@ -460,7 +461,7 @@ def generate_html(revenues, budget_ngn, revenue_file_path, budget_file_path, out
     health_headline = f"{len(on_track)} On Track, {len(closed)} Closed, {len(at_risk)} At Risk, {len(off_track)} Off Track"
     health_bullets = []
     health_bullets.append(f"<li>Annual progress: {annual_progress_pct:.0f}% — {fmt_dual(ytd_actual_revenue_usd)} of {fmt_dual(annual_revenue_target_usd)}</li>")
-    health_bullets.append(f"<li>Q1 streams on pace: {q1_achievement_rate:.0f}% ({active_streams} active streams)</li>")
+    health_bullets.append(f"<li>YTD (Jan–Apr) streams on pace: {q1_achievement_rate:.0f}% ({active_streams} active streams)</li>")
     if surplus_streams:
         total_surplus = sum(r.get('surplus', 0) for r in surplus_streams)
         health_bullets.append(f"<li>{len(surplus_streams)} streams exceeding targets (total surplus: {fmt_usd(total_surplus)})</li>")
@@ -683,6 +684,7 @@ tbody tr:hover{{background:transparent!important}}
 <div class="header">
 <h1>Seamfix Revenue & Fundability Dashboard</h1>
 <div class="sub">2026 Budget Coverage Analysis &mdash; Path to Revenue (All amounts in USD with Naira equivalents)</div>
+<div class="meta">Data as of: <strong>Jan – Apr 2026</strong> &nbsp;&bull;&nbsp; Generated: {generated_at}</div>
 </div>
 
 <!-- old nav-bar replaced by top-nav -->
@@ -707,10 +709,10 @@ tbody tr:hover{{background:transparent!important}}
 <div class="kpi-change">Actual earned vs full-year target</div>
 </div>
 <div class="kpi-card">
-<div class="kpi-label">Q1 Achievement (Active Streams)</div>
+<div class="kpi-label">YTD Achievement (Jan–Apr)</div>
 <div class="kpi-value {'negative' if q1_achievement_rate < 70 else ''}">{q1_achievement_rate:.0f}%</div>
 <div class="kpi-secondary">{fmt_usd(ytd_actual_revenue_usd)} vs {fmt_usd(ytd_target_pace_usd)} expected</div>
-<div class="kpi-change">{active_streams} of {len(revenues)} streams active in Q1</div>
+<div class="kpi-change">{active_streams} of {len(revenues)} streams active Jan–Apr</div>
 </div>
 <div class="kpi-card">
 <div class="kpi-label">Budget Fundability Score</div>
@@ -781,7 +783,7 @@ tbody tr:hover{{background:transparent!important}}
 <td colspan="3" style="color:#00D4AA;font-weight:700">TOTAL ({len(revenues)} streams)</td>
 <td class="positive">{fmt_dual(annual_revenue_target_usd)}</td>
 <td class="positive">{fmt_dual(ytd_actual_revenue_usd)}</td>
-<td>{annual_progress_pct:.0f}% annual / {q1_achievement_rate:.0f}% Q1</td>
+<td>{annual_progress_pct:.0f}% annual / {q1_achievement_rate:.0f}% YTD pace</td>
 <td></td>
 <td></td>
 </tr>

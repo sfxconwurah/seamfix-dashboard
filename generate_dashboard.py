@@ -1092,6 +1092,7 @@ tbody tr:hover{{background:transparent!important}}
 <div class="header">
 <h1>Seamfix Cash Dashboard</h1>
 <div class="sub">Executive Financial Monitoring &mdash; Weekly Cash Reports 2026</div>
+<div class="meta">Data as of: <strong>{latest_report_date}</strong> &nbsp;&bull;&nbsp; Generated: {generated_at}</div>
 </div>
 
 <!-- old nav-bar replaced by top-nav -->
