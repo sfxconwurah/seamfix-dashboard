@@ -686,8 +686,8 @@ def generate_html(revenues, output_path):
       <span class="summary-item-value" style="color:{'var(--green)' if realistic_pct >= 90 else 'var(--yellow)'}">{fmt_usd(realistic_proj)}</span>
     </div>
     <div class="summary-item">
-      <span class="summary-item-label">Realistic Gap to Target</span>
-      <span class="summary-item-value" style="color:{'var(--green)' if realistic_gap <= 0 else 'var(--yellow)'}">{fmt_usd(realistic_gap)}</span>
+      <span class="summary-item-label">{'Surplus over Target' if realistic_gap <= 0 else 'Gap to Target'}</span>
+      <span class="summary-item-value" style="color:{'var(--green)' if realistic_gap <= 0 else 'var(--yellow)'}">{fmt_usd(abs(realistic_gap))}</span>
     </div>
     <div class="summary-item">
       <span class="summary-item-label">Stalled On-Track Deals</span>
@@ -765,7 +765,7 @@ def generate_html(revenues, output_path):
           <span class="lz-scenario-value" style="color:var(--green)">{fmt_usd(realistic_proj)} &nbsp;<span style="font-weight:400;font-size:12px;color:var(--muted)">{realistic_pct:.0f}%</span></span>
         </div>
         <div class="lz-bar-track"><div class="lz-bar-fill" style="width:{realistic_bar_w:.1f}%;background:var(--green)"></div></div>
-        <div class="lz-scenario-sub">Gap to landing zone: <strong style="color:var(--yellow)">{fmt_usd(realistic_gap)}</strong></div>
+        <div class="lz-scenario-sub">{'Surplus: ' if realistic_gap <= 0 else 'Gap: '}<strong style="color:{'var(--green)' if realistic_gap <= 0 else 'var(--yellow)'}">{fmt_usd(abs(realistic_gap))}</strong></div>
       </div>
 
       <div class="lz-scenario" style="margin-top:16px">
@@ -790,9 +790,9 @@ def generate_html(revenues, output_path):
     <div class="lz-card">
       <div class="lz-title">What This Means</div>
       <div class="lz-insight">
-        <p style="margin-bottom:12px">The <strong>realistic projection of {fmt_usd(realistic_proj)}</strong> assumes all On Track deals deliver in full and 50% of At Risk deals close. This puts Seamfix at <strong>{realistic_pct:.0f}% of the ${LANDING_ZONE/1_000_000:.0f}M landing zone</strong>, leaving a gap of <strong>{fmt_usd(realistic_gap)}</strong>.</p>
-        <p style="margin-bottom:12px">If At Risk and Off Track deals are not resolved, the conservative outcome of <strong style="color:var(--red)">{fmt_usd(conservative_proj)}</strong> represents a shortfall of <strong style="color:var(--red)">{fmt_usd(conservative_gap)}</strong> — which is {conservative_gap/LANDING_ZONE*100:.0f}% of the annual target unfunded.</p>
-        <p style="margin-bottom:12px">The YTD annualised run rate of <strong style="color:var(--purple)">{fmt_usd(annual_run_rate)}</strong> is below the needed pace, which means later-stage deals (currently at $0 actuals) <em>must</em> convert to close the gap.</p>
+        <p style="margin-bottom:12px">The <strong>realistic projection of {fmt_usd(realistic_proj)}</strong> assumes all On Track deals deliver in full and 50% of At Risk deals close. This puts Seamfix at <strong>{realistic_pct:.0f}% of the ${LANDING_ZONE/1_000_000:.0f}M target</strong>{f', a surplus of <strong style="color:var(--green)">{fmt_usd(abs(realistic_gap))}</strong> above target' if realistic_gap <= 0 else f', leaving a gap of <strong>{fmt_usd(realistic_gap)}</strong>'}.</p>
+        <p style="margin-bottom:12px">If At Risk and Off Track deals are not resolved, the conservative outcome is <strong style="color:{'var(--green)' if conservative_gap <= 0 else 'var(--red)'}">{fmt_usd(conservative_proj)}</strong> — {'still above target' if conservative_gap <= 0 else f'a shortfall of <strong style="color:var(--red)">{fmt_usd(conservative_gap)}</strong>, which is {conservative_gap/LANDING_ZONE*100:.0f}% of the annual target unfunded'}.</p>
+        <p style="margin-bottom:12px">The YTD annualised run rate of <strong style="color:var(--purple)">{fmt_usd(annual_run_rate)}</strong> {'is tracking below the target pace' if annual_run_rate < LANDING_ZONE else 'is tracking at or above target pace'} — {'later-stage deals (currently at $0 actuals) <em>must</em> convert to sustain this trajectory' if annual_run_rate < LANDING_ZONE else 'continued conversion of pipeline deals will solidify this position'}.</p>
         <p><strong>The {len(stalled)} On Track deals showing zero YTD revenue ({fmt_usd(stalled_value)} combined)</strong> are the most important item to verify. If even 40% of those activate, the realistic projection improves materially.</p>
       </div>
       <div style="margin-top:16px">
@@ -847,7 +847,7 @@ def generate_html(revenues, output_path):
 <div class="section">
   <div class="section-title">🔴 At-Risk Deals — {at_risk_count} deals / {fmt_usd(at_risk_val)} at stake</div>
   <p style="color:var(--muted);font-size:13px;margin-bottom:16px">
-    Resolving all At Risk deals recovers up to {fmt_usd(at_risk_val)} — narrowing the landing zone gap from {fmt_usd(conservative_gap)} to {fmt_usd(max(0, realistic_gap))}.
+    Resolving all At Risk deals recovers up to {fmt_usd(at_risk_val)}{f' — narrowing the gap from {fmt_usd(conservative_gap)} to {fmt_usd(max(0, realistic_gap))}' if conservative_gap > 0 else ' — strengthening an already above-target position'}.
   </p>
   {at_risk_cards}
 </div>
