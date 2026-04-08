@@ -315,18 +315,18 @@ def generate_html(revenues, output_path):
     # ── HTML ────────────────────────────────────────────────────────
     stalled_rows = ""
     for r in stalled:
-        comment_short = r['comment'][:100] + '…' if len(r['comment']) > 100 else r['comment']
+        comment_short = r['comment'][:250] + '…' if len(r['comment']) > 250 else r['comment']
         stalled_rows += f"""
         <tr>
             <td>{r['name']}</td>
             <td>{r['rail']}</td>
             <td class="amount">{fmt_usd(r['annual_usd'])}</td>
-            <td style="color:#94a3b8;font-style:italic;font-size:12px">{comment_short or '—'}</td>
+            <td style="color:#94a3b8;font-style:italic;font-size:12px;max-width:400px;white-space:normal;line-height:1.4">{comment_short or '—'}</td>
         </tr>"""
 
     closed_rows = ""
     for r in closed_deals:
-        comment_short = r['comment'][:120] + '…' if len(r['comment']) > 120 else r['comment']
+        comment_short = r['comment'][:250] + '…' if len(r['comment']) > 250 else r['comment']
         ytd_str = fmt_usd(r['ytd']) if r['ytd'] > 0 else '—'
         closed_rows += f"""
         <tr>
@@ -334,12 +334,12 @@ def generate_html(revenues, output_path):
             <td>{r['rail']}</td>
             <td class="amount">{fmt_usd(r['annual_usd'])}</td>
             <td class="amount" style="color:#10b981">{ytd_str}</td>
-            <td style="color:#94a3b8;font-style:italic;font-size:12px">{comment_short or '—'}</td>
+            <td style="color:#94a3b8;font-style:italic;font-size:12px;max-width:400px;white-space:normal;line-height:1.4">{comment_short or '—'}</td>
         </tr>"""
 
     unknown_rows = ""
     for r in unknown_deals:
-        comment_short = r['comment'][:120] + '…' if len(r['comment']) > 120 else r['comment']
+        comment_short = r['comment'][:250] + '…' if len(r['comment']) > 250 else r['comment']
         ytd_str = fmt_usd(r['ytd']) if r['ytd'] > 0 else '—'
         unknown_rows += f"""
         <tr>
@@ -347,7 +347,7 @@ def generate_html(revenues, output_path):
             <td>{r['rail']}</td>
             <td class="amount">{fmt_usd(r['annual_usd'])}</td>
             <td class="amount" style="color:#94a3b8">{ytd_str}</td>
-            <td style="color:#94a3b8;font-style:italic;font-size:12px">{comment_short or '—'}</td>
+            <td style="color:#94a3b8;font-style:italic;font-size:12px;max-width:400px;white-space:normal;line-height:1.4">{comment_short or '—'}</td>
         </tr>"""
 
     movers_rows = ""
