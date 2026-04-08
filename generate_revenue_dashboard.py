@@ -310,7 +310,8 @@ def generate_html(revenues, budget_ngn, revenue_file_path, budget_file_path, out
     budget_usd = budget_ngn / FX_RATE
 
     # Calculate KPIs (all revenue in USD)
-    annual_revenue_target_usd = sum(r['annual_usd'] for r in revenues)
+    deal_bucket_total_usd = sum(r['annual_usd'] for r in revenues)  # $10M optimistic bucket
+    annual_revenue_target_usd = 8_000_000  # $8M official company target
     ytd_actual_revenue_usd = sum(r['ytd_actual'] for r in revenues)
     # Two achievement perspectives:
     # 1. Q1 achievement: actual vs what's expected from streams active in Q1 (start-date adjusted)

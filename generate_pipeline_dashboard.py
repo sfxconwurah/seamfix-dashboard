@@ -34,7 +34,7 @@ STATUS_WEIGHTS_CONSERVATIVE = {
     'Unknown':   0.50,
 }
 
-LANDING_ZONE = 10_000_000  # $10M annual target
+LANDING_ZONE = 8_000_000  # $8M official annual target (deal bucket is $10M optimistic)
 
 
 def sf(val):
@@ -218,7 +218,8 @@ def generate_html(revenues, output_path):
     # Uses the sum of all deal annual targets from the revenue file, so it
     # stays in sync with generate_revenue_dashboard.py. Falls back to the
     # module-level constant if the data is empty (shouldn't happen in prod).
-    LANDING_ZONE = sum(r['annual_usd'] for r in revenues) or globals()['LANDING_ZONE']
+    # LANDING_ZONE is the official $8M company target, not the $10M deal bucket sum
+    deal_bucket_total = sum(r['annual_usd'] for r in revenues)
 
     # ── STATUS BUCKETS ──────────────────────────────────────────────
     buckets = {}
@@ -907,7 +908,7 @@ new Chart(donutCtx, {{
       legend: {{ position:'right', labels: {{ color:'#94a3b8', boxWidth:12, padding:12, font:{{ size:12 }} }} }},
       tooltip: {{
         callbacks: {{
-          label: ctx => ` ${{ctx.label}}: ${{(ctx.parsed/1e6).toFixed(2)}}M (${{(ctx.parsed/10000000*100).toFixed(0)}}%)`
+          label: ctx => ` ${{ctx.label}}: ${{(ctx.parsed/1e6).toFixed(2)}}M (${{(ctx.parsed/8000000*100).toFixed(0)}}%)`
         }}
       }}
     }}
