@@ -1037,4 +1037,10 @@ def _bobby_chat_fragment(data_folder):
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        import traceback
+        st.error(f"**App Error:** {type(e).__name__}: {e}")
+        st.code(traceback.format_exc(), language="python")
+        st.info("Please share the traceback above with the developer.")
