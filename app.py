@@ -10,7 +10,8 @@ Data sources:
 
 import streamlit as st
 import streamlit.components.v1 as components
-import os, sys, shutil, tempfile, glob, io, urllib.request, time, importlib.util
+import os, sys, shutil, tempfile, glob, io, urllib.request, urllib.parse, time, importlib.util
+import json, base64, secrets as secrets_mod, hashlib
 from pathlib import Path
 from datetime import datetime
 from collections import defaultdict
@@ -484,55 +485,148 @@ def log_dashboard_visit(user_email):
         pass
 
 
+# ── Custom OAuth state store (shared across all WebSocket sessions) ──
+@st.cache_resource
+def _get_oauth_state_store():
+    """Global dict of {state_token: creation_timestamp}. Survives page reloads."""
+    return {}
+
+
+def _cleanup_expired_states(store, max_age=600):
+    """Remove states older than max_age seconds."""
+    now = time.time()
+    expired = [k for k, v in store.items() if now - v > max_age]
+    for k in expired:
+        del store[k]
+
+
 # ── Helper: Google OAuth check ───────────────────────────────────────
 def check_auth():
     if os.getenv("DISABLE_AUTH", "false").lower() == "true":
         return True
 
-    auth_conf  = st.secrets.get("auth", {})
-    google_conf = auth_conf.get("google", {})
-    has_oauth = (
-        "redirect_uri"   in auth_conf
-        and "cookie_secret" in auth_conf
-        and "client_id"     in google_conf
-        and "client_secret" in google_conf
+    # ── Read custom OAuth config (NOT [auth] — that triggers Streamlit's broken built-in) ──
+    oauth_conf = st.secrets.get("google_oauth", {})
+    client_id     = oauth_conf.get("client_id", "")
+    client_secret = oauth_conf.get("client_secret", "")
+    redirect_uri  = oauth_conf.get("redirect_uri", "")
+    allowed_emails = [e.lower().strip() for e in oauth_conf.get("allowed_emails", [])]
+
+    if not (client_id and client_secret and redirect_uri):
+        return True  # OAuth not configured — allow access
+
+    # ── Already authenticated this session? ──────────────────────────
+    if "authenticated_email" in st.session_state:
+        email = st.session_state.authenticated_email
+        if allowed_emails and email not in allowed_emails:
+            st.error(
+                f"Access denied. **{email}** is not on the authorized users list.\n\n"
+                "Contact the dashboard administrator to request access."
+            )
+            if st.button("Sign out"):
+                del st.session_state["authenticated_email"]
+                st.rerun()
+            st.stop()
+            return False
+        return True
+
+    # ── Handle OAuth callback (Google redirected back with ?code=&state=) ──
+    params = st.query_params
+    code  = params.get("code")
+    state = params.get("state")
+
+    if code and state:
+        store = _get_oauth_state_store()
+        _cleanup_expired_states(store)
+
+        if state not in store:
+            st.error("Authentication failed — session expired or invalid state. Please try again.")
+            if st.button("🔄 Try again"):
+                st.query_params.clear()
+                st.rerun()
+            st.stop()
+            return False
+
+        # State is valid — remove it (one-time use)
+        del store[state]
+
+        # Exchange authorization code for tokens
+        try:
+            token_body = urllib.parse.urlencode({
+                "code":          code,
+                "client_id":     client_id,
+                "client_secret": client_secret,
+                "redirect_uri":  redirect_uri,
+                "grant_type":    "authorization_code",
+            }).encode("utf-8")
+
+            req = urllib.request.Request(
+                "https://oauth2.googleapis.com/token",
+                data=token_body,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            resp = urllib.request.urlopen(req, timeout=15)
+            tokens = json.loads(resp.read())
+
+            # Decode the id_token JWT payload (base64url, no verification needed
+            # since we just got it directly from Google over HTTPS)
+            id_token = tokens.get("id_token", "")
+            parts = id_token.split(".")
+            if len(parts) < 2:
+                raise ValueError("Invalid id_token format")
+
+            payload_b64 = parts[1]
+            # Fix base64url padding
+            payload_b64 += "=" * (4 - len(payload_b64) % 4)
+            user_info = json.loads(base64.urlsafe_b64decode(payload_b64))
+            email = user_info.get("email", "").lower().strip()
+
+            if not email:
+                raise ValueError("No email in Google response")
+
+            # Store authenticated email in session
+            st.session_state.authenticated_email = email
+
+            # Clear query params and reload cleanly
+            st.query_params.clear()
+            st.rerun()
+
+        except Exception as e:
+            st.error(f"Authentication error: {e}")
+            if st.button("🔄 Try again"):
+                st.query_params.clear()
+                st.rerun()
+            st.stop()
+            return False
+
+    # ── Show login page ──────────────────────────────────────────────
+    st.markdown(
+        """<div style="text-align:center;padding:80px 20px">
+            <h1 style="color:#00D4AA;margin-bottom:8px">Seamfix Financial Intelligence</h1>
+            <p style="color:#94a3b8;margin-bottom:40px">Sign in with your authorized Google account to access the dashboards.</p>
+        </div>""",
+        unsafe_allow_html=True,
     )
 
-    if has_oauth:
-        try:
-            user = st.user
-            if not user.is_logged_in:
-                st.markdown(
-                    """<div style="text-align:center;padding:80px 20px">
-                        <h1 style="color:#00D4AA;margin-bottom:8px">Seamfix Financial Intelligence</h1>
-                        <p style="color:#94a3b8;margin-bottom:40px">Sign in with your authorized Google account to access the dashboards.</p>
-                    </div>""",
-                    unsafe_allow_html=True,
-                )
-                st.login("google")
-                st.stop()
-                return False
+    # Generate a CSRF state token and store it globally
+    oauth_state = secrets_mod.token_urlsafe(32)
+    store = _get_oauth_state_store()
+    _cleanup_expired_states(store)
+    store[oauth_state] = time.time()
 
-            email = user.email.lower().strip()
-            allowed_conf   = auth_conf.get("allowed", {})
-            allowed_emails = [e.lower().strip() for e in allowed_conf.get("emails", [])]
+    auth_url = "https://accounts.google.com/o/oauth2/v2/auth?" + urllib.parse.urlencode({
+        "client_id":     client_id,
+        "redirect_uri":  redirect_uri,
+        "response_type": "code",
+        "scope":         "openid email profile",
+        "state":         oauth_state,
+        "access_type":   "offline",
+        "prompt":        "select_account",
+    })
 
-            if allowed_emails and email not in allowed_emails:
-                st.error(
-                    f"Access denied. **{email}** is not on the authorized users list.\n\n"
-                    "Contact the dashboard administrator to request access."
-                )
-                if st.button("Sign out"):
-                    st.logout()
-                st.stop()
-                return False
-
-            return True
-        except Exception as e:
-            st.sidebar.warning(f"OAuth not fully configured: {e}")
-            return True
-
-    return True
+    st.link_button("🔐 Sign in with Google", auth_url, use_container_width=True)
+    st.stop()
+    return False
 
 
 # ── Helper: fetch Google Sheet as xlsx ───────────────────────────────
@@ -775,10 +869,7 @@ def main():
 
     # ── Log dashboard visit once per browser session ───────────────────
     if "visit_logged" not in st.session_state:
-        try:
-            user_email = st.user.email if st.user.is_logged_in else "unknown"
-        except Exception:
-            user_email = "unknown"
+        user_email = st.session_state.get("authenticated_email", "unknown")
         log_dashboard_visit(user_email)
         st.session_state.visit_logged = True
 
@@ -955,14 +1046,13 @@ setTimeout(sendHeight, 5000);
                             st.caption(f"  {e}")
 
         # Logged-in user
-        try:
-            user = st.user
-            if user.is_logged_in:
-                st.divider()
-                st.caption(f"Signed in as **{user.email}**")
-                st.logout("Sign out")
-        except Exception:
-            pass
+        auth_email = st.session_state.get("authenticated_email")
+        if auth_email:
+            st.divider()
+            st.caption(f"Signed in as **{auth_email}**")
+            if st.button("Sign out"):
+                del st.session_state["authenticated_email"]
+                st.rerun()
 
 
 @st.fragment
@@ -1026,10 +1116,7 @@ def _bobby_chat_fragment(data_folder):
         st.session_state.chat_messages.append({"role": "assistant", "content": response})
 
         # Log to Google Sheet (silent on failure)
-        try:
-            user_email = st.user.email if st.user.is_logged_in else "unknown"
-        except Exception:
-            user_email = "unknown"
+        user_email = st.session_state.get("authenticated_email", "unknown")
         log_bobby_query(user_email, prompt, response,
                         in_tok, cache_read_tok, cache_write_tok, out_tok)
 
