@@ -791,7 +791,7 @@ def generate_html(revenues, output_path):
       <span class="summary-item-value">{fmt_usd(LANDING_ZONE)}</span>
     </div>
     <div class="summary-item">
-      <span class="summary-item-label">YTD Actual (Jan–Apr)</span>
+      <span class="summary-item-label">YTD Actual ({ytd_label})</span>
       <span class="summary-item-value" style="color:var(--green)">{fmt_usd(ytd_total)}</span>
     </div>
     <div class="summary-item">
@@ -896,7 +896,7 @@ def generate_html(revenues, output_path):
           <span class="lz-scenario-value" style="color:var(--purple)">{fmt_usd(annual_run_rate)} &nbsp;<span style="font-weight:400;font-size:12px;color:var(--muted)">{run_rate_pct:.0f}%</span></span>
         </div>
         <div class="lz-bar-track"><div class="lz-bar-fill" style="width:{run_rate_bar_w:.1f}%;background:var(--purple)"></div></div>
-        <div class="lz-scenario-sub" style="color:var(--muted)">Based on Jan–Mar average; Apr scaled for days elapsed</div>
+        <div class="lz-scenario-sub" style="color:var(--muted)">Based on complete months average; latest month scaled for days elapsed</div>
       </div>
     </div>
 
@@ -919,7 +919,7 @@ def generate_html(revenues, output_path):
 <div class="section">
   <div class="section-title">Month-on-Month Momentum ({len(movers)} active deals)</div>
   <div class="chart-card" style="margin-bottom:16px">
-    <div class="chart-title">Top Revenue Movers — Jan / Feb / Mar / Apr Actuals (USD)</div>
+    <div class="chart-title">Top Revenue Movers — {ytd_label} Actuals (USD)</div>
     <canvas id="momentumChart" height="180"></canvas>
   </div>
   <div class="table-wrap">

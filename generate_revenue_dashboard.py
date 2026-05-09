@@ -139,7 +139,7 @@ def extract_revenue_data(revenue_file):
         # Get annual revenue (USD)
         annual_usd = sf(cells.get('E'))
 
-        # Get actuals to check if row has any data (Jan–Apr)
+        # Get actuals to check if row has any data
         has_actuals = any(sf(cells.get(col)) != 0 for col in ['M', 'N', 'O', 'P'])
 
         # Include rows with annual target OR actual revenue data
@@ -488,7 +488,7 @@ def generate_html(revenues, budget_ngn, revenue_file_path, budget_file_path, out
     health_headline = f"{len(on_track)} On Track, {len(closed)} Closed, {len(at_risk)} At Risk, {len(off_track)} Off Track"
     health_bullets = []
     health_bullets.append(f"<li>Annual progress: {annual_progress_pct:.0f}% — {fmt_dual(ytd_actual_revenue_usd)} of {fmt_dual(annual_revenue_target_usd)}</li>")
-    health_bullets.append(f"<li>YTD (Jan–Apr) streams on pace: {q1_achievement_rate:.0f}% ({active_streams} active streams)</li>")
+    health_bullets.append(f"<li>YTD streams on pace: {q1_achievement_rate:.0f}% ({active_streams} active streams)</li>")
     if surplus_streams:
         total_surplus = sum(r.get('surplus', 0) for r in surplus_streams)
         health_bullets.append(f"<li>{len(surplus_streams)} streams exceeding targets (total surplus: {fmt_usd(total_surplus)})</li>")
@@ -736,10 +736,10 @@ tbody tr:hover{{background:transparent!important}}
 <div class="kpi-change">Actual earned vs full-year target</div>
 </div>
 <div class="kpi-card">
-<div class="kpi-label">YTD Achievement (Jan–Apr)</div>
+<div class="kpi-label">YTD Achievement ({ytd_label})</div>
 <div class="kpi-value {'negative' if q1_achievement_rate < 70 else ''}">{q1_achievement_rate:.0f}%</div>
 <div class="kpi-secondary">{fmt_usd(ytd_actual_revenue_usd)} vs {fmt_usd(ytd_target_pace_usd)} expected</div>
-<div class="kpi-change">{active_streams} of {len(revenues)} streams active Jan–Apr</div>
+<div class="kpi-change">{active_streams} of {len(revenues)} streams active {ytd_label}</div>
 </div>
 <div class="kpi-card">
 <div class="kpi-label">Budget Fundability Score</div>
