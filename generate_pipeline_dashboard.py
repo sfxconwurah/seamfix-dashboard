@@ -503,7 +503,8 @@ def generate_html(revenues, output_path):
             if r['ytd'] == 0:
                 contrast = f'No revenue recorded YTD against {fmt_usd(r["annual_usd"])} annual target. Confirm deal is still active.'
             else:
-                contrast = f'YTD revenue of {fmt_usd(r["ytd"])} against {fmt_usd(r["annual_usd"])} annual target ({r["ytd"]/r["annual_usd"]*100:.0f}% collected).'
+                pct = (r["ytd"]/r["annual_usd"]*100) if r["annual_usd"] > 0 else 0
+                contrast = f'YTD revenue of {fmt_usd(r["ytd"])} against {fmt_usd(r["annual_usd"])} annual target ({pct:.0f}% collected).'
 
         # Append Excel comment if present (user context from the sheet)
         if excel_comment:
