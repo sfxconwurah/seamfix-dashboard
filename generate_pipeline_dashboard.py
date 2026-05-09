@@ -14,6 +14,14 @@ FX_RATE = 1450  # $1 USD = ₦1,450 NGN
 
 SECTION_HEADERS = {"ANCHOR DEALS", "EXISTING CUSTOMERS", "DEALS FROM 2025", "NEW BUSINESS", "TOTAL"}
 
+# Monthly actual columns: M=Jan, N=Feb, ..., X=Dec (convention set by Finance)
+MONTH_COLUMNS = ['M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X']
+MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+MONTH_COLORS = [
+    '#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ec4899', '#06b6d4',
+    '#84cc16', '#f97316', '#6366f1', '#14b8a6', '#e11d48', '#a855f7',
+]
+
 # Projection weights by status
 STATUS_WEIGHTS = {
     'On Track':  1.00,
@@ -109,38 +117,58 @@ def extract_revenue_data(filepath):
         annual = sf(d.get('E'))
         status = str(d.get('K', '') or '').strip()
         comment = str(d.get('L', '') or '').strip()
-        jan = sf(d.get('M'))
-        feb = sf(d.get('N'))
-        mar = sf(d.get('O'))
-        apr = sf(d.get('P'))
-        ytd = jan + feb + mar + apr
+
+        # Read all 12 month columns dynamically (M=Jan .. X=Dec)
+        monthly = [sf(d.get(col)) for col in MONTH_COLUMNS]
+        ytd = sum(monthly)
 
         # Only include rows with meaningful data
         if annual == 0 and ytd == 0:
             continue
 
-        # Determine momentum using most recent 2 months (Mar→Apr)
-        prev = mar  # second-most-recent complete month
-        latest = apr  # most recent month
+        # Find the last month index with data across ALL deals (set later globally)
+        # For momentum: find the two most recent months with any data for this deal
+        non_zero_indices = [i for i, v in enumerate(monthly) if v > 0]
+        if len(non_zero_indices) >= 2:
+            latest_idx = non_zero_indices[-1]
+            prev_idx = non_zero_indices[-2]
+            latest = monthly[latest_idx]
+            prev = monthly[prev_idx]
+        elif len(non_zero_indices) == 1:
+            latest_idx = non_zero_indices[0]
+            latest = monthly[latest_idx]
+            prev = 0
+        else:
+            latest_idx = -1
+            latest = 0
+            prev = 0
+
+        # Determine momentum dynamically
         if ytd == 0:
             momentum = 'zero'
-        elif jan == 0 and feb == 0 and mar == 0 and apr > 0:
+        elif len(non_zero_indices) == 1:
             momentum = 'new'
         elif prev > 0 and latest > prev * 1.1:
             momentum = 'growing'
         elif latest == 0 and prev > 0:
             momentum = 'stalled'
-        elif (jan > 0 or feb > 0) and mar == 0 and apr == 0:
+        elif len(non_zero_indices) >= 2 and non_zero_indices[-1] < max(non_zero_indices[-1], 0):
             momentum = 'stalled'
-        elif feb > jan * 1.1 and apr == 0 and mar == 0:
-            momentum = 'growing'  # older growth signal
         else:
             momentum = 'steady'
+
+        # Check for stalled: had early activity but last 2 months are zero
+        all_months_with_data = [i for i in range(12) if monthly[i] > 0]
+        if all_months_with_data and ytd > 0:
+            latest_data_month = max(all_months_with_data)
+            # If the most recent month with data is 2+ months behind the current data frontier
+            # (detected globally later), mark as potentially stalled
+            pass
 
         # Is this deal stalled despite On Track label?
         stalled_on_track = (status == 'On Track' and annual > 0 and ytd == 0)
 
-        revenues.append({
+        deal = {
             'sn': sn,
             'parent': current_parent if not has_sn else None,
             'name': name,
@@ -148,14 +176,16 @@ def extract_revenue_data(filepath):
             'annual_usd': annual,
             'status': status or 'Unknown',
             'comment': comment,
-            'jan': jan,
-            'feb': feb,
-            'mar': mar,
-            'apr': apr,
+            'monthly': monthly,  # list of 12 monthly values
             'ytd': ytd,
             'momentum': momentum,
             'stalled_on_track': stalled_on_track,
-        })
+        }
+        # Also store individual months for backward compatibility
+        for i, mname in enumerate(MONTH_NAMES):
+            deal[mname.lower()] = monthly[i]
+
+        revenues.append(deal)
 
     wb.close()
     return revenues
@@ -251,26 +281,41 @@ def generate_html(revenues, output_path):
     realistic_pct     = realistic_proj / LANDING_ZONE * 100
     conservative_pct  = conservative_proj / LANDING_ZONE * 100
 
-    # YTD actuals (Jan–Apr)
-    ytd_jan = sum(r['jan'] for r in revenues)
-    ytd_feb = sum(r['feb'] for r in revenues)
-    ytd_mar = sum(r['mar'] for r in revenues)
-    ytd_apr = sum(r['apr'] for r in revenues)
-    ytd_total = ytd_jan + ytd_feb + ytd_mar + ytd_apr
+    # ── DYNAMIC MONTH DETECTION ──────────────────────────────────────
+    # Sum each month across all deals to find which months have data
+    monthly_totals = [sum(r['monthly'][i] for r in revenues) for i in range(12)]
+    # Find the last month with any data
+    months_with_data = [i for i, v in enumerate(monthly_totals) if v > 0]
+    last_data_month = max(months_with_data) if months_with_data else 0  # 0-indexed (0=Jan)
+    num_months_with_data = last_data_month + 1  # count from Jan
 
-    # Determine most recent month with data for run-rate and labelling
-    # April is early-month partial; use Jan–Mar as complete months for run rate
-    # and scale April by days elapsed (today = 8 Apr → 8/30)
-    apr_days_elapsed = 8
-    apr_scaled = ytd_apr * (30 / apr_days_elapsed) if ytd_apr > 0 else 0
-    complete_months_avg = (ytd_jan + ytd_feb + ytd_mar) / 3  # clean 3-month avg
-    # Blend: if April is tracking above the 3-month avg, reflect that; otherwise hold
-    monthly_run_rate = max(complete_months_avg, (ytd_jan + ytd_feb + ytd_mar + apr_scaled) / 4)
+    ytd_total = sum(monthly_totals[:num_months_with_data])
+
+    # Run rate: use complete months (all except the last which may be partial)
+    today = datetime.now()
+    current_month_idx = today.month - 1  # 0-indexed
+    # If the last data month is the current month, treat it as partial
+    is_partial = (last_data_month == current_month_idx)
+    complete_month_count = last_data_month if is_partial else num_months_with_data
+    complete_months_total = sum(monthly_totals[:complete_month_count]) if complete_month_count > 0 else 0
+    complete_months_avg = complete_months_total / complete_month_count if complete_month_count > 0 else 0
+
+    if is_partial and monthly_totals[last_data_month] > 0:
+        days_in_month = 30
+        days_elapsed = min(today.day, days_in_month)
+        partial_scaled = monthly_totals[last_data_month] * (days_in_month / max(days_elapsed, 1))
+        monthly_run_rate = max(complete_months_avg, (complete_months_total + partial_scaled) / (complete_month_count + 1))
+    else:
+        monthly_run_rate = complete_months_avg
+
     annual_run_rate = monthly_run_rate * 12
     run_rate_pct = annual_run_rate / LANDING_ZONE * 100
 
-    # Label for most recent actual data period
-    ytd_label = 'Jan – Apr 2026'
+    # Dynamic label
+    first_month_name = MONTH_NAMES[0]
+    last_month_name = MONTH_NAMES[last_data_month]
+    partial_note = f' ({last_month_name} partial)' if is_partial else ''
+    ytd_label = f'{first_month_name} – {last_month_name} 2026{partial_note}'
 
     # ── STALLED ON TRACK ────────────────────────────────────────────
     stalled = [r for r in revenues if r['stalled_on_track']]
@@ -285,13 +330,21 @@ def generate_html(revenues, output_path):
     off_track_deals = sorted(buckets.get('Off Track',{}).get('deals', []), key=lambda x: -x['annual_usd'])
 
     # ── CHART DATA ──────────────────────────────────────────────────
-    # Monthly momentum for top movers
+    # Monthly momentum for top movers (dynamic — only months with data)
     top_movers = sorted(movers, key=lambda x: -x['ytd'])[:10]
     momentum_labels = [r['name'][:25] + ('…' if len(r['name']) > 25 else '') for r in top_movers]
-    momentum_jan    = [r['jan'] for r in top_movers]
-    momentum_feb    = [r['feb'] for r in top_movers]
-    momentum_mar    = [r['mar'] for r in top_movers]
-    momentum_apr    = [r['apr'] for r in top_movers]
+    # Build per-month data arrays for each month that has data
+    momentum_month_data = []
+    for mi in range(num_months_with_data):
+        values = [r['monthly'][mi] for r in top_movers]
+        label = MONTH_NAMES[mi]
+        if mi == last_data_month and is_partial:
+            label += ' (partial)'
+        momentum_month_data.append({
+            'label': label,
+            'data': values,
+            'color': MONTH_COLORS[mi % len(MONTH_COLORS)],
+        })
 
     # Projection bar data
     proj_labels = ['Annual Target', 'Realistic\nProjection', 'Conservative\n(If Risk Stays)', 'Run Rate\n(Annualised)']
@@ -352,33 +405,41 @@ def generate_html(revenues, output_path):
 
     movers_rows = ""
     for r in sorted(movers, key=lambda x: -x['ytd']):
-        jan, feb, mar, apr, status = r['jan'], r['feb'], r['mar'], r['apr'], r['status']
+        monthly = r['monthly']
+        status = r['status']
 
-        # ── TREND LABEL (uses Apr as latest, Mar as previous) ────────
-        if jan == 0 and feb == 0 and mar == 0 and apr > 0:
-            trend_key = 'new'
-            trend = '<span style="color:#3b82f6">✦ New</span>'
-        elif jan == 0 and feb == 0 and mar > 0:
-            trend_key = 'new'
-            trend = '<span style="color:#3b82f6">✦ New</span>'
-        elif mar > 0 and apr > mar * 1.05:
-            trend_key = 'growing'
-            trend = '<span style="color:#10b981">▲ Growing</span>'
-        elif feb > 0 and mar == 0 and apr == 0:
-            trend_key = 'dropped'
-            trend = '<span style="color:#ef4444">▼ Dropped</span>'
-        elif mar > 0 and apr == 0:
-            trend_key = 'stalled_apr'
-            trend = '<span style="color:#f59e0b">⚠ Stalled Apr</span>'
-        elif jan > 0 and feb > 0 and mar > 0 and apr > 0:
-            trend_key = 'consistent'
-            trend = '<span style="color:#10b981">✓ Consistent</span>'
-        elif (jan > 0 or feb > 0) and (mar > 0 or apr > 0):
-            trend_key = 'consistent'
-            trend = '<span style="color:#10b981">✓ Consistent</span>'
-        else:
+        # ── TREND LABEL (dynamic — uses most recent months with data) ────────
+        non_zero = [i for i, v in enumerate(monthly) if v > 0]
+        if len(non_zero) == 0:
             trend_key = 'mixed'
             trend = '<span style="color:#94a3b8">– Mixed</span>'
+        elif len(non_zero) == 1:
+            trend_key = 'new'
+            trend = '<span style="color:#3b82f6">✦ New</span>'
+        else:
+            latest_val = monthly[non_zero[-1]]
+            prev_val = monthly[non_zero[-2]]
+            latest_mi = non_zero[-1]
+            # Check if the last month with data is NOT the most recent data month globally
+            # (i.e. deal stopped producing revenue before others)
+            if latest_mi < last_data_month - 1:
+                trend_key = 'dropped'
+                trend = f'<span style="color:#ef4444">▼ Dropped (last: {MONTH_NAMES[latest_mi]})</span>'
+            elif latest_mi < last_data_month and monthly[last_data_month] == 0:
+                trend_key = 'stalled'
+                trend = f'<span style="color:#f59e0b">⚠ Stalled {MONTH_NAMES[last_data_month]}</span>'
+            elif latest_val > prev_val * 1.05:
+                trend_key = 'growing'
+                trend = '<span style="color:#10b981">▲ Growing</span>'
+            elif len(non_zero) >= 3:
+                trend_key = 'consistent'
+                trend = '<span style="color:#10b981">✓ Consistent</span>'
+            elif len(non_zero) == 2 and non_zero[1] - non_zero[0] <= 1:
+                trend_key = 'consistent'
+                trend = '<span style="color:#10b981">✓ Consistent</span>'
+            else:
+                trend_key = 'mixed'
+                trend = '<span style="color:#94a3b8">– Mixed</span>'
 
         # ── INSIGHT NOTE ──────────────────────────────────────────────
         # Always produce a note: divergence cases get a strong flag,
@@ -466,14 +527,19 @@ def generate_html(revenues, output_path):
             'Closed':    '#10b981',
         }.get(status, '#6b7280')
 
+        # Build dynamic month cells
+        month_cells = ''
+        for mi in range(num_months_with_data):
+            val = monthly[mi]
+            partial_tag = f' <span style="font-size:10px">(partial)</span>' if (mi == last_data_month and is_partial) else ''
+            style = ' style="color:#94a3b8"' if (mi == last_data_month and is_partial) else ''
+            month_cells += f'<td class="amount"{style}>{fmt_usd(val) if val else "–"}{partial_tag}</td>'
+
         movers_rows += f"""
         <tr style="{row_bg}">
             <td style="max-width:160px;white-space:normal;word-break:break-word">{r['name']}</td>
             <td><span class="badge" style="background:{status_badge_color}20;color:{status_badge_color};border:1px solid {status_badge_color}40">{status}</span></td>
-            <td class="amount">{fmt_usd(jan) if jan else '–'}</td>
-            <td class="amount">{fmt_usd(feb) if feb else '–'}</td>
-            <td class="amount">{fmt_usd(mar) if mar else '–'}</td>
-            <td class="amount" style="color:#94a3b8">{fmt_usd(apr) if apr else '–'} <span style="font-size:10px">(partial)</span></td>
+            {month_cells}
             <td class="amount"><strong>{fmt_usd(r['ytd'])}</strong></td>
             <td>{trend}</td>
             {comment_cell}
@@ -503,10 +569,7 @@ def generate_html(revenues, output_path):
                     <div class="risk-section-title">📊 YTD Revenue Recorded</div>
                     <div style="margin-top:6px">{ytd_display}</div>
                     <div style="display:flex;gap:16px;margin-top:8px;flex-wrap:wrap">
-                        <span>Jan: {fmt_usd(r['jan']) if r['jan'] else '–'}</span>
-                        <span>Feb: {fmt_usd(r['feb']) if r['feb'] else '–'}</span>
-                        <span>Mar: {fmt_usd(r['mar']) if r['mar'] else '–'}</span>
-                        <span>Apr: {fmt_usd(r['apr']) if r['apr'] else '–'} <em style="font-size:10px">(partial)</em></span>
+                        {''.join(f'<span>{MONTH_NAMES[mi]}: {fmt_usd(r["monthly"][mi]) if r["monthly"][mi] else "–"}{" <em style=font-size:10px>(partial)</em>" if mi == last_data_month and is_partial else ""}</span>' for mi in range(num_months_with_data))}
                     </div>
                 </div>
                 <div class="risk-section">
@@ -863,10 +926,7 @@ def generate_html(revenues, output_path):
       <thead>
         <tr>
           <th style="min-width:130px;max-width:160px">Deal</th><th>Status</th>
-          <th style="text-align:right">Jan</th>
-          <th style="text-align:right">Feb</th>
-          <th style="text-align:right">Mar</th>
-          <th style="text-align:right">Apr (partial)</th>
+          {''.join(f'<th style="text-align:right">{MONTH_NAMES[mi]}{" (partial)" if mi == last_data_month and is_partial else ""}</th>' for mi in range(num_months_with_data))}
           <th style="text-align:right">YTD Total</th>
           <th>Trend</th>
           <th style="min-width:180px">Notes</th>
@@ -972,10 +1032,7 @@ new Chart(momCtx, {{
   data: {{
     labels: {json.dumps(momentum_labels)},
     datasets: [
-      {{ label:'January',     data:{json.dumps(momentum_jan)},  backgroundColor:'#3b82f680', borderColor:'#3b82f6', borderWidth:1, borderRadius:3 }},
-      {{ label:'February',    data:{json.dumps(momentum_feb)},  backgroundColor:'#10b98180', borderColor:'#10b981', borderWidth:1, borderRadius:3 }},
-      {{ label:'March',       data:{json.dumps(momentum_mar)},  backgroundColor:'#8b5cf680', borderColor:'#8b5cf6', borderWidth:1, borderRadius:3 }},
-      {{ label:'April (partial)', data:{json.dumps(momentum_apr)}, backgroundColor:'#f59e0b80', borderColor:'#f59e0b', borderWidth:1, borderRadius:3 }},
+      {','.join(f"{{ label:'{md['label']}', data:{json.dumps(md['data'])}, backgroundColor:'{md['color']}80', borderColor:'{md['color']}', borderWidth:1, borderRadius:3 }}" for md in momentum_month_data)}
     ]
   }},
   options: {{

@@ -268,24 +268,17 @@ Users can click "🔄 Regenerate Dashboards" in the sidebar (under ⚙️ Data &
 
 ### Adding a New Month of Revenue Data
 
-When Finance adds actual data for a new month (e.g., May):
+**No code changes needed.** The revenue and pipeline dashboards dynamically detect which months have data by scanning columns M through X (Jan through Dec). When Finance adds May data to column Q in the Google Sheet, the dashboards will automatically:
+- Include May in YTD calculations
+- Update "Data as of" labels (e.g., "Jan – May 2026 (May partial)")
+- Add May to the momentum chart
+- Recalculate run rates, achievement percentages, and trend labels
+- Update Bobby's chat context with the new month
 
-1. **Revenue dashboard** (`generate_revenue_dashboard.py`):
-   - Add `actual_may = sf(cells.get('Q'))` (or whatever column May lands in)
-   - Update `ytd_actual = actual_jan + actual_feb + actual_mar + actual_apr + actual_may`
-   - Update `months_active = 5` (and the month calculation logic)
-
-2. **Pipeline dashboard** (`generate_pipeline_dashboard.py`):
-   - Add `may = sf(d.get('Q'))`
-   - Update `ytd = jan + feb + mar + apr + may`
-   - Update momentum: `prev = apr`, `latest = may`
-   - Add May to the momentum chart
-   - Update run rate calculation
-
-3. **All dashboards**: Update "Data as of" labels (search for "Apr" or "April" in user-facing strings)
+Just click "Regenerate Dashboards" in the sidebar or wait for the 24-hour auto-refresh.
 
 ### If Finance Adds More Columns to the Excel
-Check if Deficit/Surplus columns have shifted. Search for `cells.get('Y')` and `cells.get('Z')` — these are fragile positional references that break when columns are inserted.
+The monthly revenue columns (M=Jan through X=Dec) are read dynamically. However, Deficit (column Y) and Surplus (column Z) are still hardcoded positional references. If Finance inserts columns that shift Y/Z, search for `cells.get('Y')` and `cells.get('Z')` in both `generate_revenue_dashboard.py` and `generate_pipeline_dashboard.py` to update them.
 
 ---
 

@@ -291,15 +291,25 @@ def build_chat_context(data_folder):
                     ytd = sum(d["ytd"] for d in deals)
                     parts.append(f"  {status}: {len(deals)} deals, ${val:,.0f} annual target, ${ytd:,.0f} YTD collected")
 
+            # Detect months with data dynamically
+            _month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+            _monthly_totals = [sum(r.get('monthly', [0]*12)[i] for r in revenues) for i in range(12)]
+            _months_with_data = [i for i, v in enumerate(_monthly_totals) if v > 0]
+            _last_month = max(_months_with_data) if _months_with_data else 0
+            _num_months = _last_month + 1
+
+            month_headers = ' | '.join(f'{_month_names[i]+" $":>9}' for i in range(_num_months))
             parts.append(f"\nAll deals ({len(revenues)} total, sorted by annual value desc):")
             parts.append(
                 f"  {'Deal Name':<42} | {'Status':<12} | {'Annual $':>10} | "
-                f"{'Jan $':>9} | {'Feb $':>9} | {'Mar $':>9} | {'YTD $':>9}"
+                f"{month_headers} | {'YTD $':>9}"
             )
             for r in sorted(revenues, key=lambda x: -x["annual_usd"]):
+                monthly = r.get('monthly', [0]*12)
+                month_vals = ' | '.join(f'${monthly[i]:>8,.0f}' for i in range(_num_months))
                 parts.append(
                     f"  {r['name']:<42} | {r['status']:<12} | ${r['annual_usd']:>9,.0f} | "
-                    f"${r['jan']:>8,.0f} | ${r['feb']:>8,.0f} | ${r['mar']:>8,.0f} | ${r['ytd']:>8,.0f}"
+                    f"{month_vals} | ${r['ytd']:>8,.0f}"
                 )
 
     parts.append(f"\n=== END OF CONTEXT ===")

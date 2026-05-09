@@ -14,6 +14,10 @@ from openpyxl import load_workbook
 # Currency constants
 FX_RATE = 1450  # $1 USD = ₦1,450 NGN
 
+# Monthly actual columns: M=Jan, N=Feb, ..., X=Dec (convention set by Finance)
+MONTH_COLUMNS = ['M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X']
+MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
 
 def sf(val):
     """Safe float conversion"""
@@ -156,57 +160,60 @@ def extract_revenue_data(revenue_file):
         status = cells.get('K')
         status = str(status).strip() if status else 'Unknown'
 
-        # Get monthly actuals (USD) — Jan=M, Feb=N, Mar=O, Apr=P
-        actual_jan = sf(cells.get('M'))
-        actual_feb = sf(cells.get('N'))
-        actual_mar = sf(cells.get('O'))
-        actual_apr = sf(cells.get('P'))
+        # Get monthly actuals (USD) — dynamically read all 12 months (M=Jan..X=Dec)
+        monthly = [sf(cells.get(col)) for col in MONTH_COLUMNS]
 
         # Deficit=Y, Surplus=Z (Finance added Apr–Dec columns, shifting these right)
         deficit = sf(cells.get('Y'))
         surplus = sf(cells.get('Z'))
 
-        ytd_actual = actual_jan + actual_feb + actual_mar + actual_apr
+        ytd_actual = sum(monthly)  # will be refined after we detect which months have data globally
 
-        # Calculate YTD target pace based on ACTUAL start date (Jan–Apr = 4 months)
-        months_active = 4  # default: assume active all of Jan–Apr
-        if start_date and hasattr(start_date, 'month'):
-            if start_date.year == 2026 and start_date.month > 4:
-                months_active = 0  # starts after April
-            elif start_date.year == 2026 and start_date.month >= 1:
-                months_active = max(0, 5 - start_date.month)  # partial Jan–Apr
-            # else: started before 2026 = full 4 months
-        elif start_date_str in ('Closed', 'Closed - Dec 31', 'Closed - Aug 31'):
-            months_active = 4  # already active
-
-        ytd_target_pace = annual_usd * months_active / 12
-
-        # Achievement percentage
-        achievement_pct = (ytd_actual / ytd_target_pace * 100) if ytd_target_pace > 0 else 0
-
-        # Gap
-        gap = ytd_target_pace - ytd_actual
+        # achievement_pct, gap, ytd_target_pace calculated in post-processing below
 
         revenues.append({
             'sn': sn,
             'name': name,
             'rail': rail,
             'start_date': start_date_str,
+            'start_date_obj': start_date if hasattr(start_date, 'month') else None,
             'annual_usd': annual_usd,
             'status': status,
-            'actual_jan': actual_jan,
-            'actual_feb': actual_feb,
-            'actual_mar': actual_mar,
-            'actual_apr': actual_apr,
+            'monthly': monthly,
             'ytd_actual': ytd_actual,
-            'ytd_target_pace': ytd_target_pace,
-            'achievement_pct': achievement_pct,
-            'gap': gap,
             'deficit': deficit,
             'surplus': surplus,
         })
 
     wb.close()
+
+    # ── POST-PROCESSING: detect months with data and calculate YTD/pace dynamically ──
+    if revenues:
+        monthly_totals = [sum(r['monthly'][i] for r in revenues) for i in range(12)]
+        months_with_data = [i for i, v in enumerate(monthly_totals) if v > 0]
+        last_data_month = max(months_with_data) if months_with_data else 0
+        num_months = last_data_month + 1
+
+        for r in revenues:
+            # Recalculate YTD based on actual months with data
+            r['ytd_actual'] = sum(r['monthly'][:num_months])
+
+            # Calculate months_active based on start date
+            months_active = num_months
+            sd = r.get('start_date_obj')
+            if sd and hasattr(sd, 'month'):
+                if sd.year == 2026 and sd.month > num_months:
+                    months_active = 0
+                elif sd.year == 2026 and sd.month >= 1:
+                    months_active = max(0, num_months + 1 - sd.month)
+            elif r['start_date'] in ('Closed', 'Closed - Dec 31', 'Closed - Aug 31'):
+                months_active = num_months
+
+            r['months_active'] = months_active
+            r['ytd_target_pace'] = r['annual_usd'] * months_active / 12
+            r['achievement_pct'] = (r['ytd_actual'] / r['ytd_target_pace'] * 100) if r['ytd_target_pace'] > 0 else 0
+            r['gap'] = r['ytd_target_pace'] - r['ytd_actual']
+
     return revenues
 
 
@@ -266,8 +273,14 @@ def generate_critical_actions(revenues, budget_ngn, annual_revenue_usd):
             'description': f"<p style='margin-bottom:8px'>These streams are below 50% of YTD target — investigate delays and re-baseline if needed:</p><ul style='margin:0 0 0 16px;padding:0;list-style:disc'>{streams_bullets}</ul>"
         })
 
-    # 3. Monthly run-rate needed
-    months_elapsed = 3
+    # 3. Monthly run-rate needed (dynamic)
+    # Detect months with data from the revenues
+    if revenues:
+        monthly_totals = [sum(r['monthly'][i] for r in revenues) for i in range(12)]
+        mwd = [i for i, v in enumerate(monthly_totals) if v > 0]
+        months_elapsed = (max(mwd) + 1) if mwd else 1
+    else:
+        months_elapsed = 1
     months_remaining = 12 - months_elapsed
     if months_remaining > 0 and funding_gap_usd > 0:
         monthly_needed = funding_gap_usd / months_remaining
@@ -305,6 +318,19 @@ def generate_critical_actions(revenues, budget_ngn, annual_revenue_usd):
 
 def generate_html(revenues, budget_ngn, revenue_file_path, budget_file_path, output_path):
     """Generate interactive HTML dashboard"""
+    from datetime import datetime as _dt
+
+    # ── DYNAMIC MONTH DETECTION ──────────────────────────────────────
+    monthly_totals = [sum(r['monthly'][i] for r in revenues) for i in range(12)]
+    months_with_data_idx = [i for i, v in enumerate(monthly_totals) if v > 0]
+    last_data_month = max(months_with_data_idx) if months_with_data_idx else 0
+    num_months = last_data_month + 1
+    today = _dt.now()
+    is_partial = (last_data_month == today.month - 1)
+    first_month_name = MONTH_NAMES[0]
+    last_month_name = MONTH_NAMES[last_data_month]
+    partial_note = f' ({last_month_name} partial)' if is_partial else ''
+    ytd_label = f'{first_month_name} – {last_month_name} 2026{partial_note}'
 
     # Convert budget to USD for comparison
     budget_usd = budget_ngn / FX_RATE
@@ -685,7 +711,7 @@ tbody tr:hover{{background:transparent!important}}
 <div class="header">
 <h1>Seamfix Revenue & Fundability Dashboard</h1>
 <div class="sub">2026 Budget Coverage Analysis &mdash; Path to Revenue (All amounts in USD with Naira equivalents)</div>
-<div class="meta">Data as of: <strong>Jan – Apr 2026</strong> &nbsp;&bull;&nbsp; Generated: {generated_at}</div>
+<div class="meta">Data as of: <strong>{ytd_label}</strong> &nbsp;&bull;&nbsp; Generated: {generated_at}</div>
 </div>
 
 <!-- old nav-bar replaced by top-nav -->
@@ -701,7 +727,7 @@ tbody tr:hover{{background:transparent!important}}
 <div class="kpi-label">YTD Actual Revenue</div>
 <div class="kpi-value">{fmt_usd(ytd_actual_revenue_usd)}</div>
 <div class="kpi-secondary">{fmt_naira(ytd_actual_revenue_usd * FX_RATE)}</div>
-<div class="kpi-change">Jan – Apr 2026 (Apr partial)</div>
+<div class="kpi-change">{ytd_label}</div>
 </div>
 <div class="kpi-card">
 <div class="kpi-label">Annual Progress</div>
