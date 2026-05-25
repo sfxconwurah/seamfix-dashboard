@@ -211,8 +211,10 @@ def extract_revenue_data(revenue_file):
 
             r['months_active'] = months_active
             r['ytd_target_pace'] = r['annual_usd'] * months_active / 12
-            r['achievement_pct'] = (r['ytd_actual'] / r['ytd_target_pace'] * 100) if r['ytd_target_pace'] > 0 else 0
-            r['gap'] = r['ytd_target_pace'] - r['ytd_actual']
+            # Achievement % = progress toward FULL annual target (not pace-adjusted)
+            # Finance expects: earned full annual amount = 100%, not 240%
+            r['achievement_pct'] = (r['ytd_actual'] / r['annual_usd'] * 100) if r['annual_usd'] > 0 else 0
+            r['gap'] = r['annual_usd'] - r['ytd_actual']
 
     return revenues
 
@@ -264,13 +266,13 @@ def generate_critical_actions(revenues, budget_ngn, annual_revenue_usd):
             })
 
     # 2. Which revenue streams are underperforming vs projection?
-    underperforming = [r for r in revenues if r['achievement_pct'] < 50 and r['ytd_target_pace'] > 10_000]
+    underperforming = [r for r in revenues if r['achievement_pct'] < 20 and r['annual_usd'] > 50_000]
     if underperforming:
-        streams_bullets = ''.join([f"<li>{u['name']} — {u['achievement_pct']:.0f}% of YTD target ({fmt_usd(u['ytd_actual'])} vs {fmt_usd(u['ytd_target_pace'])} pace)</li>" for u in underperforming[:5]])
+        streams_bullets = ''.join([f"<li>{u['name']} — {u['achievement_pct']:.0f}% achieved ({fmt_usd(u['ytd_actual'])} of {fmt_usd(u['annual_usd'])} target)</li>" for u in underperforming[:5]])
         actions.append({
             'type': 'WARNING',
             'title': 'Underperforming Revenue Streams',
-            'description': f"<p style='margin-bottom:8px'>These streams are below 50% of YTD target — investigate delays and re-baseline if needed:</p><ul style='margin:0 0 0 16px;padding:0;list-style:disc'>{streams_bullets}</ul>"
+            'description': f"<p style='margin-bottom:8px'>These streams are below 20% of their annual target — investigate delays and re-baseline if needed:</p><ul style='margin:0 0 0 16px;padding:0;list-style:disc'>{streams_bullets}</ul>"
         })
 
     # 3. Monthly run-rate needed (dynamic)
@@ -339,14 +341,13 @@ def generate_html(revenues, budget_ngn, revenue_file_path, budget_file_path, out
     deal_bucket_total_usd = sum(r['annual_usd'] for r in revenues)  # $10M optimistic bucket
     annual_revenue_target_usd = 8_000_000  # $8M official company target
     ytd_actual_revenue_usd = sum(r['ytd_actual'] for r in revenues)
-    # Two achievement perspectives:
-    # 1. Q1 achievement: actual vs what's expected from streams active in Q1 (start-date adjusted)
-    ytd_target_pace_usd = sum(r['ytd_target_pace'] for r in revenues)
-    q1_achievement_rate = (ytd_actual_revenue_usd / ytd_target_pace_usd * 100) if ytd_target_pace_usd > 0 else 0
-    # 2. Annual progress: actual vs full-year target (simple, universally understood)
+    # Achievement: actual vs full annual target (simple — what Finance expects)
     annual_progress_pct = (ytd_actual_revenue_usd / annual_revenue_target_usd * 100) if annual_revenue_target_usd > 0 else 0
-    # Count active streams (those with Q1 expected revenue)
-    active_streams = len([r for r in revenues if r['ytd_target_pace'] > 0])
+    # Per-stream achievement vs their own annual targets (aggregate)
+    total_stream_annual = sum(r['annual_usd'] for r in revenues)
+    ytd_achievement_rate = (ytd_actual_revenue_usd / total_stream_annual * 100) if total_stream_annual > 0 else 0
+    # Count active streams (those with annual target > 0)
+    active_streams = len([r for r in revenues if r['annual_usd'] > 0])
     fundability_ratio = (annual_revenue_target_usd / budget_usd * 100) if budget_usd > 0 else 0
 
     # Scenarios
@@ -488,7 +489,7 @@ def generate_html(revenues, budget_ngn, revenue_file_path, budget_file_path, out
     health_headline = f"{len(on_track)} On Track, {len(closed)} Closed, {len(at_risk)} At Risk, {len(off_track)} Off Track"
     health_bullets = []
     health_bullets.append(f"<li>Annual progress: {annual_progress_pct:.0f}% — {fmt_dual(ytd_actual_revenue_usd)} of {fmt_dual(annual_revenue_target_usd)}</li>")
-    health_bullets.append(f"<li>YTD streams on pace: {q1_achievement_rate:.0f}% ({active_streams} active streams)</li>")
+    health_bullets.append(f"<li>Pipeline achievement: {ytd_achievement_rate:.0f}% of stream targets ({active_streams} active streams)</li>")
     if surplus_streams:
         total_surplus = sum(r.get('surplus', 0) for r in surplus_streams)
         health_bullets.append(f"<li>{len(surplus_streams)} streams exceeding targets (total surplus: {fmt_usd(total_surplus)})</li>")
@@ -532,7 +533,7 @@ def generate_html(revenues, budget_ngn, revenue_file_path, budget_file_path, out
             risk_alerts.append(f"<li><strong>Concentration Risk:</strong> {top['name']} is {top_conc:.0f}% of pipeline</li>")
 
     # Check underperformers
-    underperf = [r for r in revenues if r['achievement_pct'] < 30 and r['ytd_target_pace'] > 5_000]
+    underperf = [r for r in revenues if r['achievement_pct'] < 10 and r['annual_usd'] > 50_000]
     if underperf:
         underperf_str = ', '.join([u['name'] for u in underperf[:2]])
         risk_alerts.append(f"<li><strong>Underperformance:</strong> {underperf_str} significantly behind target</li>")
@@ -737,8 +738,8 @@ tbody tr:hover{{background:transparent!important}}
 </div>
 <div class="kpi-card">
 <div class="kpi-label">YTD Achievement ({ytd_label})</div>
-<div class="kpi-value {'negative' if q1_achievement_rate < 70 else ''}">{q1_achievement_rate:.0f}%</div>
-<div class="kpi-secondary">{fmt_usd(ytd_actual_revenue_usd)} vs {fmt_usd(ytd_target_pace_usd)} expected</div>
+<div class="kpi-value {'negative' if ytd_achievement_rate < 20 else ''}">{ytd_achievement_rate:.0f}%</div>
+<div class="kpi-secondary">{fmt_usd(ytd_actual_revenue_usd)} of {fmt_usd(total_stream_annual)} pipeline</div>
 <div class="kpi-change">{active_streams} of {len(revenues)} streams active {ytd_label}</div>
 </div>
 <div class="kpi-card">
@@ -810,7 +811,7 @@ tbody tr:hover{{background:transparent!important}}
 <td colspan="3" style="color:#00D4AA;font-weight:700">TOTAL ({len(revenues)} streams)</td>
 <td class="positive">{fmt_dual(annual_revenue_target_usd)}</td>
 <td class="positive">{fmt_dual(ytd_actual_revenue_usd)}</td>
-<td>{annual_progress_pct:.0f}% annual / {q1_achievement_rate:.0f}% YTD pace</td>
+<td>{annual_progress_pct:.0f}% of $8M target / {ytd_achievement_rate:.0f}% of pipeline</td>
 <td></td>
 <td></td>
 </tr>
