@@ -542,9 +542,7 @@ tr:hover td {{ background: var(--bg-table-hover); }}
 <style>{css}</style>
 </head>
 <body>
-
-<!-- Theme toggle -->
-<div class="theme-toggle-wrap">{toggle_html}</div>
+{toggle_html}
 
 <!-- Header -->
 <div class="page-header">

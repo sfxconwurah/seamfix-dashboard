@@ -16,10 +16,10 @@ THEME_CSS = """
   --bg-table-hover: rgba(0,150,120,0.04);
   --bg-table-stripe: rgba(0,0,0,0.02);
   --bg-gauge: rgba(0,0,0,0.08);
-  --text-primary: #1e293b;
-  --text-secondary: #475569;
-  --text-tertiary: #94a3b8;
-  --text-heading: #334155;
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-tertiary: #64748b;
+  --text-heading: #1e293b;
   --text-on-accent: #ffffff;
   --border-main: #e2e8f0;
   --border-light: #f1f5f9;
@@ -36,7 +36,7 @@ THEME_CSS = """
   --danger-bg: rgba(255,107,107,0.08);
   --success-bg: rgba(0,212,170,0.06);
   --chart-grid: rgba(0,0,0,0.06);
-  --chart-text: #64748b;
+  --chart-text: #475569;
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
   --shadow-hover: 0 4px 12px rgba(0,0,0,0.08);
   --print-bg: #fff;
@@ -79,9 +79,9 @@ THEME_CSS = """
 }
 """
 
-# Toggle button HTML — sits in the top-nav bar
-THEME_TOGGLE_HTML = """<button onclick="toggleTheme()" id="themeToggle" style="margin-left:auto;background:none;border:1px solid var(--border-main);border-radius:6px;padding:4px 12px;cursor:pointer;color:var(--text-secondary);font-size:12px;font-family:inherit;display:flex;align-items:center;gap:4px;height:32px;white-space:nowrap;transition:all 0.2s" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border-main)';this.style.color='var(--text-secondary)'" title="Toggle light/dark mode">
-<span id="themeIcon">&#9788;</span> <span id="themeLabel">Dark</span>
+# Toggle button HTML — floating button, NOT inside top-nav (Streamlit hides top-nav)
+THEME_TOGGLE_HTML = """<button onclick="toggleTheme()" id="themeToggle" style="position:fixed;top:12px;right:16px;z-index:9999;background:var(--bg-card);border:1px solid var(--border-main);border-radius:8px;padding:6px 14px;cursor:pointer;color:var(--text-secondary);font-size:12px;font-family:inherit;display:flex;align-items:center;gap:5px;height:34px;white-space:nowrap;transition:all 0.2s;box-shadow:0 2px 8px rgba(0,0,0,0.1)" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border-main)';this.style.color='var(--text-secondary)'" title="Toggle light/dark mode">
+<span id="themeIcon">&#9790;</span> <span id="themeLabel">Dark</span>
 </button>"""
 
 # JavaScript for theme toggle + localStorage persistence

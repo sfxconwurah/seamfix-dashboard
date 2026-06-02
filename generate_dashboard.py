@@ -1080,7 +1080,6 @@ td{{color:#334155!important;border-bottom-color:#e2e8f0!important}}
 .tabs{{display:none!important}}
 .tab-content{{display:block!important}}
 tbody tr:hover{{background:transparent!important}}
-#themeToggle{{display:none!important}}
 }}
 .dashboard-footer{{margin-top:48px;padding:20px 28px;border-top:1px solid var(--border-main);color:var(--text-secondary);font-size:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}}
 .dashboard-footer span{{color:var(--text-secondary)}}
@@ -1093,7 +1092,8 @@ tbody tr:hover{{background:transparent!important}}
 </style>
 </head>
 <body>
-<nav class="top-nav"><span class="top-nav-brand">⚡ Seamfix</span><a href="dashboard.html" class="top-nav-link active">Cash Overview</a><a href="expense_dashboard.html" class="top-nav-link ">Expense &amp; Vendor</a><a href="budget_dashboard.html" class="top-nav-link ">Budget vs Actual</a><a href="revenue_dashboard.html" class="top-nav-link ">Revenue &amp; Fundability</a><a href="pipeline_dashboard.html" class="top-nav-link ">Pipeline Intelligence</a>{toggle_html}</nav>
+{toggle_html}
+<nav class="top-nav"><span class="top-nav-brand">⚡ Seamfix</span><a href="dashboard.html" class="top-nav-link active">Cash Overview</a><a href="expense_dashboard.html" class="top-nav-link ">Expense &amp; Vendor</a><a href="budget_dashboard.html" class="top-nav-link ">Budget vs Actual</a><a href="revenue_dashboard.html" class="top-nav-link ">Revenue &amp; Fundability</a><a href="pipeline_dashboard.html" class="top-nav-link ">Pipeline Intelligence</a></nav>
 <!-- PDF button hidden per user request -->
 <div class="container">
 <div class="header">

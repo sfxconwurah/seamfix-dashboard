@@ -771,6 +771,7 @@ def generate_html(revenues, output_path):
 </style>
 </head>
 <body>
+{toggle_html}
 
 <!-- NAV -->
 <nav class="nav">
@@ -780,7 +781,6 @@ def generate_html(revenues, output_path):
   <a href="budget_dashboard.html"  class="nav-link">Budget vs Actual</a>
   <a href="revenue_dashboard.html" class="nav-link">Revenue &amp; Fundability</a>
   <a href="pipeline_dashboard.html" class="nav-link active">Pipeline Intelligence</a>
-  {toggle_html}
 </nav>
 
 <!-- HEADER -->
