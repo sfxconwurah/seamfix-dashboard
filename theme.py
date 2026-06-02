@@ -17,9 +17,9 @@ THEME_CSS = """
   --bg-table-stripe: rgba(0,0,0,0.02);
   --bg-gauge: rgba(0,0,0,0.08);
   --text-primary: #0f172a;
-  --text-secondary: #334155;
-  --text-tertiary: #64748b;
-  --text-heading: #1e293b;
+  --text-secondary: #1e293b;
+  --text-tertiary: #475569;
+  --text-heading: #0f172a;
   --text-on-accent: #ffffff;
   --border-main: #e2e8f0;
   --border-light: #f1f5f9;
@@ -36,7 +36,7 @@ THEME_CSS = """
   --danger-bg: rgba(255,107,107,0.08);
   --success-bg: rgba(0,212,170,0.06);
   --chart-grid: rgba(0,0,0,0.06);
-  --chart-text: #475569;
+  --chart-text: #334155;
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
   --shadow-hover: 0 4px 12px rgba(0,0,0,0.08);
   --print-bg: #fff;
