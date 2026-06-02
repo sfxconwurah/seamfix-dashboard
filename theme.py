@@ -93,6 +93,7 @@ function toggleTheme() {
   localStorage.setItem('seamfix-theme', next);
   updateToggleUI(next);
   updateCharts(next);
+  try { window.parent.postMessage({seamfixTheme: next}, '*'); } catch(e) {}
 }
 
 function updateToggleUI(theme) {

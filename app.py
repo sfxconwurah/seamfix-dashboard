@@ -1006,6 +1006,60 @@ def main():
     wrap.appendChild(btn);
     doc.body.appendChild(wrap);
 })();
+
+// ── Theme sync: listen for postMessage from dashboard iframes ──
+(function initThemeSync() {
+    var doc = window.parent.document;
+    if (doc.getElementById('seamfix-theme-style')) return;
+
+    // Inject a style tag we can update dynamically
+    var style = doc.createElement('style');
+    style.id = 'seamfix-theme-style';
+    doc.head.appendChild(style);
+
+    function applyStreamlitTheme(theme) {
+        if (theme === 'dark') {
+            style.textContent =
+                '[data-testid="stAppViewContainer"], [data-testid="stApp"], .main, .block-container { background-color: #0f172a !important; color: #e2e8f0 !important; }' +
+                '[data-testid="stSidebar"], [data-testid="stSidebar"] > div { background-color: #1e293b !important; color: #e2e8f0 !important; }' +
+                '[data-testid="stHeader"], header[data-testid="stHeader"] { background-color: #0a0f1e !important; color: #e2e8f0 !important; }' +
+                '[data-testid="stSidebar"] label, [data-testid="stSidebar"] .stMarkdown, [data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 { color: #e2e8f0 !important; }' +
+                '[data-testid="stSidebar"] .stCaption, [data-testid="stSidebar"] small { color: #94a3b8 !important; }' +
+                '[data-testid="stSidebar"] button { color: #e2e8f0 !important; border-color: #334155 !important; }' +
+                '[data-testid="stSidebar"] input, [data-testid="stSidebar"] textarea { background-color: #0f172a !important; color: #e2e8f0 !important; border-color: #334155 !important; }' +
+                '.stTabs [data-baseweb="tab-list"] { background-color: #0f172a !important; }' +
+                '.stTabs [data-baseweb="tab"] { color: #94a3b8 !important; }' +
+                '.stTabs [aria-selected="true"] { color: #00D4AA !important; }' +
+                '#bobby-fab-label { background: #0f172a !important; color: #00D4AA !important; border-color: rgba(0,212,170,0.35) !important; }';
+        } else {
+            style.textContent =
+                '[data-testid="stAppViewContainer"], [data-testid="stApp"], .main, .block-container { background-color: #f8fafc !important; color: #1e293b !important; }' +
+                '[data-testid="stSidebar"], [data-testid="stSidebar"] > div { background-color: #ffffff !important; color: #1e293b !important; }' +
+                '[data-testid="stHeader"], header[data-testid="stHeader"] { background-color: #ffffff !important; color: #1e293b !important; }' +
+                '[data-testid="stSidebar"] label, [data-testid="stSidebar"] .stMarkdown, [data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 { color: #1e293b !important; }' +
+                '[data-testid="stSidebar"] .stCaption, [data-testid="stSidebar"] small { color: #64748b !important; }' +
+                '[data-testid="stSidebar"] button { color: #1e293b !important; border-color: #e2e8f0 !important; }' +
+                '[data-testid="stSidebar"] input, [data-testid="stSidebar"] textarea { background-color: #ffffff !important; color: #1e293b !important; border-color: #e2e8f0 !important; }' +
+                '.stTabs [data-baseweb="tab-list"] { background-color: #ffffff !important; }' +
+                '.stTabs [data-baseweb="tab"] { color: #64748b !important; }' +
+                '.stTabs [aria-selected="true"] { color: #009E7E !important; }' +
+                '#bobby-fab-label { background: #ffffff !important; color: #009E7E !important; border-color: rgba(0,158,126,0.35) !important; }';
+        }
+        try { localStorage.setItem('seamfix-theme', theme); } catch(e) {}
+    }
+
+    // Listen for theme changes from dashboard iframes
+    window.parent.addEventListener('message', function(e) {
+        if (e.data && e.data.seamfixTheme) {
+            applyStreamlitTheme(e.data.seamfixTheme);
+        }
+    });
+
+    // Apply saved theme on load
+    var saved = 'light';
+    try { saved = localStorage.getItem('seamfix-theme') || 'light'; } catch(e) {}
+    applyStreamlitTheme(saved);
+})();
 </script>
 """, height=0)
 
