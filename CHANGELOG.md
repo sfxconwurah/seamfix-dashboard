@@ -5,6 +5,20 @@
 
 ---
 
+## 2026-06-02 — Docs: Add "Can Claude commit and push for me?" subsection to onboarding
+
+Clarifies what a non-technical collaborator needs in order to push:
+- Explains the **commit (local) vs push (remote)** distinction — Claude can always commit; pushing needs repo access.
+- Lists the three one-time requirements: accepted collaborator invite, SSH key, and git identity.
+- Notes that on a **personal** GitHub repo, a collaborator automatically gets push access — there is no Read/Write dropdown (that only appears on org repos). This answers the "I can't see read/write options" question directly.
+- Adds a "permission denied" troubleshooting note.
+- Applied to both `ONBOARDING.md` and the Word `.docx`.
+
+**Files**: `ONBOARDING.md`, `Seamfix Dashboard - Onboarding Guide.docx`, `CHANGELOG.md`
+**Author**: Chibuzor + Claude
+
+---
+
 ## 2026-06-02 — Docs: Add plain-English basics section to onboarding; switch tool guidance to Claude Code
 
 Ahead of onboarding the Head of Finance (a non-technical user):

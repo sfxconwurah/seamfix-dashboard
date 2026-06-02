@@ -171,6 +171,23 @@ git commit -m "Description of what changed"
 git push origin main
 ```
 
+### Can Claude commit and push for me?
+
+Yes — but it helps to understand there are **two separate steps**:
+
+- **Committing** = saving a snapshot of your changes *on your own computer*. Claude can always do this; it needs nothing from GitHub.
+- **Pushing** = uploading those commits *up to GitHub*, so the live site can pick them up. This is the step that needs you to have access to the repo.
+
+For pushing to work, three things must be true (all one-time setup):
+
+1. **You've been added as a collaborator on the repo, and accepted the invite.** GitHub emails you an invitation — click **Accept**. On a *personal* GitHub repo like this one (`sfxconwurah/seamfix-dashboard`), being added as a collaborator **automatically gives you push access** — there is no separate "Read vs Write" setting to choose. (That dropdown only appears on company/organization repos.)
+2. **Your SSH key is set up** (see "SSH Key Setup" above). This is how your computer proves who it is to GitHub.
+3. **Git knows your name and email.** If it doesn't, git asks the first time — or just tell Claude: *"Set my git name to [name] and email to [email@seamfix.com]."*
+
+When you ask Claude to "commit and push," Claude Code will ask you to **approve** running the git commands. Just approve them — that's normal and safe.
+
+> **If a push ever fails with "permission denied"**, it almost always means one of two things: the collaborator invite hasn't been accepted yet, or the SSH key isn't set up. Fix those two and it will work.
+
 ---
 
 ## How to Deploy Changes
