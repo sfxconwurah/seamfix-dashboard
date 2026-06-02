@@ -16,6 +16,7 @@ from datetime import datetime
 from pathlib import Path
 from collections import defaultdict, Counter
 from openpyxl import load_workbook
+from theme import get_base_css, get_toggle_html, get_theme_js
 
 
 # Category grouping rules
@@ -275,6 +276,10 @@ def generate_html(all_weekly_data, all_vendors, all_categories_by_week, kpis, ou
     latest_date = weeks_list[-1].strftime("%d %B %Y") if weeks_list else "N/A"
     generated_at = datetime.now().strftime("%d %B %Y at %H:%M")
 
+    theme_css = get_base_css()
+    toggle_html = get_toggle_html()
+    theme_js = get_theme_js()
+
     # Expense category trend data
     all_std_categories = set()
     for week_categories in all_categories_by_week.values():
@@ -402,6 +407,7 @@ def generate_html(all_weekly_data, all_vendors, all_categories_by_week, kpis, ou
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        {theme_css}
         * {{
             margin: 0;
             padding: 0;
@@ -410,10 +416,11 @@ def generate_html(all_weekly_data, all_vendors, all_categories_by_week, kpis, ou
 
         body {{
             font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-            color: #e2e8f0;
+            background: var(--bg-body);
+            color: var(--text-primary);
             min-height: 100vh;
             padding: 0;
+            transition: background 0.3s, color 0.3s;
         }}
 
         .container {{
@@ -430,14 +437,11 @@ def generate_html(all_weekly_data, all_vendors, all_categories_by_week, kpis, ou
             font-size: 2.5rem;
             font-weight: 700;
             margin-bottom: 10px;
-            background: linear-gradient(135deg, #00D4AA, #4ECDC4);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            color: var(--text-primary);
         }}
 
         .header p {{
-            color: #94a3b8;
+            color: var(--text-secondary);
             font-size: 0.95rem;
         }}
 
@@ -449,21 +453,20 @@ def generate_html(all_weekly_data, all_vendors, all_categories_by_week, kpis, ou
         }}
 
         .kpi-card {{
-            background: rgba(30, 41, 59, 0.8);
-            border: 1px solid rgba(100, 116, 139, 0.3);
+            background: var(--bg-card);
+            border: 1px solid var(--border-main);
             border-radius: 12px;
             padding: 24px;
-            backdrop-filter: blur(10px);
         }}
 
         .kpi-card.highlight {{
-            border-color: #00D4AA;
-            background: rgba(0, 212, 170, 0.05);
+            border-color: var(--accent);
+            background: var(--accent-bg);
         }}
 
         .kpi-label {{
             font-size: 0.85rem;
-            color: #94a3b8;
+            color: var(--text-secondary);
             text-transform: uppercase;
             letter-spacing: 0.05em;
             margin-bottom: 10px;
@@ -473,13 +476,13 @@ def generate_html(all_weekly_data, all_vendors, all_categories_by_week, kpis, ou
         .kpi-value {{
             font-size: 1.8rem;
             font-weight: 700;
-            color: #00D4AA;
+            color: var(--accent);
             margin-bottom: 8px;
         }}
 
         .kpi-detail {{
             font-size: 0.8rem;
-            color: #64748b;
+            color: var(--text-tertiary);
         }}
 
         .charts-grid {{
@@ -490,17 +493,16 @@ def generate_html(all_weekly_data, all_vendors, all_categories_by_week, kpis, ou
         }}
 
         .chart-card {{
-            background: rgba(30, 41, 59, 0.8);
-            border: 1px solid rgba(100, 116, 139, 0.3);
+            background: var(--bg-card);
+            border: 1px solid var(--border-main);
             border-radius: 12px;
             padding: 24px;
-            backdrop-filter: blur(10px);
         }}
 
         .chart-card h3 {{
             font-size: 1.1rem;
             margin-bottom: 20px;
-            color: #e2e8f0;
+            color: var(--text-primary);
             font-weight: 600;
         }}
 
@@ -510,18 +512,17 @@ def generate_html(all_weekly_data, all_vendors, all_categories_by_week, kpis, ou
         }}
 
         .table-card {{
-            background: rgba(30, 41, 59, 0.8);
-            border: 1px solid rgba(100, 116, 139, 0.3);
+            background: var(--bg-card);
+            border: 1px solid var(--border-main);
             border-radius: 12px;
             padding: 24px;
             margin-bottom: 30px;
-            backdrop-filter: blur(10px);
         }}
 
         .table-card h3 {{
             font-size: 1.2rem;
             margin-bottom: 20px;
-            color: #e2e8f0;
+            color: var(--text-primary);
             font-weight: 600;
         }}
 
@@ -533,21 +534,20 @@ def generate_html(all_weekly_data, all_vendors, all_categories_by_week, kpis, ou
             width: 100%;
             max-width: 400px;
             padding: 10px 15px;
-            background: rgba(15, 23, 42, 0.6);
-            border: 1px solid rgba(100, 116, 139, 0.3);
+            background: var(--bg-input);
+            border: 1px solid var(--border-main);
             border-radius: 8px;
-            color: #e2e8f0;
+            color: var(--text-primary);
             font-size: 0.9rem;
         }}
 
         .search-box input::placeholder {{
-            color: #64748b;
+            color: var(--text-tertiary);
         }}
 
         .search-box input:focus {{
             outline: none;
-            border-color: #00D4AA;
-            background: rgba(15, 23, 42, 0.8);
+            border-color: var(--accent);
         }}
 
         table {{
@@ -557,21 +557,21 @@ def generate_html(all_weekly_data, all_vendors, all_categories_by_week, kpis, ou
         }}
 
         th {{
-            background: rgba(15, 23, 42, 0.6);
+            background: var(--bg-table-header);
             padding: 12px 15px;
             text-align: left;
             font-weight: 600;
-            color: #cbd5e1;
-            border-bottom: 1px solid rgba(100, 116, 139, 0.2);
+            color: var(--text-heading);
+            border-bottom: 1px solid var(--border-main);
         }}
 
         td {{
             padding: 12px 15px;
-            border-bottom: 1px solid rgba(100, 116, 139, 0.1);
+            border-bottom: 1px solid var(--border-light);
         }}
 
         tr:hover {{
-            background: rgba(100, 116, 139, 0.1);
+            background: var(--bg-table-hover);
         }}
 
         .badge {{
@@ -584,17 +584,17 @@ def generate_html(all_weekly_data, all_vendors, all_categories_by_week, kpis, ou
         }}
 
         .badge-yes {{
-            background: rgba(0, 212, 170, 0.2);
-            color: #00D4AA;
+            background: var(--accent-bg);
+            color: var(--accent);
         }}
 
         .badge-no {{
-            background: rgba(255, 107, 107, 0.2);
-            color: #FF6B6B;
+            background: var(--danger-bg);
+            color: var(--danger);
         }}
 
         .amount {{
-            color: #00D4AA;
+            color: var(--accent);
             font-weight: 600;
         }}
 
@@ -606,16 +606,15 @@ def generate_html(all_weekly_data, all_vendors, all_categories_by_week, kpis, ou
         }}
 
         .takeaway-card {{
-            background: rgba(30, 41, 59, 0.8);
-            border: 1px solid rgba(100, 116, 139, 0.3);
+            background: var(--bg-card);
+            border: 1px solid var(--border-main);
             border-radius: 12px;
             padding: 0;
-            backdrop-filter: blur(10px);
         }}
 
         .takeaway-card h4 {{
             font-size: 0.95rem;
-            color: #cbd5e1;
+            color: var(--text-heading);
             margin-bottom: 10px;
             font-weight: 600;
             text-transform: uppercase;
@@ -624,24 +623,24 @@ def generate_html(all_weekly_data, all_vendors, all_categories_by_week, kpis, ou
 
         .takeaway-value {{
             font-size: 1.5rem;
-            color: #FFE66D;
+            color: var(--warning);
             font-weight: 700;
             margin-bottom: 8px;
         }}
 
         .takeaway-insight {{
             font-size: 0.85rem;
-            color: #94a3b8;
+            color: var(--text-secondary);
             line-height: 1.5;
         }}
 
         .alert {{
-            background: rgba(255, 107, 107, 0.1);
-            border-left: 3px solid #FF6B6B;
+            background: var(--danger-bg);
+            border-left: 3px solid var(--danger);
             padding: 12px 15px;
             border-radius: 6px;
             margin-bottom: 15px;
-            color: #FF6B6B;
+            color: var(--danger);
             font-size: 0.9rem;
         }}
 
@@ -651,19 +650,19 @@ def generate_html(all_weekly_data, all_vendors, all_categories_by_week, kpis, ou
 
         .footer {{
             text-align: center;
-            color: #64748b;
+            color: var(--text-tertiary);
             font-size: 0.85rem;
             margin-top: 40px;
             padding-top: 20px;
-            border-top: 1px solid rgba(100, 116, 139, 0.2);
+            border-top: 1px solid var(--border-main);
         }}
 
         .print-button{{display:none!important}}
-        .top-nav{{background:#0a0f1e;border-bottom:1px solid #334155;padding:0 24px;display:flex;align-items:center;height:48px;overflow-x:auto;position:sticky;top:0;z-index:200}}
-.top-nav-brand{{color:#e2e8f0;font-weight:700;font-size:15px;margin-right:24px;white-space:nowrap;text-decoration:none}}
-.top-nav-link{{color:#94a3b8;text-decoration:none;padding:0 14px;height:48px;display:flex;align-items:center;font-size:13px;border-bottom:2px solid transparent;white-space:nowrap;transition:color .2s}}
-.top-nav-link:hover{{color:#e2e8f0}}
-        .top-nav-link.active{{color:#fff;border-bottom-color:#00D4AA;font-weight:500}}
+        .top-nav{{background:var(--bg-nav);border-bottom:1px solid var(--border-main);padding:0 24px;display:flex;align-items:center;height:48px;overflow-x:auto;position:sticky;top:0;z-index:200}}
+.top-nav-brand{{color:var(--text-primary);font-weight:700;font-size:15px;margin-right:24px;white-space:nowrap;text-decoration:none}}
+.top-nav-link{{color:var(--text-secondary);text-decoration:none;padding:0 14px;height:48px;display:flex;align-items:center;font-size:13px;border-bottom:2px solid transparent;white-space:nowrap;transition:color .2s}}
+.top-nav-link:hover{{color:var(--text-primary)}}
+        .top-nav-link.active{{color:var(--text-primary);border-bottom-color:var(--accent);font-weight:500}}
 
         @media (max-width: 768px) {{
             .charts-grid {{
@@ -695,7 +694,7 @@ def generate_html(all_weekly_data, all_vendors, all_categories_by_week, kpis, ou
         }}
 
         th.sortable:hover {{
-            color: #FFE66D;
+            color: var(--warning);
         }}
 
         th.sort-asc::after {{
@@ -915,17 +914,21 @@ def generate_html(all_weekly_data, all_vendors, all_categories_by_week, kpis, ou
                 color: #64748b !important;
                 border-top-color: #e2e8f0 !important;
             }}
+
+            #themeToggle {{
+                display: none !important;
+            }}
         }}
     /* ── HEADER: match Pipeline Intelligence style ── */
-.header{{padding:24px 28px 16px!important;border-bottom:1px solid #334155!important;margin-bottom:24px!important;background:none!important}}
-.header h1{{font-size:22px!important;font-weight:700!important;background:none!important;-webkit-background-clip:unset!important;-webkit-text-fill-color:#e2e8f0!important;color:#e2e8f0!important;margin-bottom:4px!important}}
-.header .sub{{font-size:13px!important;color:#94a3b8!important}}
-.header .meta{{font-size:12px!important;color:#94a3b8!important;margin-top:4px!important}}
-.header p{{font-size:13px!important;color:#94a3b8!important;margin-top:4px!important}}
+.header{{padding:24px 28px 16px!important;border-bottom:1px solid var(--border-main)!important;margin-bottom:24px!important;background:none!important}}
+.header h1{{font-size:22px!important;font-weight:700!important;background:none!important;-webkit-background-clip:unset!important;-webkit-text-fill-color:var(--text-primary)!important;color:var(--text-primary)!important;margin-bottom:4px!important}}
+.header .sub{{font-size:13px!important;color:var(--text-secondary)!important}}
+.header .meta{{font-size:12px!important;color:var(--text-secondary)!important;margin-top:4px!important}}
+.header p{{font-size:13px!important;color:var(--text-secondary)!important;margin-top:4px!important}}
 </style>
 </head>
 <body>
-<nav class="top-nav"><span class="top-nav-brand">⚡ Seamfix</span><a href="dashboard.html" class="top-nav-link ">Cash Overview</a><a href="expense_dashboard.html" class="top-nav-link active">Expense &amp; Vendor</a><a href="budget_dashboard.html" class="top-nav-link ">Budget vs Actual</a><a href="revenue_dashboard.html" class="top-nav-link ">Revenue &amp; Fundability</a><a href="pipeline_dashboard.html" class="top-nav-link ">Pipeline Intelligence</a></nav>
+<nav class="top-nav"><span class="top-nav-brand">⚡ Seamfix</span><a href="dashboard.html" class="top-nav-link ">Cash Overview</a><a href="expense_dashboard.html" class="top-nav-link active">Expense &amp; Vendor</a><a href="budget_dashboard.html" class="top-nav-link ">Budget vs Actual</a><a href="revenue_dashboard.html" class="top-nav-link ">Revenue &amp; Fundability</a><a href="pipeline_dashboard.html" class="top-nav-link ">Pipeline Intelligence</a>{toggle_html}</nav>
     <div class="container">
         <div class="header">
             <h1>Seamfix Expense & Vendor Analysis</h1>
@@ -956,7 +959,7 @@ def generate_html(all_weekly_data, all_vendors, all_categories_by_week, kpis, ou
             </div>
             <div class="kpi-card">
                 <div class="kpi-label">Top Vendor by Spend</div>
-                <div class="kpi-value" style="color: #FFE66D; font-size: 1.3rem;">{kpis['top_vendor']}</div>
+                <div class="kpi-value" style="color: var(--warning); font-size: 1.3rem;">{kpis['top_vendor']}</div>
                 <div class="kpi-detail">Total: {format_naira(kpis['top_vendor_spend'])}</div>
             </div>
             <div class="kpi-card">
@@ -1127,7 +1130,7 @@ def generate_html(all_weekly_data, all_vendors, all_categories_by_week, kpis, ou
             </table>
         </div>
 
-        <div class="footer" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;color:#94a3b8;font-size:12px">
+        <div class="footer" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;color:var(--text-secondary);font-size:12px">
             <span>Seamfix Expense & Vendor Analysis &nbsp;·&nbsp; Powered by Claude Cowork</span>
             <span>Available Data Range: {earliest_date} &ndash; {latest_date} &nbsp;&bull;&nbsp; Generated: {generated_at} &nbsp;&bull;&nbsp; $1 = ₦1,450</span>
         </div>
@@ -1335,6 +1338,7 @@ def generate_html(all_weekly_data, all_vendors, all_categories_by_week, kpis, ou
                 }}
             }}
         }});
+        {theme_js}
     </script>
 </body>
 </html>

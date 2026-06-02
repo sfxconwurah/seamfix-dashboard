@@ -8,6 +8,7 @@ Usage: python3 generate_pipeline_dashboard.py [folder_path]
 import os, sys, json, re, glob
 from datetime import datetime
 from openpyxl import load_workbook
+from theme import get_base_css, get_toggle_html, get_theme_js
 
 
 FX_RATE = 1450  # $1 USD = ₦1,450 NGN
@@ -374,7 +375,7 @@ def generate_html(revenues, output_path):
             <td>{r['name']}</td>
             <td>{r['rail']}</td>
             <td class="amount">{fmt_usd(r['annual_usd'])}</td>
-            <td style="color:#94a3b8;font-style:italic;font-size:12px;max-width:400px;white-space:normal;line-height:1.4">{comment_short or '—'}</td>
+            <td style="color:var(--text-secondary);font-style:italic;font-size:12px;max-width:400px;white-space:normal;line-height:1.4">{comment_short or '—'}</td>
         </tr>"""
 
     closed_rows = ""
@@ -387,7 +388,7 @@ def generate_html(revenues, output_path):
             <td>{r['rail']}</td>
             <td class="amount">{fmt_usd(r['annual_usd'])}</td>
             <td class="amount" style="color:#10b981">{ytd_str}</td>
-            <td style="color:#94a3b8;font-style:italic;font-size:12px;max-width:400px;white-space:normal;line-height:1.4">{comment_short or '—'}</td>
+            <td style="color:var(--text-secondary);font-style:italic;font-size:12px;max-width:400px;white-space:normal;line-height:1.4">{comment_short or '—'}</td>
         </tr>"""
 
     unknown_rows = ""
@@ -399,8 +400,8 @@ def generate_html(revenues, output_path):
             <td>{r['name']}</td>
             <td>{r['rail']}</td>
             <td class="amount">{fmt_usd(r['annual_usd'])}</td>
-            <td class="amount" style="color:#94a3b8">{ytd_str}</td>
-            <td style="color:#94a3b8;font-style:italic;font-size:12px;max-width:400px;white-space:normal;line-height:1.4">{comment_short or '—'}</td>
+            <td class="amount" style="color:var(--text-secondary)">{ytd_str}</td>
+            <td style="color:var(--text-secondary);font-style:italic;font-size:12px;max-width:400px;white-space:normal;line-height:1.4">{comment_short or '—'}</td>
         </tr>"""
 
     movers_rows = ""
@@ -412,7 +413,7 @@ def generate_html(revenues, output_path):
         non_zero = [i for i, v in enumerate(monthly) if v > 0]
         if len(non_zero) == 0:
             trend_key = 'mixed'
-            trend = '<span style="color:#94a3b8">– Mixed</span>'
+            trend = '<span style="color:var(--text-secondary)">– Mixed</span>'
         elif len(non_zero) == 1:
             trend_key = 'new'
             trend = '<span style="color:#3b82f6">✦ New</span>'
@@ -439,7 +440,7 @@ def generate_html(revenues, output_path):
                 trend = '<span style="color:#10b981">✓ Consistent</span>'
             else:
                 trend_key = 'mixed'
-                trend = '<span style="color:#94a3b8">– Mixed</span>'
+                trend = '<span style="color:var(--text-secondary)">– Mixed</span>'
 
         # ── INSIGHT NOTE ──────────────────────────────────────────────
         # Always produce a note: divergence cases get a strong flag,
@@ -508,9 +509,9 @@ def generate_html(revenues, output_path):
 
         # Append Excel comment if present (user context from the sheet)
         if excel_comment:
-            contrast += f' <span style="color:#64748b">[Sheet note: {excel_comment}]</span>'
+            contrast += f' <span style="color:var(--text-tertiary)">[Sheet note: {excel_comment}]</span>'
 
-        comment_cell = f'<td style="font-size:12px;color:#94a3b8;font-style:italic;max-width:280px">{contrast}</td>'
+        comment_cell = f'<td style="font-size:12px;color:var(--text-secondary);font-style:italic;max-width:280px">{contrast}</td>'
 
         # ── ROW BACKGROUND by status ──────────────────────────────────
         row_bg = {
@@ -533,7 +534,7 @@ def generate_html(revenues, output_path):
         for mi in range(num_months_with_data):
             val = monthly[mi]
             partial_tag = f' <span style="font-size:10px">(partial)</span>' if (mi == last_data_month and is_partial) else ''
-            style = ' style="color:#94a3b8"' if (mi == last_data_month and is_partial) else ''
+            style = ' style="color:var(--text-secondary)"' if (mi == last_data_month and is_partial) else ''
             month_cells += f'<td class="amount"{style}>{fmt_usd(val) if val else "–"}{partial_tag}</td>'
 
         movers_rows += f"""
@@ -624,21 +625,25 @@ def generate_html(revenues, output_path):
     for client_name, val in top_clients:
         pct = (val / total_pipeline * 100) if total_pipeline > 0 else 0
         bar_color = '#ef4444' if pct > 25 else '#f59e0b' if pct > 15 else '#3b82f6'
-        risk_label = '<span style="color:#ef4444;font-size:11px;font-weight:700">HIGH</span>' if pct > 25 else '<span style="color:#f59e0b;font-size:11px;font-weight:700">MEDIUM</span>' if pct > 15 else '<span style="color:#94a3b8;font-size:11px">LOW</span>'
+        risk_label = '<span style="color:#ef4444;font-size:11px;font-weight:700">HIGH</span>' if pct > 25 else '<span style="color:#f59e0b;font-size:11px;font-weight:700">MEDIUM</span>' if pct > 15 else '<span style="color:var(--text-secondary);font-size:11px">LOW</span>'
         conc_rows_html += f"""
     <div style="margin-bottom:14px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
-        <span style="font-size:13px;font-weight:500;color:#e2e8f0">{client_name}</span>
+        <span style="font-size:13px;font-weight:500;color:var(--text-primary)">{client_name}</span>
         <span style="display:flex;align-items:center;gap:10px">
           {risk_label}
-          <span style="font-size:13px;color:#94a3b8">{fmt_usd(val)}</span>
+          <span style="font-size:13px;color:var(--text-secondary)">{fmt_usd(val)}</span>
           <span style="font-size:13px;font-weight:700;color:{bar_color}">{pct:.1f}%</span>
         </span>
       </div>
-      <div style="background:#334155;border-radius:4px;height:8px;overflow:hidden">
+      <div style="background:var(--border-main);border-radius:4px;height:8px;overflow:hidden">
         <div style="width:{min(100,pct):.1f}%;height:100%;background:{bar_color};border-radius:4px"></div>
       </div>
     </div>"""
+
+    theme_css = get_base_css()
+    toggle_html = get_toggle_html()
+    theme_js = get_theme_js()
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -648,13 +653,14 @@ def generate_html(revenues, output_path):
 <title>Seamfix — Pipeline Intelligence Dashboard</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
+  {theme_css}
   :root {{
-    --bg:        #0f172a;
-    --surface:   #1e293b;
-    --surface2:  #263348;
-    --border:    #334155;
-    --text:      #e2e8f0;
-    --muted:     #94a3b8;
+    --bg:        var(--bg-body);
+    --surface:   var(--bg-card);
+    --surface2:  var(--bg-table-header);
+    --border:    var(--border-main);
+    --text:      var(--text-primary);
+    --muted:     var(--text-secondary);
     --green:     #10b981;
     --yellow:    #f59e0b;
     --red:       #ef4444;
@@ -665,7 +671,7 @@ def generate_html(revenues, output_path):
   body {{ background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 15px; line-height: 1.5; }}
 
   /* NAV */
-  .nav {{ background: #0a0f1e; border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; align-items: center; gap: 0; height: 48px; overflow-x: auto; position: sticky; top: 0; z-index: 200; }}
+  .nav {{ background: var(--bg-nav); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; align-items: center; gap: 0; height: 48px; overflow-x: auto; position: sticky; top: 0; z-index: 200; }}
   .nav-brand {{ color: var(--text); font-weight: 700; font-size: 15px; margin-right: 24px; white-space: nowrap; }}
   .nav-link {{ color: var(--muted); text-decoration: none; padding: 0 14px; height: 48px; display: flex; align-items: center; font-size: 13px; border-bottom: 2px solid transparent; white-space: nowrap; transition: color .2s; }}
   .nav-link:hover {{ color: var(--text); }}
@@ -716,17 +722,17 @@ def generate_html(revenues, output_path):
   .lz-insight strong {{ color: var(--yellow); }}
 
   /* STALLED ALERT */
-  .alert-box {{ background: #1c1007; border: 1px solid #78350f; border-radius: 12px; padding: 20px; }}
-  .alert-box-title {{ color: #fbbf24; font-weight: 700; font-size: 14px; margin-bottom: 4px; }}
-  .alert-box-sub {{ color: #94a3b8; font-size: 12px; margin-bottom: 16px; }}
+  .alert-box {{ background: var(--warning-bg); border: 1px solid var(--warning); border-radius: 12px; padding: 20px; }}
+  .alert-box-title {{ color: var(--warning-bright); font-weight: 700; font-size: 14px; margin-bottom: 4px; }}
+  .alert-box-sub {{ color: var(--text-secondary); font-size: 12px; margin-bottom: 16px; }}
 
   /* TABLES */
   .table-wrap {{ background: var(--surface); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; }}
   table {{ width: 100%; border-collapse: collapse; }}
-  thead th {{ background: var(--surface2); padding: 11px 14px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border-bottom: 1px solid var(--border); }}
-  tbody tr {{ border-bottom: 1px solid #1e293b; }}
+  thead th {{ background: var(--bg-table-header); padding: 11px 14px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border-bottom: 1px solid var(--border); }}
+  tbody tr {{ border-bottom: 1px solid var(--border-light); }}
   tbody tr:last-child {{ border-bottom: none; }}
-  tbody tr:hover {{ background: #263348; }}
+  tbody tr:hover {{ background: var(--bg-table-hover); }}
   tbody td {{ padding: 11px 14px; font-size: 13px; vertical-align: middle; }}
   td.amount {{ text-align: right; font-variant-numeric: tabular-nums; }}
 
@@ -755,7 +761,7 @@ def generate_html(revenues, output_path):
   .rec-list li::before {{ content: '→'; position: absolute; left: 0; color: var(--yellow); font-weight: 700; }}
 
   /* FOOTER */
-  .footer {{ padding: 20px 28px; color: #94a3b8; font-size: 12px; border-top: 1px solid var(--border); margin-top: 32px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; max-width: 1600px; margin-left: auto; margin-right: auto; }}
+  .footer {{ padding: 20px 28px; color: var(--text-secondary); font-size: 12px; border-top: 1px solid var(--border); margin-top: 32px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; max-width: 1600px; margin-left: auto; margin-right: auto; }}
 
   /* SUMMARY BAR */
   .summary-bar {{ background: var(--surface2); border-radius: 12px; padding: 16px 20px; display: flex; gap: 32px; flex-wrap: wrap; margin-bottom: 0; border: 1px solid var(--border); }}
@@ -774,13 +780,14 @@ def generate_html(revenues, output_path):
   <a href="budget_dashboard.html"  class="nav-link">Budget vs Actual</a>
   <a href="revenue_dashboard.html" class="nav-link">Revenue &amp; Fundability</a>
   <a href="pipeline_dashboard.html" class="nav-link active">Pipeline Intelligence</a>
+  {toggle_html}
 </nav>
 
 <!-- HEADER -->
 <div class="page-header">
   <div class="page-title">Pipeline Intelligence</div>
   <div class="page-sub">Deal-level momentum tracking, landing zone analysis, and action recommendations</div>
-  <div class="generated" style="margin-top:6px">Data as of: <strong style="color:#e2e8f0">{ytd_label}</strong> &nbsp;·&nbsp; Generated: {generated_at}</div>
+  <div class="generated" style="margin-top:6px">Data as of: <strong style="color:var(--text-primary)">{ytd_label}</strong> &nbsp;·&nbsp; Generated: {generated_at}</div>
 </div>
 
 <!-- QUICK SUMMARY BAR -->
@@ -983,8 +990,8 @@ def generate_html(revenues, output_path):
 <!-- UNKNOWN / UNTAGGED -->
 <div class="section">
   <div class="section-title">❓ Untagged Deals — {unknown_count} deals / {fmt_usd(unknown_val)}</div>
-  <div class="alert-box" style="margin-bottom:16px;border-color:#4b2900;background:#1a1000">
-    <div class="alert-box-title" style="color:#f59e0b">Status Missing</div>
+  <div class="alert-box" style="margin-bottom:16px;border-color:var(--warning);background:var(--warning-bg)">
+    <div class="alert-box-title" style="color:var(--warning-bright)">Status Missing</div>
     <div class="alert-box-sub">These deals have no status assigned in the revenue file. Some have YTD actuals already flowing. The revenue team should tag each with On Track / At Risk / Off Track / Closed to ensure they are correctly counted in projections.</div>
   </div>
   <div class="table-wrap">
@@ -1048,6 +1055,14 @@ new Chart(momCtx, {{
     }}
   }}
 }});
+
+{theme_js}
+
+// Apply theme colors to charts after they are created
+(function() {{
+  var saved = localStorage.getItem('seamfix-theme') || 'light';
+  updateCharts(saved);
+}})();
 </script>
 </body>
 </html>"""

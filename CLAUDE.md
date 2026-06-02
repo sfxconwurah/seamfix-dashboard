@@ -8,6 +8,14 @@
 
 **These rules apply to every Claude instance, every session, every change — no exceptions.**
 
+### 0. Pull Latest Before Starting ANY Work
+
+Before making any changes, ALWAYS run:
+```bash
+git pull origin main
+```
+Multiple people (and their Claude instances) may be working on this project. If you skip this step, you risk overwriting someone else's work or creating merge conflicts. **This is the very first thing you do in every session, before reading files or making edits.**
+
 ### 1. Document Every Change
 
 After making ANY code change, you MUST:

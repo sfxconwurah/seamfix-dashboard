@@ -5,6 +5,24 @@
 
 ---
 
+## 2026-06-02 — Feature: Light/dark theme toggle across all 6 dashboards
+
+Added a shared theme system (`theme.py`) with CSS custom properties for light and dark modes. **Light mode is now the default** — the dashboards were previously dark-only. Users can toggle between light and dark mode via a button in the top navigation bar. Preference is saved to localStorage and persists across sessions. Chart.js charts also update their grid/text colors on toggle.
+
+**Files**: `theme.py` (new), `generate_revenue_dashboard.py`, `generate_pipeline_dashboard.py`, `generate_dashboard.py`, `generate_expense_dashboard.py`, `generate_budget_dashboard.py`, `generate_collections_dashboard.py`  
+**Author**: Chibuzor + Claude
+
+---
+
+## 2026-06-02 — Docs: Add "pull latest first" rule to CLAUDE.md
+
+Added Rule #0 requiring every Claude instance to run `git pull origin main` before starting any work, to prevent overwriting changes from other contributors.
+
+**Files**: `CLAUDE.md`  
+**Author**: Chibuzor + Claude
+
+---
+
 ## 2026-06-02 — Feature: Collections Intelligence dashboard (6th tab)
 
 Added a new **Collections Tracker** dashboard tab so the executive team can track critical revenue inflows in one place, see what moved week-over-week, and act on stalled or at-risk collections.

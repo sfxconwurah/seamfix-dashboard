@@ -9,6 +9,7 @@ Usage: python3 generate_dashboard.py [folder_path]
 import os, sys, json, re
 from datetime import datetime
 from openpyxl import load_workbook
+from theme import get_base_css, get_toggle_html, get_theme_js
 
 
 # --- Investment detection (keyword-based, not exact match) ---
@@ -852,24 +853,24 @@ def generate_html(reports, anomalies, insights, takeaways, output_path, data_war
     for tw in takeaways:
         urg = tw['urgency']
         if urg == 'urgent':
-            border_color = '#FF6B6B'
-            badge_bg = 'rgba(255,107,107,0.15)'
-            badge_color = '#FF6B6B'
+            border_color = 'var(--danger)'
+            badge_bg = 'var(--danger-bg)'
+            badge_color = 'var(--danger)'
             badge_text = 'NEEDS ACTION'
         elif urg == 'caution':
-            border_color = '#FFE66D'
-            badge_bg = 'rgba(255,230,109,0.15)'
-            badge_color = '#FFE66D'
+            border_color = 'var(--warning)'
+            badge_bg = 'var(--warning-bg)'
+            badge_color = 'var(--warning)'
             badge_text = 'MONITOR'
         elif urg == 'positive':
-            border_color = '#00D4AA'
-            badge_bg = 'rgba(0,212,170,0.15)'
-            badge_color = '#00D4AA'
+            border_color = 'var(--accent)'
+            badge_bg = 'var(--accent-bg)'
+            badge_color = 'var(--accent)'
             badge_text = 'HEALTHY'
         else:
-            border_color = '#64748b'
+            border_color = 'var(--text-tertiary)'
             badge_bg = 'rgba(100,116,139,0.15)'
-            badge_color = '#94a3b8'
+            badge_color = 'var(--text-secondary)'
             badge_text = 'INFO'
 
         takeaway_cards += f'''<div class="takeaway-card" style="border-left-color:{border_color}">
@@ -883,7 +884,7 @@ def generate_html(reports, anomalies, insights, takeaways, output_path, data_war
     if anomalies:
         items = ""
         for a in anomalies:
-            sev_color = '#FF6B6B' if a['severity'] == 'high' else '#FFE66D' if a['severity'] == 'medium' else '#4ECDC4'
+            sev_color = 'var(--danger)' if a['severity'] == 'high' else 'var(--warning)' if a['severity'] == 'medium' else 'var(--accent-secondary)'
             items += f'<div class="anomaly-item" style="border-left-color:{sev_color}"><div class="anomaly-week">{a["week"]}</div><div class="anomaly-type" style="color:{sev_color}">{a["type"]}</div><div class="anomaly-detail">{a["detail"]}</div></div>'
         anomaly_html = f'<div class="section anomaly-section"><h2>Anomaly Alerts</h2><div class="anomaly-grid">{items}</div></div>'
 
@@ -908,7 +909,7 @@ def generate_html(reports, anomalies, insights, takeaways, output_path, data_war
         if items:
             sorted_items = sorted(items.items(), key=lambda x: -x[1])
             detail = ', '.join([f"{k}: {fmt_naira(v)}" for k, v in sorted_items[:5]])
-            inflow_detail_rows += f'<tr><td>{r["date_str"]}</td><td>{fmt_naira(r.get("total_inflow", 0))}</td><td style="font-size:0.85em">{detail}</td></tr>'
+            inflow_detail_rows += f'<tr><td>{r["date_str"]}</td><td>{fmt_naira(r.get("total_inflow", 0))}</td><td style="font-size:0.85em;color:var(--text-secondary)">{detail}</td></tr>'
 
     # Per-week outflow breakdown table
     outflow_detail_rows = ""
@@ -917,11 +918,15 @@ def generate_html(reports, anomalies, insights, takeaways, output_path, data_war
         if items:
             sorted_items = sorted(items.items(), key=lambda x: -x[1])
             detail = ', '.join([f"{k}: {fmt_naira(v)}" for k, v in sorted_items[:5]])
-            outflow_detail_rows += f'<tr><td>{r["date_str"]}</td><td>{fmt_naira(r.get("total_outflow", 0))}</td><td style="font-size:0.85em">{detail}</td></tr>'
+            outflow_detail_rows += f'<tr><td>{r["date_str"]}</td><td>{fmt_naira(r.get("total_outflow", 0))}</td><td style="font-size:0.85em;color:var(--text-secondary)">{detail}</td></tr>'
 
     generated_at = datetime.now().strftime('%d %b %Y %H:%M')
     latest_report_date = reports[-1]['date_str']
     first_report_date  = reports[0]['date_str']
+
+    theme_css = get_base_css()
+    toggle_html = get_toggle_html()
+    theme_js = get_theme_js()
 
     # ── Build data-quality warning banner ───────────────────────────────
     data_warnings_html = ""
@@ -957,75 +962,76 @@ def generate_html(reports, anomalies, insights, takeaways, output_path, data_war
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
+{theme_css}
 *{{margin:0;padding:0;box-sizing:border-box}}
-body{{font-family:'Inter',sans-serif;background:linear-gradient(135deg,#0f172a,#1e293b);color:#e2e8f0;padding:0;min-height:100vh}}
+body{{font-family:'Inter',sans-serif;background:var(--bg-body);color:var(--text-primary);padding:0;min-height:100vh;transition:background 0.3s,color 0.3s}}
 .container{{max-width:1600px;margin:0 auto;padding:0 28px 28px}}
-.header{{margin-bottom:32px;padding-bottom:20px;border-bottom:2px solid rgba(0,212,170,0.2)}}
-.header h1{{font-size:2.4em;font-weight:700;background:linear-gradient(135deg,#00D4AA,#4ECDC4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}}
-.header .sub{{color:#94a3b8;font-size:0.95em}}
-.header .meta{{color:#64748b;font-size:0.8em;margin-top:6px}}
+.header{{margin-bottom:32px;padding-bottom:20px;border-bottom:2px solid var(--border-accent)}}
+.header h1{{font-size:2.4em;font-weight:700;color:var(--text-primary);margin-bottom:4px}}
+.header .sub{{color:var(--text-secondary);font-size:0.95em}}
+.header .meta{{color:var(--text-tertiary);font-size:0.8em;margin-top:6px}}
 .kpi-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-bottom:36px}}
-.kpi-card{{background:linear-gradient(135deg,rgba(30,41,59,0.9),rgba(15,23,42,0.9));border:1px solid rgba(0,212,170,0.15);border-radius:12px;padding:22px;transition:all 0.3s ease}}
-.kpi-card:hover{{border-color:rgba(0,212,170,0.4);transform:translateY(-3px);box-shadow:0 8px 30px rgba(0,212,170,0.1)}}
-.kpi-label{{font-size:0.78em;color:#94a3b8;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px;font-weight:600}}
-.kpi-value{{font-size:1.6em;font-weight:700;color:#00D4AA;margin-bottom:6px}}
-.kpi-value.negative{{color:#FF6B6B}}
+.kpi-card{{background:var(--bg-card);border:1px solid var(--border-accent);border-radius:12px;padding:22px;transition:all 0.3s ease}}
+.kpi-card:hover{{border-color:rgba(0,212,170,0.4);transform:translateY(-3px);box-shadow:var(--shadow-hover)}}
+.kpi-label{{font-size:0.78em;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px;font-weight:600}}
+.kpi-value{{font-size:1.6em;font-weight:700;color:var(--accent);margin-bottom:6px}}
+.kpi-value.negative{{color:var(--danger)}}
 .kpi-change{{font-size:0.82em;display:flex;align-items:center;gap:4px}}
-.kpi-change.positive{{color:#00D4AA}}
-.kpi-change.negative{{color:#FF6B6B}}
-.kpi-change.neutral{{color:#64748b}}
+.kpi-change.positive{{color:var(--accent)}}
+.kpi-change.negative{{color:var(--danger)}}
+.kpi-change.neutral{{color:var(--text-tertiary)}}
 .charts-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(480px,1fr));gap:20px;margin-bottom:36px}}
-.chart-box{{background:linear-gradient(135deg,rgba(30,41,59,0.9),rgba(15,23,42,0.9));border:1px solid rgba(0,212,170,0.15);border-radius:12px;padding:22px;min-height:380px}}
-.chart-box h3{{font-size:1em;font-weight:600;margin-bottom:16px;color:#cbd5e1}}
-.section{{background:linear-gradient(135deg,rgba(30,41,59,0.9),rgba(15,23,42,0.9));border:1px solid rgba(0,212,170,0.15);border-radius:12px;padding:24px;margin-bottom:24px}}
-.section h2{{font-size:1.3em;margin-bottom:16px;color:#00D4AA}}
-.anomaly-section{{border-color:rgba(255,107,107,0.2)}}
-.anomaly-section h2{{color:#FF6B6B}}
+.chart-box{{background:var(--bg-card);border:1px solid var(--border-accent);border-radius:12px;padding:22px;min-height:380px}}
+.chart-box h3{{font-size:1em;font-weight:600;margin-bottom:16px;color:var(--text-heading)}}
+.section{{background:var(--bg-card);border:1px solid var(--border-accent);border-radius:12px;padding:24px;margin-bottom:24px}}
+.section h2{{font-size:1.3em;margin-bottom:16px;color:var(--accent)}}
+.anomaly-section{{border-color:var(--danger-bg)}}
+.anomaly-section h2{{color:var(--danger)}}
 .anomaly-grid{{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}}
-.anomaly-item{{background:rgba(255,107,107,0.04);border-left:3px solid #FF6B6B;padding:14px;border-radius:0 6px 6px 0}}
-.anomaly-week{{font-weight:600;color:#FFE66D;font-size:0.85em;margin-bottom:3px}}
+.anomaly-item{{background:var(--danger-bg);border-left:3px solid var(--danger);padding:14px;border-radius:0 6px 6px 0}}
+.anomaly-week{{font-weight:600;color:var(--warning);font-size:0.85em;margin-bottom:3px}}
 .anomaly-type{{font-weight:600;font-size:0.95em}}
-.anomaly-detail{{color:#94a3b8;font-size:0.85em;margin-top:4px}}
-.insight-item{{padding:10px 0;border-bottom:1px solid rgba(0,212,170,0.08);color:#cbd5e1;line-height:1.7;font-size:0.92em}}
+.anomaly-detail{{color:var(--text-secondary);font-size:0.85em;margin-top:4px}}
+.insight-item{{padding:10px 0;border-bottom:1px solid var(--border-light);color:var(--text-heading);line-height:1.7;font-size:0.92em}}
 .insight-item:last-child{{border-bottom:none}}
 table{{width:100%;border-collapse:collapse;font-size:0.85em}}
-thead{{background:rgba(0,212,170,0.08)}}
-th{{padding:10px 12px;text-align:left;font-weight:600;color:#00D4AA;border-bottom:2px solid rgba(0,212,170,0.15)}}
-td{{padding:10px 12px;border-bottom:1px solid rgba(0,212,170,0.06);color:#cbd5e1}}
-tbody tr:hover{{background:rgba(0,212,170,0.04)}}
+thead{{background:var(--bg-table-header)}}
+th{{padding:10px 12px;text-align:left;font-weight:600;color:var(--accent);border-bottom:2px solid var(--border-accent)}}
+td{{padding:10px 12px;border-bottom:1px solid var(--border-light);color:var(--text-heading)}}
+tbody tr:hover{{background:var(--bg-table-hover)}}
 .positive{{color:#00D4AA}}
 .negative{{color:#FF6B6B}}
 th.sortable{{cursor:pointer;user-select:none}}
-th.sortable:hover{{color:#FFE66D}}
+th.sortable:hover{{color:var(--warning)}}
 th.sort-asc::after{{content:' ▲';font-size:0.7em}}
 th.sort-desc::after{{content:' ▼';font-size:0.7em}}
 .tabs{{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}}
-.tab-btn{{padding:8px 18px;border:1px solid rgba(0,212,170,0.2);border-radius:20px;background:transparent;color:#94a3b8;cursor:pointer;font-size:0.85em;font-family:inherit;transition:all 0.2s}}
-.tab-btn.active,.tab-btn:hover{{background:rgba(0,212,170,0.15);color:#00D4AA;border-color:rgba(0,212,170,0.4)}}
+.tab-btn{{padding:8px 18px;border:1px solid var(--border-accent);border-radius:20px;background:transparent;color:var(--text-secondary);cursor:pointer;font-size:0.85em;font-family:inherit;transition:all 0.2s}}
+.tab-btn.active,.tab-btn:hover{{background:var(--accent-bg);color:var(--accent);border-color:rgba(0,212,170,0.4)}}
 .tab-content{{display:none}}
 .tab-content.active{{display:block}}
 .takeaways-section{{margin-bottom:36px}}
-.takeaways-section h2{{font-size:1.4em;margin-bottom:16px;color:#FFE66D;display:flex;align-items:center;gap:10px}}
+.takeaways-section h2{{font-size:1.4em;margin-bottom:16px;color:var(--warning);display:flex;align-items:center;gap:10px}}
 .takeaways-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(440px,1fr));gap:16px}}
-.takeaway-card{{background:linear-gradient(135deg,rgba(30,41,59,0.95),rgba(15,23,42,0.95));border:1px solid rgba(0,212,170,0.1);border-left:4px solid #64748b;border-radius:10px;padding:20px;transition:all 0.3s ease}}
-.takeaway-card:hover{{transform:translateY(-2px);box-shadow:0 6px 24px rgba(0,0,0,0.2)}}
+.takeaway-card{{background:var(--bg-card);border:1px solid var(--border-accent);border-left:4px solid var(--text-tertiary);border-radius:10px;padding:20px;transition:all 0.3s ease}}
+.takeaway-card:hover{{transform:translateY(-2px);box-shadow:var(--shadow-hover)}}
 .tw-header{{display:flex;align-items:center;gap:8px;margin-bottom:10px}}
 .tw-icon{{font-size:1.2em}}
-.tw-title{{font-size:0.82em;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8}}
+.tw-title{{font-size:0.82em;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-secondary)}}
 .tw-badge{{font-size:0.7em;font-weight:700;padding:3px 10px;border-radius:12px;letter-spacing:0.5px}}
 .tw-headline{{font-size:1.05em;font-weight:600;margin-bottom:8px;line-height:1.4}}
-.tw-body{{font-size:0.88em;color:#94a3b8;line-height:1.65}}
+.tw-body{{font-size:0.88em;color:var(--text-secondary);line-height:1.65}}
 .tw-body ul{{margin:6px 0 0 16px}}
 .tw-body li{{margin-bottom:4px}}
 .nav-bar{{display:none!important}}
 
 @media(max-width:1024px){{.charts-grid{{grid-template-columns:1fr}}.kpi-grid{{grid-template-columns:repeat(2,1fr)}}.takeaways-grid{{grid-template-columns:1fr}}.anomaly-grid{{grid-template-columns:repeat(2,1fr)}}}}
 @media(max-width:640px){{.kpi-grid{{grid-template-columns:1fr}}.header h1{{font-size:1.6em}}.anomaly-grid{{grid-template-columns:1fr}}.nav-bar{{flex-wrap:wrap}}}}
-.top-nav{{background:#0a0f1e;border-bottom:1px solid #334155;padding:0 24px;display:flex;align-items:center;height:48px;overflow-x:auto;position:sticky;top:0;z-index:200}}
-.top-nav-brand{{color:#e2e8f0;font-weight:700;font-size:15px;margin-right:24px;white-space:nowrap;text-decoration:none}}
-.top-nav-link{{color:#94a3b8;text-decoration:none;padding:0 14px;height:48px;display:flex;align-items:center;font-size:13px;border-bottom:2px solid transparent;white-space:nowrap;transition:color .2s}}
-.top-nav-link:hover{{color:#e2e8f0}}
-.top-nav-link.active{{color:#fff;border-bottom-color:#00D4AA;font-weight:500}}
+.top-nav{{background:var(--bg-nav);border-bottom:1px solid var(--border-main);padding:0 24px;display:flex;align-items:center;height:48px;overflow-x:auto;position:sticky;top:0;z-index:200}}
+.top-nav-brand{{color:var(--text-primary);font-weight:700;font-size:15px;margin-right:24px;white-space:nowrap;text-decoration:none}}
+.top-nav-link{{color:var(--text-secondary);text-decoration:none;padding:0 14px;height:48px;display:flex;align-items:center;font-size:13px;border-bottom:2px solid transparent;white-space:nowrap;transition:color .2s}}
+.top-nav-link:hover{{color:var(--text-primary)}}
+.top-nav-link.active{{color:var(--text-primary);border-bottom-color:var(--accent);font-weight:500}}
 .pdf-btn{{display:none!important}}
 @media print{{
 .pdf-btn{{display:none!important}}
@@ -1074,19 +1080,20 @@ td{{color:#334155!important;border-bottom-color:#e2e8f0!important}}
 .tabs{{display:none!important}}
 .tab-content{{display:block!important}}
 tbody tr:hover{{background:transparent!important}}
+#themeToggle{{display:none!important}}
 }}
-.dashboard-footer{{margin-top:48px;padding:20px 28px;border-top:1px solid #334155;color:#94a3b8;font-size:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}}
-.dashboard-footer span{{color:#94a3b8}}
+.dashboard-footer{{margin-top:48px;padding:20px 28px;border-top:1px solid var(--border-main);color:var(--text-secondary);font-size:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}}
+.dashboard-footer span{{color:var(--text-secondary)}}
 /* ── HEADER: match Pipeline Intelligence style ── */
-.header{{padding:24px 28px 16px!important;border-bottom:1px solid #334155!important;margin-bottom:24px!important;background:none!important}}
-.header h1{{font-size:22px!important;font-weight:700!important;background:none!important;-webkit-background-clip:unset!important;-webkit-text-fill-color:#e2e8f0!important;color:#e2e8f0!important;margin-bottom:4px!important}}
-.header .sub{{font-size:13px!important;color:#94a3b8!important}}
-.header .meta{{font-size:12px!important;color:#94a3b8!important;margin-top:4px!important}}
-.header p{{font-size:13px!important;color:#94a3b8!important;margin-top:4px!important}}
+.header{{padding:24px 28px 16px!important;border-bottom:1px solid var(--border-main)!important;margin-bottom:24px!important;background:none!important}}
+.header h1{{font-size:22px!important;font-weight:700!important;background:none!important;-webkit-background-clip:unset!important;-webkit-text-fill-color:var(--text-primary)!important;color:var(--text-primary)!important;margin-bottom:4px!important}}
+.header .sub{{font-size:13px!important;color:var(--text-secondary)!important}}
+.header .meta{{font-size:12px!important;color:var(--text-secondary)!important;margin-top:4px!important}}
+.header p{{font-size:13px!important;color:var(--text-secondary)!important;margin-top:4px!important}}
 </style>
 </head>
 <body>
-<nav class="top-nav"><span class="top-nav-brand">⚡ Seamfix</span><a href="dashboard.html" class="top-nav-link active">Cash Overview</a><a href="expense_dashboard.html" class="top-nav-link ">Expense &amp; Vendor</a><a href="budget_dashboard.html" class="top-nav-link ">Budget vs Actual</a><a href="revenue_dashboard.html" class="top-nav-link ">Revenue &amp; Fundability</a><a href="pipeline_dashboard.html" class="top-nav-link ">Pipeline Intelligence</a></nav>
+<nav class="top-nav"><span class="top-nav-brand">⚡ Seamfix</span><a href="dashboard.html" class="top-nav-link active">Cash Overview</a><a href="expense_dashboard.html" class="top-nav-link ">Expense &amp; Vendor</a><a href="budget_dashboard.html" class="top-nav-link ">Budget vs Actual</a><a href="revenue_dashboard.html" class="top-nav-link ">Revenue &amp; Fundability</a><a href="pipeline_dashboard.html" class="top-nav-link ">Pipeline Intelligence</a>{toggle_html}</nav>
 <!-- PDF button hidden per user request -->
 <div class="container">
 <div class="header">
@@ -1133,7 +1140,7 @@ tbody tr:hover{{background:transparent!important}}
 <div class="kpi-label">4-Week Cash Forecast</div>
 <div class="kpi-value {'negative' if forecast_4w_net < 0 else ''}">{fmt_naira(forecast_4w_net)}</div>
 <div class="kpi-change {'negative' if forecast_4w_net_chg_pct < -10 else 'positive' if forecast_4w_net_chg_pct > 5 else 'neutral'}">{'+' if forecast_4w_net_chg_pct >= 0 else ''}{forecast_4w_net_chg_pct:.1f}% — expected, based on avg weekly inflows &amp; burn</div>
-<div style="margin-top:6px;font-size:0.78em;color:#94a3b8">Floor if revenue stops: {fmt_naira(forecast_4w_floor)} ({forecast_4w_floor_chg_pct:.1f}%)</div>
+<div style="margin-top:6px;font-size:0.78em;color:var(--text-secondary)">Floor if revenue stops: {fmt_naira(forecast_4w_floor)} ({forecast_4w_floor_chg_pct:.1f}%)</div>
 </div>
 </div>
 
@@ -1286,6 +1293,7 @@ new Chart(document.getElementById('fxChart'),{{
     data:{{labels:dates,datasets:[{{label:'USD/NGN',data:{json.dumps(fx_rates)},borderColor:C.s,backgroundColor:'rgba(78,205,196,0.08)',borderWidth:2.5,fill:true,tension:0.3,pointRadius:4}}]}},
     options:{{...baseOpts,scales:{{...baseOpts.scales,y:{{...baseOpts.scales.y,ticks:{{color:'#64748b',callback:function(v){{return'\\u20A6'+v.toLocaleString()}}}}}}}}}}
 }});
+{theme_js}
 </script>
 <div class="dashboard-footer">
 <span>Seamfix Financial Intelligence &nbsp;·&nbsp; Powered by Claude Cowork</span>

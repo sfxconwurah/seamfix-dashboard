@@ -9,6 +9,7 @@ Usage: python3 generate_revenue_dashboard.py [folder_path]
 import os, sys, json, re, glob
 from datetime import datetime
 from openpyxl import load_workbook
+from theme import get_base_css, get_toggle_html, get_theme_js
 
 
 # Currency constants
@@ -407,7 +408,7 @@ def generate_html(revenues, budget_ngn, revenue_file_path, budget_file_path, out
         elif deficit_val > 0:
             ds_display = f'<span class="negative">-{fmt_usd(deficit_val)}</span>'
         else:
-            ds_display = '<span style="color:#64748b">—</span>'
+            ds_display = '<span style="color:var(--text-tertiary)">—</span>'
 
         revenue_rows += f"""<tr>
 <td>{r['name']}</td>
@@ -560,6 +561,11 @@ def generate_html(revenues, budget_ngn, revenue_file_path, budget_file_path, out
     # Generate at timestamp
     generated_at = datetime.now().strftime('%d %b %Y %H:%M')
 
+    # Theme system
+    theme_css = get_base_css()
+    theme_toggle = get_toggle_html()
+    theme_js = get_theme_js()
+
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -569,83 +575,84 @@ def generate_html(revenues, budget_ngn, revenue_file_path, budget_file_path, out
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
+{theme_css}
 *{{margin:0;padding:0;box-sizing:border-box}}
-body{{font-family:'Inter',sans-serif;background:linear-gradient(135deg,#0f172a,#1e293b);color:#e2e8f0;padding:0;min-height:100vh}}
+body{{font-family:'Inter',sans-serif;background:var(--bg-body);color:var(--text-primary);padding:0;min-height:100vh}}
 .container{{max-width:1600px;margin:0 auto;padding:0 28px 28px}}
-.header{{margin-bottom:32px;padding-bottom:20px;border-bottom:2px solid rgba(0,212,170,0.2)}}
-.header h1{{font-size:2.4em;font-weight:700;background:linear-gradient(135deg,#00D4AA,#4ECDC4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}}
-.header .sub{{color:#94a3b8;font-size:0.95em}}
-.header .meta{{color:#64748b;font-size:0.8em;margin-top:6px}}
+.header{{margin-bottom:32px;padding-bottom:20px;border-bottom:2px solid var(--border-accent)}}
+.header h1{{font-size:2.4em;font-weight:700;background:linear-gradient(135deg,var(--accent),var(--accent-secondary));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}}
+.header .sub{{color:var(--text-secondary);font-size:0.95em}}
+.header .meta{{color:var(--text-tertiary);font-size:0.8em;margin-top:6px}}
 
 .nav-bar{{display:none!important}}
 
 .kpi-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:36px}}
-.kpi-card{{background:linear-gradient(135deg,rgba(30,41,59,0.9),rgba(15,23,42,0.9));border:1px solid rgba(0,212,170,0.15);border-radius:12px;padding:22px;transition:all 0.3s ease}}
-.kpi-card:hover{{border-color:rgba(0,212,170,0.4);transform:translateY(-3px);box-shadow:0 8px 30px rgba(0,212,170,0.1)}}
-.kpi-label{{font-size:0.78em;color:#94a3b8;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px;font-weight:600}}
-.kpi-value{{font-size:1.4em;font-weight:700;color:#00D4AA;margin-bottom:6px}}
+.kpi-card{{background:var(--bg-card);border:1px solid var(--border-accent);border-radius:12px;padding:22px;transition:all 0.3s ease}}
+.kpi-card:hover{{border-color:var(--border-accent);transform:translateY(-3px);box-shadow:var(--shadow-hover)}}
+.kpi-label{{font-size:0.78em;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px;font-weight:600}}
+.kpi-value{{font-size:1.4em;font-weight:700;color:var(--accent);margin-bottom:6px}}
 .kpi-value.negative{{color:#FF6B6B}}
-.kpi-secondary{{font-size:0.85em;color:#64748b;margin-bottom:4px}}
-.kpi-change{{font-size:0.82em;color:#94a3b8}}
+.kpi-secondary{{font-size:0.85em;color:var(--text-tertiary);margin-bottom:4px}}
+.kpi-change{{font-size:0.82em;color:var(--text-secondary)}}
 
 .charts-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(480px,1fr));gap:20px;margin-bottom:36px}}
-.chart-box{{background:linear-gradient(135deg,rgba(30,41,59,0.9),rgba(15,23,42,0.9));border:1px solid rgba(0,212,170,0.15);border-radius:12px;padding:22px;min-height:380px}}
-.chart-box h3{{font-size:1em;font-weight:600;margin-bottom:16px;color:#cbd5e1}}
+.chart-box{{background:var(--bg-card);border:1px solid var(--border-accent);border-radius:12px;padding:22px;min-height:380px}}
+.chart-box h3{{font-size:1em;font-weight:600;margin-bottom:16px;color:var(--text-heading)}}
 
-.section{{background:linear-gradient(135deg,rgba(30,41,59,0.9),rgba(15,23,42,0.9));border:1px solid rgba(0,212,170,0.15);border-radius:12px;padding:24px;margin-bottom:24px}}
-.section h2{{font-size:1.3em;margin-bottom:16px;color:#00D4AA}}
+.section{{background:var(--bg-card);border:1px solid var(--border-accent);border-radius:12px;padding:24px;margin-bottom:24px}}
+.section h2{{font-size:1.3em;margin-bottom:16px;color:var(--accent)}}
 
 .fundability-section{{border-color:rgba(78,205,196,0.2)}}
-.fundability-section h2{{color:#4ECDC4}}
+.fundability-section h2{{color:var(--accent-secondary)}}
 
 
 
-.scenario-label{{font-size:0.8em;color:#94a3b8;text-transform:uppercase;margin-bottom:10px;font-weight:600}}
-.scenario-value{{font-size:1.2em;font-weight:700;color:#00D4AA;margin-bottom:4px}}
-.scenario-secondary{{font-size:0.75em;color:#64748b;margin-bottom:6px}}
-.scenario-coverage{{font-size:0.9em;color:#4ECDC4;margin-bottom:4px}}
-.scenario-gap{{font-size:0.85em;color:#FFE66D}}
+.scenario-label{{font-size:0.8em;color:var(--text-secondary);text-transform:uppercase;margin-bottom:10px;font-weight:600}}
+.scenario-value{{font-size:1.2em;font-weight:700;color:var(--accent);margin-bottom:4px}}
+.scenario-secondary{{font-size:0.75em;color:var(--text-tertiary);margin-bottom:6px}}
+.scenario-coverage{{font-size:0.9em;color:var(--accent-secondary);margin-bottom:4px}}
+.scenario-gap{{font-size:0.85em;color:var(--warning)}}
 
-.gauge{{width:100%;height:24px;background:rgba(0,0,0,0.3);border-radius:12px;overflow:hidden;margin-top:8px}}
-.gauge-fill{{height:100%;background:linear-gradient(90deg,#FF6B6B,#FFE66D,#00D4AA);border-radius:12px;transition:width 0.3s}}
+.gauge{{width:100%;height:24px;background:var(--bg-gauge);border-radius:12px;overflow:hidden;margin-top:8px}}
+.gauge-fill{{height:100%;background:linear-gradient(90deg,var(--danger),var(--warning),var(--accent));border-radius:12px;transition:width 0.3s}}
 
-.action-card{{background:rgba(255,107,107,0.05);border-left:4px solid #FF6B6B;border-radius:8px;padding:16px;margin-bottom:12px}}
+.action-card{{background:var(--danger-bg);border-left:4px solid var(--danger);border-radius:8px;padding:16px;margin-bottom:12px}}
 .action-header{{display:flex;align-items:center;gap:8px;margin-bottom:8px}}
 .action-icon{{font-size:1.2em}}
-.action-title{{font-size:0.9em;font-weight:700;color:#cbd5e1;text-transform:uppercase;letter-spacing:0.5px}}
+.action-title{{font-size:0.9em;font-weight:700;color:var(--text-heading);text-transform:uppercase;letter-spacing:0.5px}}
 .action-badge{{font-size:0.7em;font-weight:700;padding:3px 10px;border-radius:12px;letter-spacing:0.5px}}
-.action-description{{font-size:0.85em;color:#94a3b8;line-height:1.6}}
+.action-description{{font-size:0.85em;color:var(--text-secondary);line-height:1.6}}
 
 .takeaways-section{{margin-bottom:36px}}
-.takeaways-section h2{{font-size:1.4em;margin-bottom:16px;color:#FFE66D;display:flex;align-items:center;gap:10px}}
+.takeaways-section h2{{font-size:1.4em;margin-bottom:16px;color:var(--warning);display:flex;align-items:center;gap:10px}}
 .takeaways-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(440px,1fr));gap:16px}}
-.takeaway-card{{background:linear-gradient(135deg,rgba(30,41,59,0.95),rgba(15,23,42,0.95));border:1px solid rgba(0,212,170,0.1);border-left:4px solid #64748b;border-radius:10px;padding:20px;transition:all 0.3s ease}}
-.takeaway-card:hover{{transform:translateY(-2px);box-shadow:0 6px 24px rgba(0,0,0,0.2)}}
+.takeaway-card{{background:var(--bg-card);border:1px solid var(--border-light);border-left:4px solid var(--text-tertiary);border-radius:10px;padding:20px;transition:all 0.3s ease}}
+.takeaway-card:hover{{transform:translateY(-2px);box-shadow:var(--shadow-hover)}}
 .tw-header{{display:flex;align-items:center;gap:8px;margin-bottom:10px}}
 .tw-icon{{font-size:1.2em}}
-.tw-title{{font-size:0.82em;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8}}
+.tw-title{{font-size:0.82em;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-secondary)}}
 .tw-badge{{font-size:0.7em;font-weight:700;padding:3px 10px;border-radius:12px;letter-spacing:0.5px}}
 .tw-headline{{font-size:1.05em;font-weight:600;margin-bottom:8px;line-height:1.4}}
-.tw-body{{font-size:0.88em;color:#94a3b8;line-height:1.65}}
+.tw-body{{font-size:0.88em;color:var(--text-secondary);line-height:1.65}}
 
 table{{width:100%;border-collapse:collapse;font-size:0.85em}}
-thead{{background:rgba(0,212,170,0.08)}}
-th{{padding:10px 12px;text-align:left;font-weight:600;color:#00D4AA;border-bottom:2px solid rgba(0,212,170,0.15)}}
-td{{padding:10px 12px;border-bottom:1px solid rgba(0,212,170,0.06);color:#cbd5e1}}
-tbody tr:hover{{background:rgba(0,212,170,0.04)}}
+thead{{background:var(--bg-table-header)}}
+th{{padding:10px 12px;text-align:left;font-weight:600;color:var(--accent);border-bottom:2px solid var(--border-accent)}}
+td{{padding:10px 12px;border-bottom:1px solid var(--border-light);color:var(--text-heading)}}
+tbody tr:hover{{background:var(--bg-table-hover)}}
 .positive{{color:#00D4AA}}
 .negative{{color:#FF6B6B}}
 
 th.sortable{{cursor:pointer;user-select:none}}
-th.sortable:hover{{color:#FFE66D}}
+th.sortable:hover{{color:var(--warning)}}
 th.sort-asc::after{{content:' ▲';font-size:0.7em}}
 th.sort-desc::after{{content:' ▼';font-size:0.7em}}
 
-.top-nav{{background:#0a0f1e;border-bottom:1px solid #334155;padding:0 24px;display:flex;align-items:center;height:48px;overflow-x:auto;position:sticky;top:0;z-index:200}}
-.top-nav-brand{{color:#e2e8f0;font-weight:700;font-size:15px;margin-right:24px;white-space:nowrap;text-decoration:none}}
-.top-nav-link{{color:#94a3b8;text-decoration:none;padding:0 14px;height:48px;display:flex;align-items:center;font-size:13px;border-bottom:2px solid transparent;white-space:nowrap;transition:color .2s}}
-.top-nav-link:hover{{color:#e2e8f0}}
-.top-nav-link.active{{color:#fff;border-bottom-color:#00D4AA;font-weight:500}}
+.top-nav{{background:var(--bg-nav);border-bottom:1px solid var(--border-main);padding:0 24px;display:flex;align-items:center;height:48px;overflow-x:auto;position:sticky;top:0;z-index:200}}
+.top-nav-brand{{color:var(--text-primary);font-weight:700;font-size:15px;margin-right:24px;white-space:nowrap;text-decoration:none}}
+.top-nav-link{{color:var(--text-secondary);text-decoration:none;padding:0 14px;height:48px;display:flex;align-items:center;font-size:13px;border-bottom:2px solid transparent;white-space:nowrap;transition:color .2s}}
+.top-nav-link:hover{{color:var(--text-primary)}}
+.top-nav-link.active{{color:var(--text-primary);border-bottom-color:var(--accent);font-weight:500}}
 .pdf-btn{{display:none!important}}
 
 @media(max-width:1024px){{.charts-grid{{grid-template-columns:1fr}}.kpi-grid{{grid-template-columns:repeat(2,1fr)}}.takeaways-grid{{grid-template-columns:1fr}}}}
@@ -694,18 +701,18 @@ th{{color:#0f172a!important;border-bottom-color:#cbd5e1!important}}
 td{{color:#334155!important;border-bottom-color:#e2e8f0!important}}
 tbody tr:hover{{background:transparent!important}}
 }}
-.dashboard-footer{{margin-top:48px;padding:20px 28px;border-top:1px solid #334155;color:#94a3b8;font-size:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}}
-.dashboard-footer span{{color:#94a3b8}}
+.dashboard-footer{{margin-top:48px;padding:20px 28px;border-top:1px solid var(--border-main);color:var(--text-secondary);font-size:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}}
+.dashboard-footer span{{color:var(--text-secondary)}}
 /* ── HEADER: match Pipeline Intelligence style ── */
-.header{{padding:24px 28px 16px!important;border-bottom:1px solid #334155!important;margin-bottom:24px!important;background:none!important}}
-.header h1{{font-size:22px!important;font-weight:700!important;background:none!important;-webkit-background-clip:unset!important;-webkit-text-fill-color:#e2e8f0!important;color:#e2e8f0!important;margin-bottom:4px!important}}
-.header .sub{{font-size:13px!important;color:#94a3b8!important}}
-.header .meta{{font-size:12px!important;color:#94a3b8!important;margin-top:4px!important}}
-.header p{{font-size:13px!important;color:#94a3b8!important;margin-top:4px!important}}
+.header{{padding:24px 28px 16px!important;border-bottom:1px solid var(--border-main)!important;margin-bottom:24px!important;background:none!important}}
+.header h1{{font-size:22px!important;font-weight:700!important;background:none!important;-webkit-background-clip:unset!important;-webkit-text-fill-color:var(--text-primary)!important;color:var(--text-primary)!important;margin-bottom:4px!important}}
+.header .sub{{font-size:13px!important;color:var(--text-secondary)!important}}
+.header .meta{{font-size:12px!important;color:var(--text-secondary)!important;margin-top:4px!important}}
+.header p{{font-size:13px!important;color:var(--text-secondary)!important;margin-top:4px!important}}
 </style>
 </head>
 <body>
-<nav class="top-nav"><span class="top-nav-brand">⚡ Seamfix</span><a href="dashboard.html" class="top-nav-link ">Cash Overview</a><a href="expense_dashboard.html" class="top-nav-link ">Expense &amp; Vendor</a><a href="budget_dashboard.html" class="top-nav-link ">Budget vs Actual</a><a href="revenue_dashboard.html" class="top-nav-link active">Revenue &amp; Fundability</a><a href="pipeline_dashboard.html" class="top-nav-link ">Pipeline Intelligence</a></nav>
+<nav class="top-nav"><span class="top-nav-brand">⚡ Seamfix</span><a href="dashboard.html" class="top-nav-link ">Cash Overview</a><a href="expense_dashboard.html" class="top-nav-link ">Expense &amp; Vendor</a><a href="budget_dashboard.html" class="top-nav-link ">Budget vs Actual</a><a href="revenue_dashboard.html" class="top-nav-link active">Revenue &amp; Fundability</a><a href="pipeline_dashboard.html" class="top-nav-link ">Pipeline Intelligence</a>{theme_toggle}</nav>
 <!-- PDF button hidden per user request -->
 
 <div class="container">
@@ -765,19 +772,19 @@ tbody tr:hover{{background:transparent!important}}
 
 <div class="section fundability-section">
 <h2>💼 Revenue Projection</h2>
-<p style="color:#94a3b8;margin-bottom:16px">Status-weighted projections are on <a href="pipeline_dashboard.html" style="color:#00D4AA;text-decoration:none">Pipeline Intelligence</a> — deal-level scenarios built from actual On Track / At Risk / Off Track weights are more accurate than flat conversion rates.</p>
-<div style="background:rgba(0,212,170,0.06);border:1px solid rgba(0,212,170,0.2);border-radius:10px;padding:16px 20px">
+<p style="color:var(--text-secondary);margin-bottom:16px">Status-weighted projections are on <a href="pipeline_dashboard.html" style="color:var(--accent);text-decoration:none">Pipeline Intelligence</a> — deal-level scenarios built from actual On Track / At Risk / Off Track weights are more accurate than flat conversion rates.</p>
+<div style="background:var(--accent-bg);border:1px solid var(--border-accent);border-radius:10px;padding:16px 20px">
   <div style="display:flex;gap:32px;flex-wrap:wrap">
-    <div><div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Annual Target</div><div style="font-size:1.4em;font-weight:700;color:#00D4AA">{fmt_usd(annual_revenue_target_usd)}</div></div>
-    <div><div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Budget</div><div style="font-size:1.4em;font-weight:700;color:#e2e8f0">{fmt_naira(budget_ngn)}</div></div>
-    <div><div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Full-conversion Coverage</div><div style="font-size:1.4em;font-weight:700;color:#{'00D4AA' if optimistic_coverage >= 100 else 'FFE66D'}">{optimistic_coverage:.0f}%</div></div>
+    <div><div style="font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Annual Target</div><div style="font-size:1.4em;font-weight:700;color:var(--accent)">{fmt_usd(annual_revenue_target_usd)}</div></div>
+    <div><div style="font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Budget</div><div style="font-size:1.4em;font-weight:700;color:var(--text-primary)">{fmt_naira(budget_ngn)}</div></div>
+    <div><div style="font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Full-conversion Coverage</div><div style="font-size:1.4em;font-weight:700;color:#{'00D4AA' if optimistic_coverage >= 100 else 'FFE66D'}">{optimistic_coverage:.0f}%</div></div>
   </div>
 </div>
 </div>
 
 <div class="section">
 <h2>🚨 Critical Actions Engine</h2>
-<p style="color:#94a3b8;margin-bottom:16px">Auto-generated recommendations based on pipeline health and fundability scenarios.</p>
+<p style="color:var(--text-secondary);margin-bottom:16px">Auto-generated recommendations based on pipeline health and fundability scenarios.</p>
 {actions_html}
 </div>
 
@@ -788,9 +795,9 @@ tbody tr:hover{{background:transparent!important}}
 
 <div class="section">
 <h2>📊 Revenue Streams Overview</h2>
-<p style="color:#94a3b8;margin-bottom:12px;font-size:0.9em">All revenue streams sorted by projected annual amount. Values in USD (₦ equivalent). Status from revenue tracker.</p>
+<p style="color:var(--text-secondary);margin-bottom:12px;font-size:0.9em">All revenue streams sorted by projected annual amount. Values in USD (₦ equivalent). Status from revenue tracker.</p>
 <div style="margin-bottom:16px">
-<input type="text" id="revenueSearch" placeholder="Search revenue streams (e.g. NIMC, MTN, Fixiam, Benin...)" style="width:100%;max-width:500px;padding:10px 16px;border-radius:8px;border:1px solid rgba(0,212,170,0.3);background:rgba(15,23,42,0.8);color:#e2e8f0;font-family:inherit;font-size:0.9em;outline:none" onfocus="this.style.borderColor='#00D4AA'" onblur="this.style.borderColor='rgba(0,212,170,0.3)'" oninput="filterRevenueTable()">
+<input type="text" id="revenueSearch" placeholder="Search revenue streams (e.g. NIMC, MTN, Fixiam, Benin...)" style="width:100%;max-width:500px;padding:10px 16px;border-radius:8px;border:1px solid var(--border-accent);background:var(--bg-input);color:var(--text-primary);font-family:inherit;font-size:0.9em;outline:none" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border-accent)'" oninput="filterRevenueTable()">
 </div>
 <table id="revenueTable">
 <thead><tr>
@@ -806,9 +813,9 @@ tbody tr:hover{{background:transparent!important}}
 <tbody id="revenueBody">
 {revenue_rows}
 </tbody>
-<tfoot style="background:rgba(0,212,170,0.08);font-weight:700">
+<tfoot style="background:var(--bg-table-header);font-weight:700">
 <tr>
-<td colspan="3" style="color:#00D4AA;font-weight:700">TOTAL ({len(revenues)} streams)</td>
+<td colspan="3" style="color:var(--accent);font-weight:700">TOTAL ({len(revenues)} streams)</td>
 <td class="positive">{fmt_dual(annual_revenue_target_usd)}</td>
 <td class="positive">{fmt_dual(ytd_actual_revenue_usd)}</td>
 <td>{annual_progress_pct:.0f}% of $8M target / {ytd_achievement_rate:.0f}% of pipeline</td>
@@ -817,7 +824,7 @@ tbody tr:hover{{background:transparent!important}}
 </tr>
 </tfoot>
 </table>
-<div id="searchResults" style="color:#64748b;font-size:0.8em;margin-top:8px"></div>
+<div id="searchResults" style="color:var(--text-tertiary);font-size:0.8em;margin-top:8px"></div>
 </div>
 </div>
 
@@ -930,6 +937,7 @@ function filterRevenueTable() {{
         info.textContent = '';
     }}
 }}
+{theme_js}
 </script>
 <div class="dashboard-footer">
 <span>Seamfix Financial Intelligence &nbsp;·&nbsp; Powered by Claude Cowork</span>

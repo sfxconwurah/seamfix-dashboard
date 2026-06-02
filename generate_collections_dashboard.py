@@ -18,6 +18,7 @@ the same behaviour as the 2026 Path to Revenue dashboard.
 import os, sys, csv
 from datetime import datetime
 from pathlib import Path
+from theme import get_base_css, get_toggle_html, get_theme_js
 
 FX_RATE = 1450  # $1 = ₦1,450
 COLLECTIONS_FILENAME = "2026 Collections Tracker.csv"
@@ -306,119 +307,126 @@ def generate_html(items, update_dates):
             moved_items.append({**item, '_movement': status, '_detail': detail})
 
     # ── CSS ──────────────────────────────────────────────────────────────────
-    css = """
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body {
+    theme_css = get_base_css()
+    toggle_html = get_toggle_html()
+    theme_js = get_theme_js()
+
+    css = f"""
+{theme_css}
+* {{ box-sizing: border-box; margin: 0; padding: 0; }}
+body {{
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #0a0f1e;
-    color: #e2e8f0;
+    background: var(--bg-nav);
+    color: var(--text-primary);
     padding: 28px 28px 60px;
     font-size: 14px;
     line-height: 1.55;
-}
+}}
 
 /* Header */
-.page-header { margin-bottom: 6px; }
-.page-title  { font-size: 26px; font-weight: 700; color: #00D4AA; }
-.page-sub    { font-size: 13px; color: #475569; margin-top: 3px; margin-bottom: 28px; }
+.page-header {{ margin-bottom: 6px; }}
+.page-title  {{ font-size: 26px; font-weight: 700; color: var(--accent); }}
+.page-sub    {{ font-size: 13px; color: var(--text-tertiary); margin-top: 3px; margin-bottom: 28px; }}
 
 /* Badges */
-.badge {
+.badge {{
     display: inline-block; padding: 2px 10px; border-radius: 20px;
     font-size: 11px; font-weight: 600; text-transform: uppercase; white-space: nowrap;
-}
-.b-paid     { background: rgba(16,185,129,.15); color: #10b981; border: 1px solid rgba(16,185,129,.3); }
-.b-progress { background: rgba(59,130,246,.15); color: #60a5fa; border: 1px solid rgba(59,130,246,.3); }
-.b-pending  { background: rgba(245,158,11,.15); color: #f59e0b; border: 1px solid rgba(245,158,11,.3); }
-.b-critical { background: rgba(239,68,68,.15);  color: #f87171; border: 1px solid rgba(239,68,68,.3);  }
-.b-high     { background: rgba(251,146,60,.15); color: #fb923c; border: 1px solid rgba(251,146,60,.3); }
+}}
+.b-paid     {{ background: rgba(16,185,129,.15); color: #10b981; border: 1px solid rgba(16,185,129,.3); }}
+.b-progress {{ background: rgba(59,130,246,.15); color: #60a5fa; border: 1px solid rgba(59,130,246,.3); }}
+.b-pending  {{ background: rgba(245,158,11,.15); color: #f59e0b; border: 1px solid rgba(245,158,11,.3); }}
+.b-critical {{ background: rgba(239,68,68,.15);  color: #f87171; border: 1px solid rgba(239,68,68,.3);  }}
+.b-high     {{ background: rgba(251,146,60,.15); color: #fb923c; border: 1px solid rgba(251,146,60,.3); }}
 
 /* KPI row */
-.kpi-row {
+.kpi-row {{
     display: grid; grid-template-columns: repeat(4, 1fr);
     gap: 16px; margin-bottom: 32px;
-}
-.kpi-card {
-    background: #111827; border: 1px solid #1e293b; border-radius: 12px;
+}}
+.kpi-card {{
+    background: var(--bg-card); border: 1px solid var(--border-main); border-radius: 12px;
     padding: 20px 22px;
-}
-.kpi-label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
-.kpi-val   { font-size: 24px; font-weight: 700; }
-.kpi-sub   { font-size: 12px; color: #475569; margin-top: 4px; }
+}}
+.kpi-label {{ font-size: 11px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }}
+.kpi-val   {{ font-size: 24px; font-weight: 700; }}
+.kpi-sub   {{ font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }}
 
 /* Section headers */
-.sec-hdr {
+.sec-hdr {{
     display: flex; align-items: center; gap: 12px;
     margin: 32px 0 16px; padding-bottom: 12px;
-    border-bottom: 1px solid #1e293b;
-}
-.sec-title { font-size: 16px; font-weight: 700; color: #f1f5f9; }
-.sec-sub   { font-size: 12px; color: #475569; }
+    border-bottom: 1px solid var(--border-main);
+}}
+.sec-title {{ font-size: 16px; font-weight: 700; color: var(--text-primary); }}
+.sec-sub   {{ font-size: 12px; color: var(--text-tertiary); }}
 
 /* Card grids */
-.card-grid {
+.card-grid {{
     display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
     gap: 14px; margin-bottom: 8px;
-}
-.action-card {
-    background: #111827; border: 1px solid #1e293b; border-radius: 10px;
+}}
+.action-card {{
+    background: var(--bg-card); border: 1px solid var(--border-main); border-radius: 10px;
     padding: 16px 18px;
-}
-.action-card.critical { border-left: 4px solid #ef4444; }
-.action-card.high     { border-left: 4px solid #f59e0b; }
-.card-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px; }
-.card-name { font-weight: 600; font-size: 13px; color: #f1f5f9; }
-.card-amount { font-size: 13px; font-weight: 700; color: #00D4AA; margin-bottom: 5px; }
-.card-who   { font-size: 11px; color: #64748b; margin-bottom: 10px; }
-.card-action {
+}}
+.action-card.critical {{ border-left: 4px solid #ef4444; }}
+.action-card.high     {{ border-left: 4px solid #f59e0b; }}
+.card-row {{ display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px; }}
+.card-name {{ font-weight: 600; font-size: 13px; color: var(--text-primary); }}
+.card-amount {{ font-size: 13px; font-weight: 700; color: var(--accent); margin-bottom: 5px; }}
+.card-who   {{ font-size: 11px; color: var(--text-tertiary); margin-bottom: 10px; }}
+.card-action {{
     font-size: 12px; color: #fbbf24; background: rgba(251,191,36,.06);
     padding: 7px 10px; border-radius: 6px; margin-bottom: 7px;
-}
-.card-update { font-size: 11px; color: #94a3b8; font-style: italic; }
+}}
+.card-update {{ font-size: 11px; color: var(--text-secondary); font-style: italic; }}
 
 /* Movement cards */
-.mv-card {
-    background: #111827; border: 1px solid #1e293b; border-radius: 10px;
+.mv-card {{
+    background: var(--bg-card); border: 1px solid var(--border-main); border-radius: 10px;
     padding: 14px 16px;
-}
-.mv-card.positive { border-left: 4px solid #10b981; }
-.mv-card.updated  { border-left: 4px solid #3b82f6; }
-.mv-card.negative { border-left: 4px solid #ef4444; }
-.mv-name     { font-weight: 600; font-size: 13px; color: #f1f5f9; margin-bottom: 2px; }
-.mv-customer { font-size: 11px; color: #64748b; margin-bottom: 10px; }
-.mv-lbl      { font-size: 10px; font-weight: 600; text-transform: uppercase; color: #475569; margin-bottom: 3px; }
-.mv-prev { font-size: 11px; color: #475569; background: #0d1424; padding: 7px 9px; border-radius: 6px; margin-bottom: 7px; }
-.mv-curr { font-size: 11px; color: #cbd5e1; background: #1e293b; padding: 7px 9px; border-radius: 6px; }
+}}
+.mv-card.positive {{ border-left: 4px solid #10b981; }}
+.mv-card.updated  {{ border-left: 4px solid #3b82f6; }}
+.mv-card.negative {{ border-left: 4px solid #ef4444; }}
+.mv-name     {{ font-weight: 600; font-size: 13px; color: var(--text-primary); margin-bottom: 2px; }}
+.mv-customer {{ font-size: 11px; color: var(--text-tertiary); margin-bottom: 10px; }}
+.mv-lbl      {{ font-size: 10px; font-weight: 600; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 3px; }}
+.mv-prev {{ font-size: 11px; color: var(--text-tertiary); background: var(--bg-body); padding: 7px 9px; border-radius: 6px; margin-bottom: 7px; }}
+.mv-curr {{ font-size: 11px; color: var(--text-heading); background: var(--bg-card); padding: 7px 9px; border-radius: 6px; }}
 
 /* Full tracker table */
-.tbl-wrap { overflow-x: auto; margin-top: 4px; }
-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-th {
-    background: #111827; color: #64748b;
+.tbl-wrap {{ overflow-x: auto; margin-top: 4px; }}
+table {{ width: 100%; border-collapse: collapse; font-size: 12px; }}
+th {{
+    background: var(--bg-table-header); color: var(--text-tertiary);
     font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: .5px;
-    padding: 10px 12px; text-align: left; border-bottom: 1px solid #1e293b;
+    padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border-main);
     white-space: nowrap;
-}
-td { padding: 10px 12px; border-bottom: 1px solid #151f35; vertical-align: top; }
-tr:hover td { background: rgba(255,255,255,.02); }
-.t-name { font-weight: 600; color: #f1f5f9; }
-.t-cust { font-size: 11px; color: #475569; }
-.t-usd  { font-weight: 700; color: #00D4AA; white-space: nowrap; }
-.t-ngn  { font-size: 11px; color: #334155; white-space: nowrap; }
-.t-upd  { max-width: 300px; color: #64748b; font-size: 11px; }
-.t-act  { max-width: 220px; color: #fbbf24; font-size: 11px; }
-.t-acc  { color: #818cf8; font-size: 12px; font-weight: 500; }
-.pred-HIGH   { color: #10b981; font-size: 11px; font-weight: 700; }
-.pred-MEDIUM { color: #f59e0b; font-size: 11px; font-weight: 700; }
-.pred-LOW    { color: #ef4444; font-size: 11px; font-weight: 700; }
+}}
+td {{ padding: 10px 12px; border-bottom: 1px solid var(--border-light); vertical-align: top; }}
+tr:hover td {{ background: var(--bg-table-hover); }}
+.t-name {{ font-weight: 600; color: var(--text-primary); }}
+.t-cust {{ font-size: 11px; color: var(--text-tertiary); }}
+.t-usd  {{ font-weight: 700; color: var(--accent); white-space: nowrap; }}
+.t-ngn  {{ font-size: 11px; color: var(--text-tertiary); white-space: nowrap; }}
+.t-upd  {{ max-width: 300px; color: var(--text-tertiary); font-size: 11px; }}
+.t-act  {{ max-width: 220px; color: #fbbf24; font-size: 11px; }}
+.t-acc  {{ color: #818cf8; font-size: 12px; font-weight: 500; }}
+.pred-HIGH   {{ color: #10b981; font-size: 11px; font-weight: 700; }}
+.pred-MEDIUM {{ color: #f59e0b; font-size: 11px; font-weight: 700; }}
+.pred-LOW    {{ color: #ef4444; font-size: 11px; font-weight: 700; }}
 
 /* Filter bar */
-.filter-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
-.f-btn {
-    background: #111827; border: 1px solid #1e293b; color: #64748b;
+.filter-bar {{ display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }}
+.f-btn {{
+    background: var(--bg-card); border: 1px solid var(--border-main); color: var(--text-tertiary);
     padding: 5px 14px; border-radius: 20px; font-size: 12px; cursor: pointer; transition: all .15s;
-}
-.f-btn.active, .f-btn:hover { background: rgba(0,212,170,.1); border-color: #00D4AA; color: #00D4AA; }
+}}
+.f-btn.active, .f-btn:hover {{ background: rgba(0,212,170,.1); border-color: var(--accent); color: var(--accent); }}
+/* Theme toggle in header */
+.theme-toggle-wrap {{ display: flex; justify-content: flex-end; margin-bottom: 8px; }}
 """
 
     # ── Build action card HTML ────────────────────────────────────────────────
@@ -474,7 +482,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
 </div>"""
 
     movement_html = ''.join(movement_card(i) for i in moved_items) if moved_items else \
-        '<p style="color:#475569;font-size:13px">No significant movement detected between the last two weekly updates.</p>'
+        '<p style="color:var(--text-tertiary);font-size:13px">No significant movement detected between the last two weekly updates.</p>'
 
     # ── Build tracker table rows ──────────────────────────────────────────────
     def payment_badge(s):
@@ -504,7 +512,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
 
         table_rows.append(f"""
 <tr data-payment="{esc(data_p)}">
-    <td style="color:#334155;font-size:11px">{esc(item['sn'] or str(i_num))}</td>
+    <td style="color:var(--text-tertiary);font-size:11px">{esc(item['sn'] or str(i_num))}</td>
     <td>
         <div class="t-name">{esc(item['name'])}</div>
         <div class="t-cust">{esc(item['customer'])}</div>
@@ -512,7 +520,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
     <td><div class="t-usd">{fmt_usd(item['usd'])}</div></td>
     <td><div class="t-ngn">{fmt_ngn(item['ngn'])}</div></td>
     <td><span class="{p_class}">{esc(pred or '—')}</span></td>
-    <td style="color:#475569;font-size:11px;white-space:nowrap">{esc(item['closure_period'])}</td>
+    <td style="color:var(--text-tertiary);font-size:11px;white-space:nowrap">{esc(item['closure_period'])}</td>
     <td>{deal_badge(item['deal_status'])}</td>
     <td>{payment_badge(item['payment_status'])}</td>
     <td class="t-acc">{esc(item['accountable'])}</td>
@@ -535,6 +543,9 @@ tr:hover td { background: rgba(255,255,255,.02); }
 </head>
 <body>
 
+<!-- Theme toggle -->
+<div class="theme-toggle-wrap">{toggle_html}</div>
+
 <!-- Header -->
 <div class="page-header">
     <div class="page-title">&#128229; Collections Intelligence</div>
@@ -545,7 +556,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
 <div class="kpi-row">
     <div class="kpi-card">
         <div class="kpi-label">Total Tracked</div>
-        <div class="kpi-val" style="color:#f1f5f9">{fmt_usd(total_usd)}</div>
+        <div class="kpi-val" style="color:var(--text-primary)">{fmt_usd(total_usd)}</div>
         <div class="kpi-sub">{fmt_ngn(total_ngn)} &nbsp;&#183;&nbsp; {len(items)} items</div>
     </div>
     <div class="kpi-card" style="border-top:3px solid #10b981">
@@ -593,7 +604,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
 </div>
 
 <div class="filter-bar">
-    <span style="color:#475569;font-size:12px">Filter by payment status:</span>
+    <span style="color:var(--text-tertiary);font-size:12px">Filter by payment status:</span>
     <button class="f-btn active" onclick="filterTable(this,'all')">All ({len(items)})</button>
     <button class="f-btn" onclick="filterTable(this,'pending')">Pending ({len(pending)})</button>
     <button class="f-btn" onclick="filterTable(this,'in-progress')">In Progress ({len(in_progress)})</button>
@@ -638,6 +649,8 @@ function filterTable(btn, status) {{
         }}
     }});
 }}
+
+{theme_js}
 </script>
 
 </body>

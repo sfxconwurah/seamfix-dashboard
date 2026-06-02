@@ -9,6 +9,7 @@ import os, sys, json, re, glob
 from datetime import datetime
 from openpyxl import load_workbook
 from difflib import SequenceMatcher
+from theme import get_base_css, get_toggle_html, get_theme_js
 
 
 # --- Investment detection (reused from generate_dashboard.py) ---
@@ -579,20 +580,20 @@ def generate_html(budget_items, reports, output_path):
         color = bt['color']
         bar_pct = min(bt['pct'], 100)
         share_pct = (bt['actual'] / total_known_actual * 100) if total_known_actual > 0 else 0
-        strategic_section_html += f"""<div class="strategic-bucket" style="border-left:4px solid {color};background:rgba(15,23,42,0.6);border-radius:8px;padding:16px 20px;margin-bottom:12px;">
+        strategic_section_html += f"""<div class="strategic-bucket" style="border-left:4px solid {color};background:var(--bg-card);border-radius:8px;padding:16px 20px;margin-bottom:12px;">
 <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">
-  <span style="font-weight:600;font-size:14px;color:#e2e8f0">{bucket}</span>
-  <span style="font-size:12px;color:#94a3b8">{share_pct:.1f}% of total spend</span>
+  <span style="font-weight:600;font-size:14px;color:var(--text-primary)">{bucket}</span>
+  <span style="font-size:12px;color:var(--text-secondary)">{share_pct:.1f}% of total spend</span>
 </div>
 <div style="display:flex;gap:20px;margin-bottom:10px;flex-wrap:wrap">
-  <div><span style="font-size:11px;color:#94a3b8">YTD Actual</span><br><span style="font-size:18px;font-weight:700;color:{color}">{fmt_naira(bt['actual'])}</span></div>
-  <div><span style="font-size:11px;color:#94a3b8">Annual Budget</span><br><span style="font-size:16px;color:#cbd5e1">{fmt_naira(bt['budget'])}</span></div>
-  <div><span style="font-size:11px;color:#94a3b8">Remaining</span><br><span style="font-size:16px;color:{'#ef4444' if bt['remaining'] < 0 else '#10b981'}">{fmt_naira(abs(bt['remaining']))} {'over' if bt['remaining'] < 0 else 'left'}</span></div>
+  <div><span style="font-size:11px;color:var(--text-secondary)">YTD Actual</span><br><span style="font-size:18px;font-weight:700;color:{color}">{fmt_naira(bt['actual'])}</span></div>
+  <div><span style="font-size:11px;color:var(--text-secondary)">Annual Budget</span><br><span style="font-size:16px;color:var(--text-heading)">{fmt_naira(bt['budget'])}</span></div>
+  <div><span style="font-size:11px;color:var(--text-secondary)">Remaining</span><br><span style="font-size:16px;color:{'#ef4444' if bt['remaining'] < 0 else '#10b981'}">{fmt_naira(abs(bt['remaining']))} {'over' if bt['remaining'] < 0 else 'left'}</span></div>
 </div>
-<div style="background:#1e293b;border-radius:4px;height:8px;overflow:hidden">
+<div style="background:var(--bg-gauge);border-radius:4px;height:8px;overflow:hidden">
   <div style="height:100%;width:{bar_pct:.1f}%;background:{color};border-radius:4px;transition:width 0.5s"></div>
 </div>
-<div style="font-size:11px;color:#94a3b8;margin-top:4px">{bt['pct']:.1f}% of annual budget consumed</div>
+<div style="font-size:11px;color:var(--text-secondary);margin-top:4px">{bt['pct']:.1f}% of annual budget consumed</div>
 </div>"""
 
     # Build unbudgeted spend rows HTML
@@ -604,6 +605,10 @@ def generate_html(budget_items, reports, output_path):
 <td class="negative">{fmt_naira(line['amount'])}</td>
 </tr>"""
 
+    theme_css = get_base_css()
+    toggle_html = get_toggle_html()
+    theme_js = get_theme_js()
+
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -613,66 +618,67 @@ def generate_html(budget_items, reports, output_path):
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
+{theme_css}
 *{{margin:0;padding:0;box-sizing:border-box}}
-body{{font-family:'Inter',sans-serif;background:linear-gradient(135deg,#0f172a,#1e293b);color:#e2e8f0;padding:0;min-height:100vh}}
+body{{font-family:'Inter',sans-serif;background:linear-gradient(135deg,var(--bg-body),var(--bg-card));color:var(--text-primary);padding:0;min-height:100vh}}
 .container{{max-width:1600px;margin:0 auto;padding:0 28px 28px}}
-.header{{margin-bottom:32px;padding-bottom:20px;border-bottom:2px solid rgba(0,212,170,0.2)}}
-.header h1{{font-size:2.4em;font-weight:700;background:linear-gradient(135deg,#00D4AA,#4ECDC4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}}
-.header .sub{{color:#94a3b8;font-size:0.95em}}
-.header .meta{{color:#64748b;font-size:0.8em;margin-top:6px}}
+.header{{margin-bottom:32px;padding-bottom:20px;border-bottom:2px solid var(--border-accent)}}
+.header h1{{font-size:2.4em;font-weight:700;background:linear-gradient(135deg,var(--accent),var(--accent-secondary));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}}
+.header .sub{{color:var(--text-secondary);font-size:0.95em}}
+.header .meta{{color:var(--text-tertiary);font-size:0.8em;margin-top:6px}}
 .nav-tabs{{display:none!important}}
-.top-nav{{background:#0a0f1e;border-bottom:1px solid #334155;padding:0 24px;display:flex;align-items:center;height:48px;overflow-x:auto;position:sticky;top:0;z-index:200}}
-.top-nav-brand{{color:#e2e8f0;font-weight:700;font-size:15px;margin-right:24px;white-space:nowrap;text-decoration:none}}
-.top-nav-link{{color:#94a3b8;text-decoration:none;padding:0 14px;height:48px;display:flex;align-items:center;font-size:13px;border-bottom:2px solid transparent;white-space:nowrap;transition:color .2s}}
-.top-nav-link:hover{{color:#e2e8f0}}
-.top-nav-link.active{{color:#fff;border-bottom-color:#00D4AA;font-weight:500}}
+.top-nav{{background:var(--bg-nav);border-bottom:1px solid var(--border-main);padding:0 24px;display:flex;align-items:center;height:48px;overflow-x:auto;position:sticky;top:0;z-index:200}}
+.top-nav-brand{{color:var(--text-primary);font-weight:700;font-size:15px;margin-right:24px;white-space:nowrap;text-decoration:none}}
+.top-nav-link{{color:var(--text-secondary);text-decoration:none;padding:0 14px;height:48px;display:flex;align-items:center;font-size:13px;border-bottom:2px solid transparent;white-space:nowrap;transition:color .2s}}
+.top-nav-link:hover{{color:var(--text-primary)}}
+.top-nav-link.active{{color:var(--text-on-accent);border-bottom-color:var(--accent);font-weight:500}}
 .kpi-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-bottom:36px}}
-.kpi-card{{background:linear-gradient(135deg,rgba(30,41,59,0.9),rgba(15,23,42,0.9));border:1px solid rgba(0,212,170,0.15);border-radius:12px;padding:22px;transition:all 0.3s ease}}
-.kpi-card:hover{{border-color:rgba(0,212,170,0.4);transform:translateY(-3px);box-shadow:0 8px 30px rgba(0,212,170,0.1)}}
-.kpi-label{{font-size:0.78em;color:#94a3b8;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px;font-weight:600}}
-.kpi-value{{font-size:1.6em;font-weight:700;color:#00D4AA;margin-bottom:6px}}
-.kpi-value.negative{{color:#FF6B6B}}
+.kpi-card{{background:var(--bg-card);border:1px solid var(--border-accent);border-radius:12px;padding:22px;transition:all 0.3s ease}}
+.kpi-card:hover{{border-color:rgba(0,212,170,0.4);transform:translateY(-3px);box-shadow:var(--shadow-hover)}}
+.kpi-label{{font-size:0.78em;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px;font-weight:600}}
+.kpi-value{{font-size:1.6em;font-weight:700;color:var(--accent);margin-bottom:6px}}
+.kpi-value.negative{{color:var(--danger)}}
 .kpi-change{{font-size:0.82em;display:flex;align-items:center;gap:4px}}
-.kpi-change.positive{{color:#00D4AA}}
-.kpi-change.negative{{color:#FF6B6B}}
-.kpi-change.neutral{{color:#64748b}}
+.kpi-change.positive{{color:var(--accent)}}
+.kpi-change.negative{{color:var(--danger)}}
+.kpi-change.neutral{{color:var(--text-tertiary)}}
 .charts-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(480px,1fr));gap:20px;margin-bottom:36px}}
-.chart-box{{background:linear-gradient(135deg,rgba(30,41,59,0.9),rgba(15,23,42,0.9));border:1px solid rgba(0,212,170,0.15);border-radius:12px;padding:22px;min-height:380px}}
-.chart-box h3{{font-size:1em;font-weight:600;margin-bottom:16px;color:#cbd5e1}}
-.section{{background:linear-gradient(135deg,rgba(30,41,59,0.9),rgba(15,23,42,0.9));border:1px solid rgba(0,212,170,0.15);border-radius:12px;padding:24px;margin-bottom:24px}}
-.section h2{{font-size:1.3em;margin-bottom:16px;color:#00D4AA}}
-.search-box{{margin-bottom:16px;padding:12px;background:rgba(0,212,170,0.05);border:1px solid rgba(0,212,170,0.2);border-radius:8px;color:#e2e8f0;font-family:inherit;width:100%;max-width:400px}}
-.search-box::placeholder{{color:#64748b}}
+.chart-box{{background:var(--bg-card);border:1px solid var(--border-accent);border-radius:12px;padding:22px;min-height:380px}}
+.chart-box h3{{font-size:1em;font-weight:600;margin-bottom:16px;color:var(--text-heading)}}
+.section{{background:var(--bg-card);border:1px solid var(--border-accent);border-radius:12px;padding:24px;margin-bottom:24px}}
+.section h2{{font-size:1.3em;margin-bottom:16px;color:var(--accent)}}
+.search-box{{margin-bottom:16px;padding:12px;background:var(--accent-bg);border:1px solid var(--border-accent);border-radius:8px;color:var(--text-primary);font-family:inherit;width:100%;max-width:400px}}
+.search-box::placeholder{{color:var(--text-tertiary)}}
 table{{width:100%;border-collapse:collapse;font-size:0.85em}}
-thead{{background:rgba(0,212,170,0.08)}}
-th{{padding:10px 12px;text-align:left;font-weight:600;color:#00D4AA;border-bottom:2px solid rgba(0,212,170,0.15)}}
-td{{padding:10px 12px;border-bottom:1px solid rgba(0,212,170,0.06);color:#cbd5e1}}
-tbody tr:hover{{background:rgba(0,212,170,0.04)}}
+thead{{background:var(--bg-table-header)}}
+th{{padding:10px 12px;text-align:left;font-weight:600;color:var(--accent);border-bottom:2px solid var(--border-accent)}}
+td{{padding:10px 12px;border-bottom:1px solid var(--border-light);color:var(--text-heading)}}
+tbody tr:hover{{background:var(--bg-table-hover)}}
 .positive{{color:#00D4AA}}
 .negative{{color:#FF6B6B}}
 .tabs{{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}}
-.tab-btn{{padding:8px 18px;border:1px solid rgba(0,212,170,0.2);border-radius:20px;background:transparent;color:#94a3b8;cursor:pointer;font-size:0.85em;font-family:inherit;transition:all 0.2s}}
-.tab-btn.active,.tab-btn:hover{{background:rgba(0,212,170,0.15);color:#00D4AA;border-color:rgba(0,212,170,0.4)}}
+.tab-btn{{padding:8px 18px;border:1px solid var(--border-accent);border-radius:20px;background:transparent;color:var(--text-secondary);cursor:pointer;font-size:0.85em;font-family:inherit;transition:all 0.2s}}
+.tab-btn.active,.tab-btn:hover{{background:rgba(0,212,170,0.15);color:var(--accent);border-color:rgba(0,212,170,0.4)}}
 .tab-content{{display:none}}
 .tab-content.active{{display:block}}
 .takeaways-section{{margin-bottom:36px}}
-.takeaways-section h2{{font-size:1.4em;margin-bottom:16px;color:#FFE66D;display:flex;align-items:center;gap:10px}}
+.takeaways-section h2{{font-size:1.4em;margin-bottom:16px;color:var(--warning);display:flex;align-items:center;gap:10px}}
 .takeaways-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(440px,1fr));gap:16px}}
-.takeaway-card{{background:linear-gradient(135deg,rgba(30,41,59,0.95),rgba(15,23,42,0.95));border:1px solid rgba(0,212,170,0.1);border-left:4px solid #64748b;border-radius:10px;padding:20px;transition:all 0.3s ease}}
+.takeaway-card{{background:var(--bg-card);border:1px solid var(--border-accent);border-left:4px solid var(--text-tertiary);border-radius:10px;padding:20px;transition:all 0.3s ease}}
 .takeaway-card:hover{{transform:translateY(-2px);box-shadow:0 6px 24px rgba(0,0,0,0.2)}}
 .tw-header{{display:flex;align-items:center;gap:8px;margin-bottom:10px}}
 .tw-icon{{font-size:1.2em}}
-.tw-title{{font-size:0.82em;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8}}
+.tw-title{{font-size:0.82em;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-secondary)}}
 .tw-badge{{font-size:0.7em;font-weight:700;padding:3px 10px;border-radius:12px;letter-spacing:0.5px}}
 .tw-headline{{font-size:1.05em;font-weight:600;margin-bottom:8px;line-height:1.4}}
-.tw-body{{font-size:0.88em;color:#94a3b8;line-height:1.65}}
+.tw-body{{font-size:0.88em;color:var(--text-secondary);line-height:1.65}}
 .tw-body ul{{margin:6px 0 0 16px}}
 .tw-body li{{margin-bottom:4px}}
 @media(max-width:1024px){{.charts-grid{{grid-template-columns:1fr}}.kpi-grid{{grid-template-columns:repeat(2,1fr)}}.takeaways-grid{{grid-template-columns:1fr}}}}
 @media(max-width:640px){{.kpi-grid{{grid-template-columns:1fr}}.header h1{{font-size:1.6em}}.nav-tabs{{flex-wrap:wrap}}}}
 .pdf-btn{{display:none!important}}
 th.sortable{{cursor:pointer;user-select:none}}
-th.sortable:hover{{color:#FFE66D}}
+th.sortable:hover{{color:var(--warning)}}
 th.sort-asc::after{{content:' ▲';font-size:0.7em}}
 th.sort-desc::after{{content:' ▼';font-size:0.7em}}
 
@@ -717,18 +723,18 @@ td{{color:#334155!important;border-bottom-color:#e2e8f0!important}}
 .search-box{{display:none!important}}
 tbody tr:hover{{background:transparent!important}}
 }}
-.dashboard-footer{{margin-top:48px;padding:20px 28px;border-top:1px solid #334155;color:#94a3b8;font-size:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}}
-.dashboard-footer span{{color:#94a3b8}}
+.dashboard-footer{{margin-top:48px;padding:20px 28px;border-top:1px solid var(--border-main);color:var(--text-secondary);font-size:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}}
+.dashboard-footer span{{color:var(--text-secondary)}}
 /* ── HEADER: match Pipeline Intelligence style ── */
-.header{{padding:24px 28px 16px!important;border-bottom:1px solid #334155!important;margin-bottom:24px!important;background:none!important}}
-.header h1{{font-size:22px!important;font-weight:700!important;background:none!important;-webkit-background-clip:unset!important;-webkit-text-fill-color:#e2e8f0!important;color:#e2e8f0!important;margin-bottom:4px!important}}
-.header .sub{{font-size:13px!important;color:#94a3b8!important}}
-.header .meta{{font-size:12px!important;color:#94a3b8!important;margin-top:4px!important}}
-.header p{{font-size:13px!important;color:#94a3b8!important;margin-top:4px!important}}
+.header{{padding:24px 28px 16px!important;border-bottom:1px solid var(--border-main)!important;margin-bottom:24px!important;background:none!important}}
+.header h1{{font-size:22px!important;font-weight:700!important;background:none!important;-webkit-background-clip:unset!important;-webkit-text-fill-color:var(--text-primary)!important;color:var(--text-primary)!important;margin-bottom:4px!important}}
+.header .sub{{font-size:13px!important;color:var(--text-secondary)!important}}
+.header .meta{{font-size:12px!important;color:var(--text-secondary)!important;margin-top:4px!important}}
+.header p{{font-size:13px!important;color:var(--text-secondary)!important;margin-top:4px!important}}
 </style>
 </head>
 <body>
-<nav class="top-nav"><span class="top-nav-brand">⚡ Seamfix</span><a href="dashboard.html" class="top-nav-link ">Cash Overview</a><a href="expense_dashboard.html" class="top-nav-link ">Expense &amp; Vendor</a><a href="budget_dashboard.html" class="top-nav-link active">Budget vs Actual</a><a href="revenue_dashboard.html" class="top-nav-link ">Revenue &amp; Fundability</a><a href="pipeline_dashboard.html" class="top-nav-link ">Pipeline Intelligence</a></nav>
+<nav class="top-nav"><span class="top-nav-brand">⚡ Seamfix</span><a href="dashboard.html" class="top-nav-link ">Cash Overview</a><a href="expense_dashboard.html" class="top-nav-link ">Expense &amp; Vendor</a><a href="budget_dashboard.html" class="top-nav-link active">Budget vs Actual</a><a href="revenue_dashboard.html" class="top-nav-link ">Revenue &amp; Fundability</a><a href="pipeline_dashboard.html" class="top-nav-link ">Pipeline Intelligence</a>{toggle_html}</nav>
 <!-- PDF button hidden per user request -->
 
 <div class="container">
@@ -782,7 +788,7 @@ tbody tr:hover{{background:transparent!important}}
 
 <div class="section">
 <h2>🎯 Strategic Spend Breakdown</h2>
-<p style="color:#94a3b8;font-size:13px;margin:-8px 0 18px">Where is the money going? Spend classified into four strategic buckets to show revenue-generating investment vs operational overhead.</p>
+<p style="color:var(--text-secondary);font-size:13px;margin:-8px 0 18px">Where is the money going? Spend classified into four strategic buckets to show revenue-generating investment vs operational overhead.</p>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px">
 {strategic_section_html}
 </div>
@@ -811,7 +817,7 @@ tbody tr:hover{{background:transparent!important}}
 <div id="tab-unbudgeted" class="tab-content">
 <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:8px;padding:14px 18px;margin-bottom:16px">
   <strong style="color:#ef4444">⚠ Governance Flag:</strong>
-  <span style="color:#94a3b8;font-size:13px;margin-left:8px">These {len(unbudgeted_lines)} expense line(s) totalling <strong style="color:#ef4444">{fmt_naira(total_unbudgeted)}</strong> have no matching approved budget category. They are excluded from the Variance Table above but are real cash outflows. Review and either reclassify to an existing budget heading or add a new budget line item.</span>
+  <span style="color:var(--text-secondary);font-size:13px;margin-left:8px">These {len(unbudgeted_lines)} expense line(s) totalling <strong style="color:#ef4444">{fmt_naira(total_unbudgeted)}</strong> have no matching approved budget category. They are excluded from the Variance Table above but are real cash outflows. Review and either reclassify to an existing budget heading or add a new budget line item.</span>
 </div>
 <table id="unbudgetedTable">
 <thead><tr><th class="sortable" onclick="sortTable('unbudgetedTable',0,'text')">Date</th><th class="sortable" onclick="sortTable('unbudgetedTable',1,'text')">Expense Item</th><th class="sortable" onclick="sortTable('unbudgetedTable',2,'money')">Amount</th></tr></thead>
@@ -924,6 +930,7 @@ new Chart(document.getElementById('trendChart'),{{
     options:baseOpts
 }});
 
+{theme_js}
 </script>
 <div class="dashboard-footer">
 <span>Seamfix Financial Intelligence &nbsp;·&nbsp; Powered by Claude Cowork</span>
