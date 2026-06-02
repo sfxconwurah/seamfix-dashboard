@@ -53,6 +53,16 @@ This is a Streamlit web application that serves 5 interactive financial dashboar
 
 ---
 
+## Repository & Data Policy
+
+**This repository is the single source of truth.** There is exactly one copy of every generator and `app.py` — the ones in this folder. (Historically the project was duplicated inside an outer `financial-dashboards` repo and synced by hand; that caused drift and has been retired. If you find another copy anywhere, this one wins.)
+
+- **Canonical remote (for now)**: `sfxconwurah/seamfix-dashboard` (personal). A future migration to the `seamfix` org repo is planned but blocked on CTO access — do not assume the org repo is current yet.
+- **Financial data is local-only going forward**: `*.xlsx` is gitignored. The live app reads fresh data from Google Drive/Sheets, so committed data is not required for production. The existing `data/*.xlsx` files remain tracked as an offline fallback; to refresh that baseline you must force-add (`git add -f <file>.xlsx`). Otherwise, just drop xlsx into `data/` locally and they stay on your machine.
+- **Secrets** (`.streamlit/secrets.toml`, any `*.rtf` secrets export) are gitignored and must never be committed.
+
+---
+
 ## Architecture
 
 ```
@@ -319,7 +329,7 @@ Bobby logs to Google Sheet `1c7QMZuV-YNDsmn1XYLJtx8pRyYi6g_wwdAHJ-D0cgtk`:
 
 **Cash reports**: Finance uploads new weekly reports to the shared Google Drive folder. The app fetches all xlsx files from the folder and its subfolders.
 
-**Budget file**: Currently bundled in `data/`. To update, replace `data/2026 LEAN BUDGET.xlsx` and push.
+**Budget file**: Currently bundled in `data/`. To update, replace `data/2026 LEAN BUDGET.xlsx`. Note: `*.xlsx` is gitignored (see "Repository & Data Policy" below), so committing a refreshed baseline requires `git add -f "data/2026 LEAN BUDGET.xlsx"` before pushing.
 
 ### Regenerating Dashboards
 Users can click "🔄 Regenerate Dashboards" in the sidebar (under ⚙️ Data & Settings) to force a fresh build. The app also auto-refreshes every 24 hours.

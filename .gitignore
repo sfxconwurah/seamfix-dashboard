@@ -4,3 +4,12 @@ __pycache__/
 generated/
 *.egg-info/
 .env
+
+# Financial data is kept local-only going forward (the live app reads from
+# Google Drive/Sheets). The existing data/*.xlsx baseline stays tracked as the
+# offline fallback; new/updated xlsx you drop locally will NOT be committed.
+# To intentionally refresh the committed baseline, use: git add -f <file>.xlsx
+*.xlsx
+
+# Secrets exports (e.g. the Streamlit secrets .rtf) must never be committed.
+*.rtf

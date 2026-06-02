@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-06-02 — Update: Consolidate to a single repository; keep financial data local-only
+
+Established this repo (`seamfix-dashboard`) as the **single source of truth**. Previously the project was duplicated inside an outer working folder/repo (`sfxconwurah/financial-dashboards`) that held a second copy of every generator + an old `app.py`, kept in sync by a manual `cp` step. That copy had drifted (the outer copies were stale relative to deployment), which was a recurring source of confusion and bugs. The outer folder has been retired; all work now happens here.
+
+Also added `*.xlsx` and `*.rtf` to `.gitignore`: financial data is now local-only going forward (the live app reads from Google Drive/Sheets). The existing `data/*.xlsx` baseline remains tracked as the offline fallback; new/updated xlsx will not be committed unless force-added (`git add -f`).
+
+**Files**: `.gitignore`, `CLAUDE.md`, `CHANGELOG.md`
+**Author**: Chibuzor + Claude
+
+---
+
 ## 2026-06-02 — Docs: Add project rules, onboarding guide, and changelog
 
 Added mandatory documentation rules to CLAUDE.md (auto-documentation, commit standards, testing requirements). Created ONBOARDING.md and Word document guide for finance team onboarding with Claude Cowork. Created this CHANGELOG.md.
