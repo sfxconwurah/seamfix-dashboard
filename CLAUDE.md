@@ -2,6 +2,46 @@
 
 > **Purpose**: This document gives a new developer or AI assistant full context to maintain and extend this project. Read this first.
 
+---
+
+## MANDATORY: Rules for Any AI Assistant Working on This Project
+
+**These rules apply to every Claude instance, every session, every change — no exceptions.**
+
+### 1. Document Every Change
+
+After making ANY code change, you MUST:
+
+- **Update this file (CLAUDE.md)** if the change affects architecture, business logic, column mappings, authentication, deployment, or any "how it works" section. Update the relevant section — don't just append.
+- **Add an entry to CHANGELOG.md** with the date, what changed, why, and which files were modified. Follow the format already in the file.
+- **If you add a new gotcha or lesson learned**, add it to the "Lessons Learned & Gotchas" section below.
+
+### 2. Commit Message Standards
+
+Every commit message must:
+- Start with what type of change it is: `Fix:`, `Feature:`, `Update:`, `Refactor:`, or `Docs:`
+- Explain WHY, not just what (e.g., "Fix: achievement % using annual target instead of pace — Finance expects 100% for completed deals" not "Fix percentage calculation")
+
+### 3. Test Before Pushing
+
+Before pushing any change:
+- Run the affected generator script locally: `python3 generate_*.py ./data`
+- Verify the HTML output opens correctly in a browser
+- Check that no other dashboard broke (if you changed shared logic like FX_RATE)
+
+### 4. Don't Break the Column Convention
+
+The Google Sheet column layout (M=Jan through X=Dec, Y=Deficit, Z=Surplus) is the single most fragile part of this system. If Finance changes the sheet structure:
+- Update the column mappings in ALL affected generator files
+- Update the "Excel Column Mapping" section in this document
+- Add a CHANGELOG entry explaining the old vs new mapping
+
+### 5. Keep This File Current
+
+If you notice any section of this document is outdated or wrong, fix it immediately. This file is the single source of truth for anyone (human or AI) working on this project.
+
+---
+
 ## Overview
 
 This is a Streamlit web application that serves 5 interactive financial dashboards plus an AI chat assistant ("Bobby") for Seamfix's executive team. It pulls live data from Google Sheets/Drive, processes Excel files, generates standalone HTML dashboards, and embeds them in a tabbed Streamlit interface.
@@ -154,14 +194,32 @@ Compares the two most recent months to classify deal momentum:
 - `new`: only the most recent month has revenue
 - `steady`: everything else
 
-### YTD Calculation
-As of the April 2026 update: YTD = Jan + Feb + Mar + Apr (4 months). When May data is added, you'll need to update `months_active`, add the May column, update momentum to use May as latest/Apr as previous, and update all YTD labels.
-
-### Run Rate
+### YTD Calculation (Fully Dynamic)
+**No code changes needed when Finance adds new months.** Both the revenue and pipeline dashboards dynamically detect which months have data by scanning monthly totals across all deals:
+```python
+monthly_totals = [sum(r['monthly'][i] for r in revenues) for i in range(12)]
+months_with_data = [i for i, v in enumerate(monthly_totals) if v > 0]
+last_data_month = max(months_with_data)  # e.g., 4 = May
+num_months = last_data_month + 1         # e.g., 5
 ```
-complete_months_avg = (Jan + Feb + Mar) / 3
-apr_scaled = Apr_actual * (30 / days_elapsed_in_april)
-monthly_run_rate = max(complete_months_avg, (Jan+Feb+Mar+apr_scaled) / 4)
+YTD labels, run rates, momentum, and all calculations automatically adjust.
+
+### Achievement Percentage (Revenue Dashboard)
+**Uses full annual target, NOT pace-adjusted target.** This was changed in June 2026 because Finance expects deals that earned their full annual target to show 100%, not 240%.
+```python
+# CORRECT: simple progress toward annual goal
+achievement_pct = ytd_actual / annual_usd * 100
+
+# WRONG (old calculation — DO NOT USE):
+# achievement_pct = ytd_actual / (annual_usd * months_active / 12) * 100
+```
+
+### Run Rate (Pipeline Dashboard)
+```
+complete_months = all months before last_data_month
+complete_months_avg = sum(complete_months) / len(complete_months)
+last_month_scaled = last_month_actual * (30 / days_elapsed)
+monthly_run_rate = max(complete_months_avg, total_with_scaled / num_months)
 annual_run_rate = monthly_run_rate * 12
 ```
 
@@ -287,9 +345,11 @@ The monthly revenue columns (M=Jan through X=Dec) are read dynamically. However,
 ### Streamlit Cloud Quirks
 1. **Python version**: Only controllable via the settings dropdown, NOT via `.python-version` or `runtime.txt` files
 2. **Streamlit version**: Cannot be pinned — Streamlit Cloud always installs the latest version regardless of `requirements.txt`
-3. **Built-in OAuth is broken** (as of May 2026): `st.login()` / `st.user` / `[auth]` section causes `MismatchingStateError` crashes. That's why we use a custom OAuth flow.
-4. **Deploy keys**: After deleting/recreating the repo, you need to re-establish the deploy key in Streamlit Cloud
-5. **Secrets are preserved** across reboots — they persist independently of the repo
+3. **Built-in OAuth is broken** (as of May 2026): `st.login()` / `st.user` / `[auth]` section causes `MismatchingStateError` crashes. That's why we use a custom OAuth flow with `[google_oauth]` secrets section.
+4. **"Regenerate Dashboards" ≠ code reload**: The sidebar button only clears the HTML/data caches. It does NOT reload Python source code. After pushing code changes, you MUST reboot the app from share.streamlit.io (three dots → Reboot).
+5. **Deploy keys**: After deleting/recreating the repo, you need to re-establish the deploy key in Streamlit Cloud
+6. **Secrets are preserved** across reboots — they persist independently of the repo
+7. **Secrets structure**: Must use `[google_oauth]` section (NOT `[auth]` or `[auth.google]`). The old format triggers Streamlit's broken built-in OAuth. See Authentication section for the correct format.
 
 ### Excel Parsing Fragility
 - Column positions are hardcoded (A, B, C, E, K, L, M, N, O, P, Y, Z). If Finance restructures the sheet, all generators break.
@@ -308,7 +368,9 @@ The monthly revenue columns (M=Jan through X=Dec) are read dynamically. However,
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | Dashboard shows stale data | Cached HTML | Click "Regenerate Dashboards" or wait 24h |
+| Code changes not taking effect | "Regenerate Dashboards" only refreshes data/HTML cache, NOT code | **Reboot the app** from share.streamlit.io (three dots → Reboot) |
 | Revenue numbers wrong | Column shift in Excel | Check column letters in `generate_revenue_dashboard.py` and `generate_pipeline_dashboard.py` |
+| Achievement % over 100% | Calculation using pace-adjusted target instead of annual | Should use `ytd_actual / annual_usd` — see "Achievement Percentage" section above |
 | "Data quality errors" banner | Cash report parsing failure | Check filename format of new cash reports |
 | OAuth error after reboot | Session state cleared | Normal — user just signs in again |
 | Bobby says "API error" | Invalid or expired Anthropic key | Update `ANTHROPIC_API_KEY` in secrets |
