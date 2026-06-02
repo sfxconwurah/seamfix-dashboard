@@ -36,8 +36,10 @@ BOBBY_LOG_SHEET_ID = "1c7QMZuV-YNDsmn1XYLJtx8pRyYi6g_wwdAHJ-D0cgtk"
 
 GOOGLE_SHEET_ID = "1XKIE9eRP8H1AWpuMAJA0U8bM7pQ9o1jvoQobc6aUn5s"
 GOOGLE_DRIVE_FOLDER_ID = "1vLq8m030d1ifL6nAVuo9LT5N9NSeGs9U"
+COLLECTIONS_SHEET_ID = "17KE1n5_SOeDXaX96Xsa1JfAjNs_OZX8xu-wYDt4LpU8"
 REVENUE_FILENAME = "2026 Path to Revenue (1).xlsx"
 BUDGET_FILENAME = "2026 LEAN BUDGET.xlsx"
+COLLECTIONS_FILENAME = "2026 Collections Tracker.xlsx"
 
 DASHBOARDS = {
     "Cash Overview": {
@@ -69,6 +71,12 @@ DASHBOARDS = {
         "script": "generate_pipeline_dashboard.py",
         "output": "pipeline_dashboard.html",
         "description": "Deal-level momentum, status vs trend signals, On Track / At Risk / Off Track breakdown"
+    },
+    "Collections Tracker": {
+        "icon": "📥",
+        "script": "generate_collections_dashboard.py",
+        "output": "collections_dashboard.html",
+        "description": "Critical revenue inflows, weekly movement, payment status, and urgent collection actions"
     },
 }
 
@@ -798,6 +806,16 @@ def prepare_data_folder():
                 "Local file (bundled)" if (data_path / REVENUE_FILENAME).exists() else "Not available"
             )
 
+    if COLLECTIONS_SHEET_ID:
+        coll_bytes = fetch_google_sheet_xlsx(COLLECTIONS_SHEET_ID)
+        if coll_bytes:
+            (data_path / COLLECTIONS_FILENAME).write_bytes(coll_bytes)
+            st.session_state["collections_source"] = "Google Sheet (live)"
+        else:
+            st.session_state["collections_source"] = (
+                "Local file (bundled)" if (data_path / COLLECTIONS_FILENAME).exists() else "Not available"
+            )
+
     if "uploaded_files" in st.session_state:
         for uploaded in st.session_state.uploaded_files:
             (data_path / uploaded.name).write_bytes(uploaded.getvalue())
@@ -963,7 +981,7 @@ def main():
             return dash_name, html
 
         with st.spinner("Loading dashboards — this takes about 10 seconds on first visit..."):
-            with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
                 for dash_name, html in executor.map(_generate_one, list(DASHBOARDS.keys())):
                     app_cache[dash_name] = html
 
@@ -1034,13 +1052,15 @@ setTimeout(sendHeight, 5000);
             st.caption("Auto-refreshes daily")
 
             st.markdown("##### Data Sources")
-            rev_source   = st.session_state.get("revenue_source", "Checking...")
-            cash_source  = st.session_state.get("cash_source",    "Checking...")
+            rev_source   = st.session_state.get("revenue_source",    "Checking...")
+            cash_source  = st.session_state.get("cash_source",       "Checking...")
+            coll_source  = st.session_state.get("collections_source","Checking...")
             upload_count = len(uploaded) if uploaded else 0
 
             st.caption(f"📈 Revenue: {rev_source}")
             st.caption(f"💵 Cash reports: {cash_source}" + (f" + {upload_count} uploaded" if upload_count else ""))
             st.caption(f"📋 Budget: {'Available' if (DATA_DIR / BUDGET_FILENAME).exists() else 'Missing'}")
+            st.caption(f"📥 Collections: {coll_source}")
 
             gsheet_errs = st.session_state.get("_gsheet_errors", [])
             gdrive_errs = st.session_state.get("_gdrive_errors", [])

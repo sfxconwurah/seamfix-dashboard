@@ -124,6 +124,7 @@ seamfix-dashboard/
 ├── generate_budget_dashboard.py    # Budget vs Actual generator
 ├── generate_revenue_dashboard.py   # Revenue & Fundability generator
 ├── generate_pipeline_dashboard.py  # Pipeline Intelligence generator
+├── generate_collections_dashboard.py  # Collections Tracker generator
 ├── requirements.txt                # Python dependencies
 ├── runtime.txt                     # Python version hint (ignored by Streamlit Cloud)
 ├── .python-version                 # Python version hint (ignored by Streamlit Cloud)
@@ -394,10 +395,12 @@ The monthly revenue columns (M=Jan through X=Dec) are read dynamically. However,
 | Resource | ID | Location in Code |
 |----------|-----|-----------------|
 | Revenue Google Sheet | `1XKIE9eRP8H1AWpuMAJA0U8bM7pQ9o1jvoQobc6aUn5s` | `app.py` → `GOOGLE_SHEET_ID` |
+| Collections Tracker Sheet | `17KE1n5_SOeDXaX96Xsa1JfAjNs_OZX8xu-wYDt4LpU8` | `app.py` → `COLLECTIONS_SHEET_ID` |
 | Google Drive folder (cash reports) | `1vLq8m030d1ifL6nAVuo9LT5N9NSeGs9U` | `app.py` → `GOOGLE_DRIVE_FOLDER_ID` |
 | Bobby usage log sheet | `1c7QMZuV-YNDsmn1XYLJtx8pRyYi6g_wwdAHJ-D0cgtk` | `app.py` → `BOBBY_LOG_SHEET_ID` |
 | Revenue filename | `2026 Path to Revenue (1).xlsx` | `app.py` → `REVENUE_FILENAME` |
 | Budget filename | `2026 LEAN BUDGET.xlsx` | `app.py` → `BUDGET_FILENAME` |
+| Collections filename | `2026 Collections Tracker.xlsx` | `app.py` → `COLLECTIONS_FILENAME` |
 | FX Rate | $1 = ₦1,450 | All generator files → `FX_RATE` |
 | Annual target | $8,000,000 | Pipeline → `LANDING_ZONE`, Revenue → `annual_revenue_target_usd` |
 

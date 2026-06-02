@@ -5,6 +5,25 @@
 
 ---
 
+## 2026-06-02 — Feature: Collections Intelligence dashboard (6th tab)
+
+Added a new **Collections Tracker** dashboard tab so the executive team can track critical revenue inflows in one place, see what moved week-over-week, and act on stalled or at-risk collections.
+
+**What it shows:**
+- **KPI row**: Total tracked ($2.67M / ₦3.88B), fully collected, in-progress, and payment-pending amounts with item counts and % of portfolio.
+- **Critical Actions panel**: Automatically surfaces items needing urgent action (high-value pending items, "at risk" flags, overdue deadlines, specific deliverables assigned), sorted by USD value. Colour-coded red (critical) and amber (follow-up needed).
+- **What Moved This Week**: Compares the last two weekly update columns for every item and highlights deals where something changed — green for positive movement (payment received, deal signed), red for negative flags (payment at risk, extension granted, no response), blue for general updates.
+- **Full tracker table**: All 20 items with payment status, deal status, predictability, accountable party, latest update, and actionable deliverable. Filterable by status.
+
+**Data source**: Google Sheet `17KE1n5_SOeDXaX96Xsa1JfAjNs_OZX8xu-wYDt4LpU8` — fetched live each page load (5-min cache, same pattern as the revenue sheet). The sheet must be shared with the service account or set to "anyone with the link can view".
+
+**How it works**: `app.py` fetches the sheet as xlsx and saves it to the data_working folder as `2026 Collections Tracker.xlsx`. The generator (`generate_collections_dashboard.py`) scans all tabs for the one containing the S/N header, dynamically maps columns by name (not position), detects date-labelled weekly-update columns, runs movement/urgency analysis, and outputs a self-contained HTML dashboard.
+
+**Files**: `generate_collections_dashboard.py` (new), `app.py`, `CLAUDE.md`, `CHANGELOG.md`
+**Author**: Lilian Wilfred + Claude
+
+---
+
 ## 2026-06-02 — Docs: Add "Can Claude commit and push for me?" subsection to onboarding
 
 Clarifies what a non-technical collaborator needs in order to push:
