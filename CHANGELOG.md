@@ -17,7 +17,7 @@ Follow-up to the consolidation below, ahead of onboarding the Head of Finance:
 **Files**: `ONBOARDING.md`, `CLAUDE.md`, `CHANGELOG.md`, `.gitignore`
 **Author**: Chibuzor + Claude
 
-> **Note**: `Seamfix Dashboard - Onboarding Guide.docx` carries the same stale repo references as the old ONBOARDING.md and is updated separately.
+Also updated `Seamfix Dashboard - Onboarding Guide.docx` (the Word version of the onboarding guide) with the same repo-reference corrections, via in-place XML edits so formatting is preserved.
 
 ---
 
