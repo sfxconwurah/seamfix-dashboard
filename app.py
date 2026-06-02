@@ -37,9 +37,13 @@ BOBBY_LOG_SHEET_ID = "1c7QMZuV-YNDsmn1XYLJtx8pRyYi6g_wwdAHJ-D0cgtk"
 GOOGLE_SHEET_ID = "1XKIE9eRP8H1AWpuMAJA0U8bM7pQ9o1jvoQobc6aUn5s"
 GOOGLE_DRIVE_FOLDER_ID = "1vLq8m030d1ifL6nAVuo9LT5N9NSeGs9U"
 COLLECTIONS_SHEET_ID = "17KE1n5_SOeDXaX96Xsa1JfAjNs_OZX8xu-wYDt4LpU8"
+# gid of the "2026 CRITICAL REVENUE INFLOWS" tab. The workbook holds several
+# near-identical tabs (Revenue Bridge - Data is a mirror, plus Closed/IAM), so we
+# pin to this gid to always fetch the correct one regardless of tab renaming/order.
+COLLECTIONS_GID = "1584269897"
 REVENUE_FILENAME = "2026 Path to Revenue (1).xlsx"
 BUDGET_FILENAME = "2026 LEAN BUDGET.xlsx"
-COLLECTIONS_FILENAME = "2026 Collections Tracker.xlsx"
+COLLECTIONS_FILENAME = "2026 Collections Tracker.csv"
 
 DASHBOARDS = {
     "Cash Overview": {
@@ -682,6 +686,51 @@ def fetch_google_sheet_xlsx(sheet_id):
     return None
 
 
+# ── Helper: fetch a single Google Sheet tab (by gid) as CSV bytes ────
+@st.cache_data(ttl=300, show_spinner="Fetching live collections data from Google Sheet...")
+def fetch_google_sheet_csv(sheet_id, gid):
+    """
+    Fetch one specific worksheet tab (pinned by gid) as CSV bytes.
+    Tries public export first, then falls back to the service account.
+    Pinning to gid guarantees the correct tab even if the workbook has
+    several similarly-structured tabs.
+    """
+    errors = []
+    try:
+        url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
+        req  = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        resp = urllib.request.urlopen(req, timeout=30)
+        return resp.read()
+    except Exception as e:
+        errors.append(f"Public access: {e}")
+
+    try:
+        import gspread, csv as _csv
+        from google.oauth2.service_account import Credentials
+        creds_dict = dict(st.secrets["gcp_service_account"])
+        creds = Credentials.from_service_account_info(
+            creds_dict,
+            scopes=[
+                "https://www.googleapis.com/auth/spreadsheets.readonly",
+                "https://www.googleapis.com/auth/drive.readonly",
+            ],
+        )
+        gc          = gspread.authorize(creds)
+        spreadsheet = gc.open_by_key(sheet_id)
+        ws          = spreadsheet.get_worksheet_by_id(int(gid))
+        rows        = ws.get_all_values()
+        buf = io.StringIO()
+        _csv.writer(buf).writerows(rows)
+        return buf.getvalue().encode("utf-8")
+    except KeyError:
+        errors.append("Service account: No gcp_service_account in secrets")
+    except Exception as e:
+        errors.append(f"Service account: {e}")
+
+    st.session_state["_collections_errors"] = errors
+    return None
+
+
 # ── Helper: fetch cash reports from Google Drive folder ──────────────
 def fetch_drive_folder_files(folder_id):
     debug_log = []
@@ -807,7 +856,7 @@ def prepare_data_folder():
             )
 
     if COLLECTIONS_SHEET_ID:
-        coll_bytes = fetch_google_sheet_xlsx(COLLECTIONS_SHEET_ID)
+        coll_bytes = fetch_google_sheet_csv(COLLECTIONS_SHEET_ID, COLLECTIONS_GID)
         if coll_bytes:
             (data_path / COLLECTIONS_FILENAME).write_bytes(coll_bytes)
             st.session_state["collections_source"] = "Google Sheet (live)"

@@ -362,6 +362,10 @@ The monthly revenue columns (M=Jan through X=Dec) are read dynamically. However,
 6. **Secrets are preserved** across reboots — they persist independently of the repo
 7. **Secrets structure**: Must use `[google_oauth]` section (NOT `[auth]` or `[auth.google]`). The old format triggers Streamlit's broken built-in OAuth. See Authentication section for the correct format.
 
+### Collections Tracker — Tab Pinning
+- The Collections Tracker workbook has **several near-identical tabs**: the live one is "2026 CRITICAL REVENUE INFLOWS" (gid `1584269897`), but "Revenue Bridge - Data" is a structural mirror, and "Closed" / "Potential Revenue Tracker - IAM" also carry an `S/N` header. **Do not scan by header to pick the tab** — you will sometimes land on the mirror. `app.py` fetches the tab as CSV pinned to `COLLECTIONS_GID`, which is robust to tab renaming/reordering. If Finance ever recreates that tab (deletes + re-adds), its gid changes — update `COLLECTIONS_GID` (find the new gid in the URL: `...#gid=NNNN`).
+- The header row is **row 3** (rows 1–2 hold the title and USD rate). The generator's `find_header_row` locates it by scanning for `S/N`. Weekly update columns (`Update - 2nd Jan` … `Update 29th May`) are detected dynamically — adding a new week needs no code change.
+
 ### Excel Parsing Fragility
 - Column positions are hardcoded (A, B, C, E, K, L, M, N, O, P, Y, Z). If Finance restructures the sheet, all generators break.
 - The `TOTAL` row is used as a stop marker. If someone removes it or adds data below it, unexpected rows get parsed.
@@ -398,9 +402,10 @@ The monthly revenue columns (M=Jan through X=Dec) are read dynamically. However,
 | Collections Tracker Sheet | `17KE1n5_SOeDXaX96Xsa1JfAjNs_OZX8xu-wYDt4LpU8` | `app.py` → `COLLECTIONS_SHEET_ID` |
 | Google Drive folder (cash reports) | `1vLq8m030d1ifL6nAVuo9LT5N9NSeGs9U` | `app.py` → `GOOGLE_DRIVE_FOLDER_ID` |
 | Bobby usage log sheet | `1c7QMZuV-YNDsmn1XYLJtx8pRyYi6g_wwdAHJ-D0cgtk` | `app.py` → `BOBBY_LOG_SHEET_ID` |
+| Collections Tracker tab gid | `1584269897` ("2026 CRITICAL REVENUE INFLOWS" tab) | `app.py` → `COLLECTIONS_GID` |
 | Revenue filename | `2026 Path to Revenue (1).xlsx` | `app.py` → `REVENUE_FILENAME` |
 | Budget filename | `2026 LEAN BUDGET.xlsx` | `app.py` → `BUDGET_FILENAME` |
-| Collections filename | `2026 Collections Tracker.xlsx` | `app.py` → `COLLECTIONS_FILENAME` |
+| Collections filename | `2026 Collections Tracker.csv` | `app.py` → `COLLECTIONS_FILENAME` |
 | FX Rate | $1 = ₦1,450 | All generator files → `FX_RATE` |
 | Annual target | $8,000,000 | Pipeline → `LANDING_ZONE`, Revenue → `annual_revenue_target_usd` |
 

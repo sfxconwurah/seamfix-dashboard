@@ -3,14 +3,24 @@
 Seamfix Collections Intelligence Dashboard Generator
 Tracks critical revenue inflows, weekly progress, movement between weeks, and critical actions.
 Usage: python3 generate_collections_dashboard.py [folder_path]
+
+Data source: the "2026 CRITICAL REVENUE INFLOWS" tab of the Collections Tracker
+Google Sheet, fetched by app.py as CSV pinned to its gid (1584269897) and saved
+as "2026 Collections Tracker.csv". CSV is used (not xlsx) because the workbook
+holds several near-identical tabs; pinning to the gid guarantees the right one
+regardless of tab renaming or reordering.
+
+Weekly updates are fully dynamic: each new "Update - <date>" column Finance adds
+is auto-detected (see is_date_like), so no code change is needed week to week —
+the same behaviour as the 2026 Path to Revenue dashboard.
 """
 
-import os, sys, json
+import os, sys, csv
 from datetime import datetime
 from pathlib import Path
 
 FX_RATE = 1450  # $1 = ₦1,450
-COLLECTIONS_FILENAME = "2026 Collections Tracker.xlsx"
+COLLECTIONS_FILENAME = "2026 Collections Tracker.csv"
 
 
 # ── Formatters ────────────────────────────────────────────────────────────────
@@ -60,12 +70,22 @@ def esc(s):
 # ── xlsx parsing ──────────────────────────────────────────────────────────────
 
 def is_date_like(val):
-    """Return True if the value looks like a weekly date header, e.g. '2nd Jan', '29th May'."""
+    """Return True if the value looks like a weekly update header, e.g. 'Update - 2nd Jan', '29th May'."""
     if not val:
         return False
     s = str(val).strip().lower()
     months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
     return any(m in s for m in months) and any(c.isdigit() for c in s)
+
+
+def clean_date_label(val):
+    """Turn 'Update - 2nd Jan' / 'Update 29th May' into a tidy '2nd Jan' / '29th May'."""
+    s = str(val).strip()
+    for prefix in ('Update -', 'Update-', 'Update'):
+        if s.lower().startswith(prefix.lower()):
+            s = s[len(prefix):]
+            break
+    return s.lstrip('-').strip() or str(val).strip()
 
 
 FIELD_KEYWORDS = {
@@ -91,58 +111,40 @@ SKIP_NAMES = {
 }
 
 
-def find_header_row(ws):
+def find_header_row(rows):
     """Scan first 10 rows for the row that contains the S/N column header."""
-    for row_idx, row in enumerate(ws.iter_rows(min_row=1, max_row=10, values_only=True), start=1):
+    for idx, row in enumerate(rows[:10]):
         for cell in row:
             if cell and str(cell).strip().upper() in ('S/N', 'SN', 'S / N'):
-                return row_idx
-    return 2  # fallback
+                return idx
+    return 2  # fallback (title rows usually occupy rows 0-1)
 
 
-def extract_collections(xlsx_path):
+def extract_collections(csv_path):
     """
-    Parse the Collections Tracker xlsx.
+    Parse the Collections Tracker CSV (a single sheet tab, pinned by gid in app.py).
     Returns a list of deal dicts, each with an 'updates' list of {date, text} dicts.
     """
-    from openpyxl import load_workbook
-    wb = load_workbook(str(xlsx_path), data_only=True)
+    with open(csv_path, newline='', encoding='utf-8') as f:
+        rows = list(csv.reader(f))
 
-    # Find the worksheet that contains the tracker table (scan all sheets)
-    target_ws = None
-    for sheet_name in wb.sheetnames:
-        ws = wb[sheet_name]
-        for row_idx, row in enumerate(ws.iter_rows(min_row=1, max_row=10, values_only=True), start=1):
-            for cell in row:
-                if cell and str(cell).strip().upper() in ('S/N', 'SN', 'S / N'):
-                    target_ws = ws
-                    break
-            if target_ws:
-                break
-        if target_ws:
-            break
+    if not rows:
+        return []
 
-    if target_ws is None:
-        target_ws = wb.active
+    header_idx = find_header_row(rows)
+    header = rows[header_idx]
 
-    ws = target_ws
-    header_row_idx = find_header_row(ws)
-
-    # Read header row → build column map and detect weekly-update columns
-    header_values = list(
-        ws.iter_rows(min_row=header_row_idx, max_row=header_row_idx, values_only=True)
-    )[0]
-
+    # Build column map and detect weekly-update columns
     col_map = {}
-    update_cols = []  # list of (col_index, date_label)
+    update_cols = []  # list of (col_index, clean_date_label)
 
-    for ci, hval in enumerate(header_values):
-        if hval is None:
+    for ci, hval in enumerate(header):
+        if not hval:
             continue
         key = str(hval).strip().upper()
 
         if is_date_like(hval):
-            update_cols.append((ci, str(hval).strip()))
+            update_cols.append((ci, clean_date_label(hval)))
             continue
 
         for field, keywords in FIELD_KEYWORDS.items():
@@ -152,16 +154,16 @@ def extract_collections(xlsx_path):
 
     # Parse data rows
     items = []
-    for row in ws.iter_rows(min_row=header_row_idx + 1, values_only=True):
-        if not any(cell for cell in row if cell is not None):
-            continue
+    for row in rows[header_idx + 1:]:
+        if not any(str(c).strip() for c in row):
+            continue  # skip blank rows
 
         def get(field):
             ci = col_map.get(field)
             if ci is None or ci >= len(row):
                 return None
             v = row[ci]
-            return str(v).strip() if v is not None else None
+            return str(v).strip() if v is not None and str(v).strip() else None
 
         name = get('name')
         if not name:
@@ -169,15 +171,13 @@ def extract_collections(xlsx_path):
         n_upper = name.strip().upper()
         if n_upper in SKIP_NAMES:
             continue
-        if any(x in n_upper for x in ('TOTAL', 'GRAND', 'SUB-TOTAL', 'USD RATE', 'EXCHANGE', 'RATE')):
+        if any(x in n_upper for x in ('TOTAL', 'GRAND', 'SUB-TOTAL', 'USD RATE', 'EXCHANGE RATE')):
             continue
 
         # Collect weekly updates
         updates = []
         for ci, date_label in update_cols:
-            text = ''
-            if ci < len(row) and row[ci] is not None:
-                text = str(row[ci]).strip()
+            text = str(row[ci]).strip() if ci < len(row) and row[ci] is not None else ''
             updates.append({'date': date_label, 'text': text})
 
         items.append({
@@ -650,15 +650,15 @@ function filterTable(btn, status) {{
 
 def main():
     folder = Path(sys.argv[1]) if len(sys.argv) > 1 else Path('.')
-    xlsx_path = folder / COLLECTIONS_FILENAME
+    csv_path = folder / COLLECTIONS_FILENAME
 
     # Try alternate filename patterns if exact name not found
-    if not xlsx_path.exists():
-        for alt in sorted(folder.glob('*ollection*.xlsx')):
-            xlsx_path = alt
+    if not csv_path.exists():
+        for alt in sorted(folder.glob('*ollection*.csv')):
+            csv_path = alt
             break
 
-    if not xlsx_path.exists():
+    if not csv_path.exists():
         # Write a placeholder so the dashboard tab doesn't crash
         placeholder = """<!DOCTYPE html><html><head>
 <style>
@@ -676,7 +676,7 @@ h2{color:#f59e0b;} p{color:#475569;font-size:13px;}
         return
 
     try:
-        items = extract_collections(xlsx_path)
+        items = extract_collections(csv_path)
         update_dates = [u['date'] for u in items[0]['updates']] if items else []
         html = generate_html(items, update_dates)
         out  = folder / 'collections_dashboard.html'
