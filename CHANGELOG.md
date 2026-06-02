@@ -5,6 +5,18 @@
 
 ---
 
+## 2026-06-02 — Docs: Add plain-English basics section to onboarding; switch tool guidance to Claude Code
+
+Ahead of onboarding the Head of Finance (a non-technical user):
+- **Added a "Brand-New to All This? Read This First" section** to the top of the onboarding guide — plain-English explanations of GitHub, repo, clone, Streamlit, the terminal, git/commit/push, `CLAUDE.md`, and the data → code → website big picture. Lets a complete newcomer understand the system before the setup steps.
+- **Switched the recommended Claude tool from Cowork to Claude Code.** Both live in the Claude desktop app; Claude Code is preferred because its usage limits are more generous (Cowork hits limits faster). Updated all setup steps and references accordingly, with a short note explaining the choice.
+- Applied the same changes to both `ONBOARDING.md` and the Word version (`Seamfix Dashboard - Onboarding Guide.docx`) via in-place XML edits so formatting is preserved. (Repacked manually as a zip because the local Python is 3.9 and the docx skill's pack script needs 3.10+; XML well-formedness and zip integrity were verified.)
+
+**Files**: `ONBOARDING.md`, `Seamfix Dashboard - Onboarding Guide.docx`, `CHANGELOG.md`
+**Author**: Chibuzor + Claude
+
+---
+
 ## 2026-06-02 — Docs: Flatten folder layout, fix onboarding repo refs, allow Claude to push
 
 Follow-up to the consolidation below, ahead of onboarding the Head of Finance:

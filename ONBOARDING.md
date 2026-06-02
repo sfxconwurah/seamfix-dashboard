@@ -5,6 +5,41 @@
 
 ---
 
+## Brand-New to All This? Read This First (Plain-English Basics)
+
+If words like "GitHub," "repo," or "Streamlit" are new to you, don't worry — you don't need to be a programmer to maintain this dashboard. Here is everything explained in simple sentences. Read this once and the rest of the guide will make sense.
+
+**What is the dashboard, really?**
+It's a website (https://seamfix-executive-dashboard.streamlit.app) that shows Seamfix's financial health in charts and tables. The charts are not drawn by hand — a small program reads the company's Excel files and Google Sheet and *builds* the charts automatically.
+
+**What is GitHub?**
+Think of GitHub as a shared online folder (like a Google Drive) — but specifically for the code that builds the dashboard. It stores the latest version of every file and keeps a full history of every change ever made. We keep the code there so it's safe, backed up, and so the live website knows where to get its instructions. The address of our folder on GitHub is called the **repo** (short for "repository"): https://github.com/sfxconwurah/seamfix-dashboard
+
+**What does "clone" mean?**
+"Cloning" is just downloading a copy of that GitHub folder onto your own computer so you can work on it. You do this once.
+
+**What is Streamlit?**
+Streamlit is the service that *hosts* the live website. It takes the code from GitHub and turns it into the web page your colleagues open in their browser. When people say "the live app," they mean the Streamlit website. Streamlit re-reads the code from GitHub whenever the app is restarted ("rebooted").
+
+**What is the terminal?**
+The terminal is a plain text window where you type commands instead of clicking buttons (on Mac it's the "Terminal" app). You'll only need it a couple of times for one-time setup. Claude can run most commands for you, so don't be intimidated by it.
+
+**What is "git," "commit," and "push"?**
+- *git* is the tool that tracks changes to the code.
+- A *commit* is a saved snapshot of your changes, with a short note describing what you did.
+- *Pushing* means uploading your commits from your computer up to GitHub, so the live site can pick them up. (In short: **edit → commit → push → reboot.**)
+
+**What is `CLAUDE.md`?**
+It's a file in the project that explains the whole system to Claude in detail — how the data flows, what every column means, and lessons learned. When you point Claude at the project folder, it reads this file automatically so it already understands the project. You generally don't need to read it yourself, but it's there if you're curious. (This onboarding guide is the friendly version; `CLAUDE.md` is the deep technical version.)
+
+**Claude Code vs Cowork — which do I use?**
+Inside the **Claude desktop app** there are two ways to let Claude work on files: "Cowork" and "Claude Code." **Use Claude Code.** It does the same job — reads the project, edits files, runs tests — but its usage limits are more generous, so you're less likely to get cut off mid-task. (Both live in the same desktop app; this guide assumes Claude Code.)
+
+**The big picture in one line:**
+The Excel/Google Sheet data lives in the cloud → the code on GitHub turns it into charts → Streamlit shows those charts as a website → when you want to change how it works, you ask Claude Code to edit the code, then push it to GitHub and reboot Streamlit.
+
+---
+
 ## What This Project Is
 
 The Seamfix Financial Intelligence Suite is a set of 5 interactive dashboards that show the company's financial health — revenue tracking, cash position, expenses, budget vs actual, and pipeline intelligence. It also includes "Bobby," an AI chat assistant that can answer questions about the data.
@@ -29,7 +64,7 @@ Before you start, you need three things:
 
 2. **Claude Pro or Team plan** at https://claude.ai. Seamfix has a team plan — ask your admin to add your email.
 
-3. **Claude Desktop app** installed on your computer. Download from https://claude.ai/download. You need the desktop app (not just the website) because it includes "Cowork mode" which can edit files and run code.
+3. **Claude Desktop app** installed on your computer. Download from https://claude.ai/download. You need the desktop app (not just the website) because it includes **Claude Code**, which can edit files and run code on your computer. (The desktop app also has "Cowork" — we use Claude Code instead because its usage limits are more generous.)
 
 ---
 
@@ -39,9 +74,9 @@ Before you start, you need three things:
 
 Download and install from https://claude.ai/download. Sign in with your Seamfix Claude account.
 
-### Step 2: Enable Cowork Mode
+### Step 2: Open Claude Code
 
-In Claude Desktop, look for "Cowork" in the sidebar or settings. Enable it. This gives Claude the ability to read/write files and run commands on your computer.
+In Claude Desktop, open **Claude Code** (look for it in the sidebar or settings). This is the mode that gives Claude the ability to read/write files and run commands on your computer. (Use Claude Code rather than Cowork — same capabilities, but Claude Code's usage limits are more generous, so you won't get cut off as quickly.)
 
 ### Step 3: Clone the Repository
 
@@ -56,7 +91,7 @@ If you get a permission error, you need to set up an SSH key. See the "SSH Key S
 
 ### Step 4: Connect Claude to the Project Folder
 
-In Claude Desktop's Cowork mode, click "Select folder" and choose the `seamfix-dashboard` folder you just cloned. Claude will automatically read `CLAUDE.md` to understand the project.
+In Claude Code, select the `seamfix-dashboard` folder you just cloned as the working folder. Claude will automatically read `CLAUDE.md` to understand the project.
 
 ---
 
@@ -86,7 +121,7 @@ This is the core workflow. You talk to Claude in natural language, and it edits 
 
 ### Example 1: Fix a Bug
 
-You notice the dashboard shows wrong numbers. Open Claude Cowork with the project folder selected and say:
+You notice the dashboard shows wrong numbers. Open Claude Code with the project folder selected and say:
 
 > "The achievement percentage on the Revenue dashboard is showing 200% for deals that should be 100%. Can you investigate and fix this?"
 
@@ -223,7 +258,7 @@ Tell Claude:
 
 ## Getting Help
 
-- **Dashboard bugs or feature requests**: Use Claude Cowork with the project folder
+- **Dashboard bugs or feature requests**: Use Claude Code with the project folder
 - **Can't log in**: Check if your email is in the `allowed_emails` list
 - **Data questions**: Ask Bobby (the chat assistant in the dashboard sidebar)
 - **Infrastructure issues**: Contact Chibuzor (conwurah@gmail.com)
