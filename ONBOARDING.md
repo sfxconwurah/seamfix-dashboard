@@ -10,8 +10,14 @@
 The Seamfix Financial Intelligence Suite is a set of 5 interactive dashboards that show the company's financial health — revenue tracking, cash position, expenses, budget vs actual, and pipeline intelligence. It also includes "Bobby," an AI chat assistant that can answer questions about the data.
 
 **Live dashboard**: https://seamfix-executive-dashboard.streamlit.app  
-**GitHub repo**: https://github.com/seamfix/finance-dashboard (branch: `snapshot-dev`)  
+**GitHub repo**: https://github.com/sfxconwurah/seamfix-dashboard (branch: `main`)  
 **Full technical docs**: See `CLAUDE.md` in this same folder
+
+> **Note**: The repo currently lives under Chibuzor's personal GitHub account
+> (`sfxconwurah/seamfix-dashboard`). A migration to the company org repo
+> (`seamfix/finance-dashboard`) is planned but not done yet — it's waiting on
+> CTO access. Until then, use the personal repo above, and ask Chibuzor to add
+> you as a collaborator.
 
 ---
 
@@ -19,7 +25,7 @@ The Seamfix Financial Intelligence Suite is a set of 5 interactive dashboards th
 
 Before you start, you need three things:
 
-1. **A GitHub account** with access to the `seamfix/finance-dashboard` repository. Ask your IT admin or Chibuzor to add you as a collaborator.
+1. **A GitHub account** with access to the `sfxconwurah/seamfix-dashboard` repository. Ask Chibuzor to add you as a collaborator.
 
 2. **Claude Pro or Team plan** at https://claude.ai. Seamfix has a team plan — ask your admin to add your email.
 
@@ -42,15 +48,15 @@ In Claude Desktop, look for "Cowork" in the sidebar or settings. Enable it. This
 Open a terminal (Mac: Terminal app, Windows: PowerShell) and run:
 
 ```bash
-git clone git@github.com:seamfix/finance-dashboard.git
-cd finance-dashboard
+git clone git@github.com:sfxconwurah/seamfix-dashboard.git
+cd seamfix-dashboard
 ```
 
 If you get a permission error, you need to set up an SSH key. See the "SSH Key Setup" section below.
 
 ### Step 4: Connect Claude to the Project Folder
 
-In Claude Desktop's Cowork mode, click "Select folder" and choose the `finance-dashboard` folder you just cloned. Claude will automatically read `CLAUDE.md` to understand the project.
+In Claude Desktop's Cowork mode, click "Select folder" and choose the `seamfix-dashboard` folder you just cloned. Claude will automatically read `CLAUDE.md` to understand the project.
 
 ---
 
@@ -104,6 +110,7 @@ Claude will:
 - **Be specific** about which dashboard has the issue (Cash Overview, Expense & Vendor, Budget vs Actual, Revenue & Fundability, or Pipeline Intelligence)
 - **Share screenshots** if you see something wrong — you can paste them directly into Claude
 - **Always test** before pushing. Ask Claude: "Can you test this locally to make sure it works?"
+- **Quick local preview without Claude**: double-click `UPDATE_DASHBOARD.command` in the project folder. It regenerates all 5 dashboards from the Excel files in `data/` and opens them in your browser. (This is a local preview only — it does not change the live site. The live site updates when changes are pushed to GitHub.)
 
 ---
 
@@ -126,7 +133,7 @@ In terminal, from the project folder:
 ```bash
 git add .
 git commit -m "Description of what changed"
-git push origin snapshot-dev
+git push origin main
 ```
 
 ---

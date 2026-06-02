@@ -13,3 +13,7 @@ generated/
 
 # Secrets exports (e.g. the Streamlit secrets .rtf) must never be committed.
 *.rtf
+
+# Local-only reference material: PDFs, planning docs, secrets, and superseded
+# artifacts gathered when the project was consolidated. Not used by the app.
+docs/

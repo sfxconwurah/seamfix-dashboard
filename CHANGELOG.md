@@ -5,6 +5,22 @@
 
 ---
 
+## 2026-06-02 — Docs: Flatten folder layout, fix onboarding repo refs, allow Claude to push
+
+Follow-up to the consolidation below, ahead of onboarding the Head of Finance:
+- **Folder layout flattened** to `seamfix/seamfix-dashboard` (removed the outer `financial dashboards` wrapper folder). No code paths were hardcoded, so nothing broke. Loose reference material (PDF exports, planning docx, a superseded older `app.py`, the OAuth patch, the secrets `.rtf`) was gathered into a gitignored `docs/` folder; duplicate copies of tracked files were removed.
+- **ONBOARDING.md corrected**: it pointed at `seamfix/finance-dashboard` on branch `snapshot-dev` (the stale org repo). Updated to the live `sfxconwurah/seamfix-dashboard` on `main`, with a note that the org migration is pending CTO access. Added a tip about the local `UPDATE_DASHBOARD.command` preview.
+- **Push policy**: Claude may now commit and push directly to `origin/main` (see CLAUDE.md → Development Workflow).
+- Removed an inaccurate "Reported by: Lilian Wilfred" attribution on the achievement-% fix below (she had not yet seen the dashboards).
+- `.gitignore`: added `docs/`.
+
+**Files**: `ONBOARDING.md`, `CLAUDE.md`, `CHANGELOG.md`, `.gitignore`
+**Author**: Chibuzor + Claude
+
+> **Note**: `Seamfix Dashboard - Onboarding Guide.docx` carries the same stale repo references as the old ONBOARDING.md and is updated separately.
+
+---
+
 ## 2026-06-02 — Update: Consolidate to a single repository; keep financial data local-only
 
 Established this repo (`seamfix-dashboard`) as the **single source of truth**. Previously the project was duplicated inside an outer working folder/repo (`sfxconwurah/financial-dashboards`) that held a second copy of every generator + an old `app.py`, kept in sync by a manual `cp` step. That copy had drifted (the outer copies were stale relative to deployment), which was a recurring source of confusion and bugs. The outer folder has been retired; all work now happens here.
@@ -32,8 +48,7 @@ Changed `achievement_pct` calculation in the Revenue & Fundability dashboard fro
 **Root cause**: The old formula divided YTD actual by a pro-rated target (annual × months/12). A deal earning $100K of a $100K target by May showed: $100K / ($100K × 5/12) = 240%.
 
 **Files**: `generate_revenue_dashboard.py`  
-**Author**: Chibuzor + Claude  
-**Reported by**: Lilian Wilfred (Finance)
+**Author**: Chibuzor + Claude
 
 ---
 

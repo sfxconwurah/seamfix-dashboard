@@ -420,6 +420,8 @@ git push origin main
 ```
 Streamlit Cloud auto-deploys on push to `main`. The app reboots within ~30 seconds.
 
+**Push policy (updated 2026-06-02)**: Claude is authorized to commit AND push directly to `origin/main` on Chibuzor's machine — no need to hand the push back. Still follow the rules above: stage only intentional files, write a proper `Fix:`/`Feature:`/`Update:`/`Docs:` commit message explaining *why*, add a CHANGELOG entry, and test generators locally first. After pushing a **code** change, the app needs a reboot from share.streamlit.io to pick it up (docs/config-only changes don't).
+
 ### Testing a Generator Locally
 Each generator can be run standalone:
 ```bash
