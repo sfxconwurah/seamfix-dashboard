@@ -174,7 +174,7 @@ seamfix-dashboard/
 
 **IMPORTANT — column history**: In March 2026 Finance added monthly columns Apr–Dec. In **June 2026 Finance inserted a new column D ("Recurring/Not Recurring")**, which shifted *every* column after C one to the right: Annual Revenue E→**F**, Start Date D→**E**, Status K→**L**, Comments L→**M**, monthly actuals M–X→**N–Y**, Deficit Y→**Z**, Surplus Z→**AA**. If Finance shifts columns again, update `MONTH_COLUMNS` plus `cells.get('F')` (annual), `cells.get('E')` (start), `cells.get('L')` (status), `cells.get('D')` (recurring), `cells.get('Z')`/`cells.get('AA')` (deficit/surplus) in `generate_revenue_dashboard.py`, and the matching `d.get('F'/'L'/'M')` refs in `generate_pipeline_dashboard.py`.
 
-**ARR card**: The Revenue & Fundability dashboard shows an **ARR (Annual Recurring Revenue)** KPI = sum of column F for deals where column D == "Recurring". Computed in `generate_revenue_dashboard.py` as `arr_usd`.
+**ARR cards**: The Revenue & Fundability dashboard shows two KPIs: **ARR (Annual Recurring Revenue)** = sum of column F for deals where column D == "Recurring" (`arr_usd`), and **ARR Mix (% of Revenue)** = `arr_usd / total_stream_annual` (`arr_pct`), measured against a **50% target** (`ARR_TARGET_PCT`, flagged red when below). Both in `generate_revenue_dashboard.py`.
 
 ### Cash Report Files (`Cash Report as at *.xlsx`)
 

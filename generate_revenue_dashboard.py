@@ -348,6 +348,8 @@ def generate_html(revenues, budget_ngn, revenue_file_path, budget_file_path, out
     # "Recurring" in col D. Excludes one-time / Not Recurring deals.
     arr_usd = sum(r['annual_usd'] for r in revenues if r.get('recurring'))
     arr_deal_count = len([r for r in revenues if r.get('recurring')])
+    # ARR mix = recurring revenue as a % of total annual revenue. Target: 50%.
+    ARR_TARGET_PCT = 50
     annual_revenue_target_usd = 8_000_000  # $8M official company target
     ytd_actual_revenue_usd = sum(r['ytd_actual'] for r in revenues)
     # Achievement: actual vs full annual target (simple — what Finance expects)
@@ -355,6 +357,8 @@ def generate_html(revenues, budget_ngn, revenue_file_path, budget_file_path, out
     # Per-stream achievement vs their own annual targets (aggregate)
     total_stream_annual = sum(r['annual_usd'] for r in revenues)
     ytd_achievement_rate = (ytd_actual_revenue_usd / total_stream_annual * 100) if total_stream_annual > 0 else 0
+    # ARR mix: recurring revenue as a % of total annual revenue (target ARR_TARGET_PCT)
+    arr_pct = (arr_usd / total_stream_annual * 100) if total_stream_annual > 0 else 0
     # Count active streams (those with annual target > 0)
     active_streams = len([r for r in revenues if r['annual_usd'] > 0])
     fundability_ratio = (annual_revenue_target_usd / budget_usd * 100) if budget_usd > 0 else 0
@@ -745,6 +749,12 @@ tbody tr:hover{{background:transparent!important}}
 <div class="kpi-value">{fmt_usd(arr_usd)}</div>
 <div class="kpi-secondary">{fmt_naira(arr_usd * FX_RATE)}</div>
 <div class="kpi-change">{arr_deal_count} recurring of {len(revenues)} streams</div>
+</div>
+<div class="kpi-card">
+<div class="kpi-label">ARR Mix (% of Revenue)</div>
+<div class="kpi-value {'negative' if arr_pct < ARR_TARGET_PCT else ''}">{arr_pct:.0f}%</div>
+<div class="kpi-secondary">Target {ARR_TARGET_PCT}% &middot; {'▼ ' + format(ARR_TARGET_PCT - arr_pct, '.0f') + 'pts below' if arr_pct < ARR_TARGET_PCT else '▲ on/above target'}</div>
+<div class="kpi-change">{fmt_usd(arr_usd)} recurring of {fmt_usd(total_stream_annual)} total</div>
 </div>
 <div class="kpi-card">
 <div class="kpi-label">YTD Actual Revenue</div>
