@@ -250,6 +250,14 @@ Cash dashboard separates operational flows from investment movements using keywo
 - Investment outflows: categories containing "investment in" or "funding"
 - Investment inflows: categories containing "investment withdrawal" or "investment liquidation"
 
+### Cash KPI Cards (Currency Split & Runway)
+The Cash Overview KPI row shows three position cards:
+- **Total Position (incl. Investments)** = `total_cash_ngn` (NGN equivalent of everything).
+- **NGN Balance (incl. Investments)** = `ngn_closing + investment_ngn`, displayed in ₦ via `fmt_naira()`.
+- **USD Balance (incl. Investments)** = `usd_raw + investment_usd_raw`, displayed in actual dollars via `fmt_usd()` (NOT NGN-equivalent).
+
+NGN balance + (USD balance × report FX) reconciles to Total Position (GBP, usually ~0, is the only other component). **Operational Runway** = `total position / average operational burn`. The numerator includes investments, so the sub-label reads "at operational burn rate" — do NOT re-add "excl. investments" (the burn rate excludes investment *outflows*, but the runway position does not exclude investments).
+
 ---
 
 ## Authentication

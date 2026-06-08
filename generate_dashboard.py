@@ -92,6 +92,20 @@ def fmt_naira(val):
         return f"{sign}\u20A6{v:,.0f}"
 
 
+def fmt_usd(val):
+    """Format as USD with appropriate suffix"""
+    v = abs(val)
+    sign = '-' if val < 0 else ''
+    if v >= 1_000_000_000:
+        return f"{sign}${v/1_000_000_000:.2f}B"
+    elif v >= 1_000_000:
+        return f"{sign}${v/1_000_000:.1f}M"
+    elif v >= 1_000:
+        return f"{sign}${v/1_000:.0f}K"
+    else:
+        return f"{sign}${v:,.0f}"
+
+
 def extract_report(filepath):
     fn = os.path.basename(filepath)
     dt = parse_date(fn)
@@ -780,6 +794,14 @@ def generate_html(reports, anomalies, insights, takeaways, output_path, data_war
     prev_cash = cash_positions[-2] if len(cash_positions) > 1 else latest_cash
     cash_chg = ((latest_cash - prev_cash) / prev_cash * 100) if prev_cash else 0
 
+    # NGN vs USD balance split (naira-denominated vs dollar-denominated holdings, incl. investments)
+    ngn_balance = latest.get('ngn_closing', 0) + latest.get('investment_ngn', 0)
+    usd_balance = latest.get('usd_raw', 0) + latest.get('investment_usd_raw', 0)
+    prev_ngn_balance = prev.get('ngn_closing', 0) + prev.get('investment_ngn', 0)
+    prev_usd_balance = prev.get('usd_raw', 0) + prev.get('investment_usd_raw', 0)
+    ngn_bal_chg = ((ngn_balance - prev_ngn_balance) / prev_ngn_balance * 100) if prev_ngn_balance else 0
+    usd_bal_chg = ((usd_balance - prev_usd_balance) / prev_usd_balance * 100) if prev_usd_balance else 0
+
     latest_in = inflows[-1]
     prev_in = inflows[-2] if len(inflows) > 1 else latest_in
     in_chg = ((latest_in - prev_in) / prev_in * 100) if prev_in else 0
@@ -1112,6 +1134,16 @@ tbody tr:hover{{background:transparent!important}}
 <div class="kpi-change {'positive' if cash_chg >= 0 else 'negative'}">{'&#9650;' if cash_chg >= 0 else '&#9660;'} {abs(cash_chg):.1f}% vs prior week</div>
 </div>
 <div class="kpi-card">
+<div class="kpi-label">NGN Balance (incl. Investments)</div>
+<div class="kpi-value">{fmt_naira(ngn_balance)}</div>
+<div class="kpi-change {'positive' if ngn_bal_chg >= 0 else 'negative'}">{'&#9650;' if ngn_bal_chg >= 0 else '&#9660;'} {abs(ngn_bal_chg):.1f}% vs prior week</div>
+</div>
+<div class="kpi-card">
+<div class="kpi-label">USD Balance (incl. Investments)</div>
+<div class="kpi-value">{fmt_usd(usd_balance)}</div>
+<div class="kpi-change {'positive' if usd_bal_chg >= 0 else 'negative'}">{'&#9650;' if usd_bal_chg >= 0 else '&#9660;'} {abs(usd_bal_chg):.1f}% vs prior week</div>
+</div>
+<div class="kpi-card">
 <div class="kpi-label">Weekly Inflow</div>
 <div class="kpi-value">{fmt_naira(latest_in)}</div>
 <div class="kpi-change {'positive' if in_chg >= 0 else 'negative'}">{'&#9650;' if in_chg >= 0 else '&#9660;'} {abs(in_chg):.1f}% vs prior week</div>
@@ -1129,7 +1161,7 @@ tbody tr:hover{{background:transparent!important}}
 <div class="kpi-card">
 <div class="kpi-label">Operational Runway</div>
 <div class="kpi-value">{runway:.0f} weeks</div>
-<div class="kpi-change neutral">({runway/4.3:.0f} months at op. burn excl. investments)</div>
+<div class="kpi-change neutral">({runway/4.3:.0f} months at operational burn rate)</div>
 </div>
 <div class="kpi-card">
 <div class="kpi-label">Revenue Concentration</div>

@@ -5,11 +5,29 @@
 
 ---
 
+## 2026-06-08 — Update: Cash Overview — split NGN/USD balances + clarify runway label
+
+**Why:** Finance wanted the single "Total Position" figure broken out by currency so the NGN-denominated and USD-denominated holdings are visible at a glance, while still keeping the overall total in NGN. They also flagged that the runway KPI's "excl. investments" note was misleading — the runway numerator is the *total* position (which includes investments), so the parenthetical wrongly implied investments were excluded.
+
+**What changed:**
+- Added two KPI cards next to **Total Position (incl. Investments)**:
+  - **NGN Balance (incl. Investments)** = `ngn_closing + investment_ngn`, shown in ₦.
+  - **USD Balance (incl. Investments)** = `usd_raw + investment_usd_raw`, shown in $ (actual dollars, not NGN-equivalent). Each card shows week-over-week % change.
+- Added a `fmt_usd()` helper (mirrors `fmt_naira()`) for dollar-suffixed formatting.
+- Runway KPI sub-label changed from "(N months at op. burn excl. investments)" to "(N months at operational burn rate)". Logic unchanged — runway is still `total position / operational burn`.
+
+**Note:** NGN + (USD × report FX) reconciles to Total Position (GBP, usually ~0, is the only other component). Verified locally against the 12 bundled cash reports: Total ₦2.42B = NGN ₦228.2M + USD $1.6M.
+
+**Files**: `generate_dashboard.py`, `CLAUDE.md`, `CHANGELOG.md`
+**Author**: Lilian Wilfred + Claude
+
+---
+
 ## 2026-06-02 — Feature: Light/dark theme toggle across all 6 dashboards
 
 Added a shared theme system (`theme.py`) with CSS custom properties for light and dark modes. **Light mode is now the default** — the dashboards were previously dark-only. Users can toggle between light and dark mode via a button in the top navigation bar. Preference is saved to localStorage and persists across sessions. Chart.js charts also update their grid/text colors on toggle.
 
-**Files**: `theme.py` (new), `generate_revenue_dashboard.py`, `generate_pipeline_dashboard.py`, `generate_dashboard.py`, `generate_expense_dashboard.py`, `generate_budget_dashboard.py`, `generate_collections_dashboard.py`  
+**Files**: `theme.py` (new), `generate_revenue_dashboard.py`, `generate_pipeline_dashboard.py`, `generate_dashboard.py`, `generate_expense_dashboard.py`, `generate_budget_dashboard.py`, `generate_collections_dashboard.py`
 **Author**: Chibuzor + Claude
 
 ---
@@ -18,7 +36,7 @@ Added a shared theme system (`theme.py`) with CSS custom properties for light an
 
 Added Rule #0 requiring every Claude instance to run `git pull origin main` before starting any work, to prevent overwriting changes from other contributors.
 
-**Files**: `CLAUDE.md`  
+**Files**: `CLAUDE.md`
 **Author**: Chibuzor + Claude
 
 ---
