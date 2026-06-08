@@ -882,7 +882,7 @@ def generate_dashboard(script_name, data_folder, output_name):
     import subprocess
     result = subprocess.run(
         [sys.executable, "-B", str(script_path), data_folder],  # -B: bypass .pyc bytecode cache
-        capture_output=True, text=True, timeout=60,
+        capture_output=True, text=True, timeout=120,
     )
 
     if result.returncode != 0:
@@ -1083,8 +1083,13 @@ def main():
                 html = fix_html_for_streamlit(html)
             return dash_name, html
 
-        with st.spinner("Loading dashboards — this takes about 10 seconds on first visit..."):
-            with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+        # max_workers is intentionally low (2): Streamlit Cloud runs on a heavily
+        # throttled/shared CPU, and the cash/expense/budget generators each re-parse
+        # every accumulated weekly cash report via openpyxl (CPU + memory heavy).
+        # Running all 6 at once starved them so badly they all hit the 60s subprocess
+        # timeout. Capping concurrency lets each finish well within its timeout.
+        with st.spinner("Loading dashboards — this takes about 20 seconds on first visit..."):
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
                 for dash_name, html in executor.map(_generate_one, list(DASHBOARDS.keys())):
                     app_cache[dash_name] = html
 

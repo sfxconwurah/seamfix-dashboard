@@ -5,6 +5,23 @@
 
 ---
 
+## 2026-06-08 — Fix: Dashboards timing out on load (all 6 hit 60s subprocess timeout)
+
+**Symptom:** The live app showed `TimeoutExpired: Command [... generate_dashboard.py ...] timed out after 60 seconds`, and every tab failed to render.
+
+**Root cause:** `app.py` launched all 6 generator subprocesses at once (`ThreadPoolExecutor(max_workers=6)`), each with a 60s wall-clock timeout. Streamlit Community Cloud runs on a heavily throttled/shared CPU, and the cash, expense, and budget generators each re-parse *every* accumulated weekly cash report via openpyxl (CPU + memory heavy). As more weekly reports piled up through the year, 6 simultaneous openpyxl processes starved each other badly enough that all of them blew past 60s together. Locally (12 reports, unthrottled CPU) each generator finishes in ≤7s, so it was invisible in local testing. This was a latent scaling issue, not caused by the recent NGN/USD or theme changes — `max_workers` and the 60s timeout predate both.
+
+**Fix:**
+- Reduced generator concurrency from `max_workers=6` to `max_workers=2` so the heavy generators no longer contend for the throttled CPU.
+- Raised the per-subprocess timeout from 60s to 120s for headroom.
+
+**Trade-off:** First-load is a little slower (generators now run ~3 waves of 2 instead of all at once) but completes reliably. Subsequent loads use the shared HTML cache.
+
+**Files**: `app.py`, `CLAUDE.md`, `CHANGELOG.md`
+**Author**: Lilian Wilfred + Claude
+
+---
+
 ## 2026-06-08 — Update: Cash Overview — split NGN/USD balances + clarify runway label
 
 **Why:** Finance wanted the single "Total Position" figure broken out by currency so the NGN-denominated and USD-denominated holdings are visible at a glance, while still keeping the overall total in NGN. They also flagged that the runway KPI's "excl. investments" note was misleading — the runway numerator is the *total* position (which includes investments), so the parenthetical wrongly implied investments were excluded.

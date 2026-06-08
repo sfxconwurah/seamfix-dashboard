@@ -389,10 +389,11 @@ The monthly revenue columns (M=Jan through X=Dec) are read dynamically. However,
 - Date parsing from cash report filenames uses regex — non-standard filenames will be skipped silently.
 
 ### Performance
-- First load takes ~10 seconds (data fetch + 5 dashboards generated in parallel)
+- First load takes ~20 seconds (data fetch + 6 dashboards generated in waves of 2)
 - Subsequent loads use `st.cache_resource` (shared HTML cache across all users)
 - Bobby's first query takes longer (cache write); follow-up queries use prompt caching (~90% cheaper)
 - Auto-refresh every 24 hours clears all caches
+- **Generator concurrency is capped at `max_workers=2`** in `app.py` (was 6). Streamlit Cloud's CPU is heavily throttled/shared; the cash/expense/budget generators each re-parse every accumulated weekly cash report via openpyxl. Running all 6 at once starved them so they all hit the (then 60s) subprocess timeout. Per-subprocess timeout is now 120s. **Do NOT raise `max_workers` back up** — it will reintroduce the timeout as more weekly reports accumulate. If first-load ever needs to be faster, optimize the generators (e.g. parse each cash report once and share), not the worker count.
 
 ### Common Issues
 
