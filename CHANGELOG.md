@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-06-08 — Update: Remove "ARR Mix (% of Revenue)" card, keep only "ARR As At <month>"
+
+**Why:** Finance wanted only the actuals-based ARR percentage. The plan-based "ARR Mix (% of Revenue)" card (recurring share of annual *targets*, 36%) was redundant alongside "ARR As At <month>" (recurring share of revenue *actually earned* YTD, 19% vs 50% target).
+
+**What:** Removed the "ARR Mix (% of Revenue)" KPI card and its now-unused `arr_pct` computation from `generate_revenue_dashboard.py`. Kept "ARR As At <month>". `ARR_TARGET_PCT` (50) is still used by the remaining card.
+
+**Files**: `generate_revenue_dashboard.py`, `CLAUDE.md`, `CHANGELOG.md`
+**Author**: Lilian Wilfred + Claude
+
+---
+
 ## 2026-06-08 — Update: Replace duplicated "YTD Achievement" card with "ARR As At <month>"
 
 **Why:** Once the revenue column-shift fix made total pipeline (`total_stream_annual`) equal the $8M company target, the **"Annual Progress"** and **"YTD Achievement"** KPI cards showed the identical 26% / "$2.12M of $8.00M" — a visible duplicate.
