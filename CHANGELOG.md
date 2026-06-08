@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-06-08 — Update: Replace duplicated "YTD Achievement" card with "ARR As At <month>"
+
+**Why:** Once the revenue column-shift fix made total pipeline (`total_stream_annual`) equal the $8M company target, the **"Annual Progress"** and **"YTD Achievement"** KPI cards showed the identical 26% / "$2.12M of $8.00M" — a visible duplicate.
+
+**What:** Replaced the redundant "YTD Achievement" card with **"ARR As At <month>"** = `recurring_ytd_usd / ytd_actual_revenue_usd` (`arr_asat_pct`) — the recurring share of revenue *actually earned* year-to-date, measured against the same **50% target** (red + "▼ N pts below" when under). Currently **19%** ($394.8K recurring of $2.12M earned, Jan–Jun 2026). This is distinct from the existing plan-based "ARR Mix (% of Revenue)" card (36%): ARR Mix uses annual targets (col F), ARR As At uses realized monthly actuals (cols N–Y). "Annual Progress" is kept; `ytd_achievement_rate`/`active_streams` remain used in the health summary + table.
+
+**Files**: `generate_revenue_dashboard.py`, `CLAUDE.md`, `CHANGELOG.md`
+**Author**: Lilian Wilfred + Claude
+
+---
+
 ## 2026-06-08 — Feature: ARR Mix % card (recurring share of revenue vs 50% target)
 
 **Why:** Finance wants to see the current ARR as a percentage against a 50% target.

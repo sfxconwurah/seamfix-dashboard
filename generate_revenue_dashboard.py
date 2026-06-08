@@ -359,6 +359,9 @@ def generate_html(revenues, budget_ngn, revenue_file_path, budget_file_path, out
     ytd_achievement_rate = (ytd_actual_revenue_usd / total_stream_annual * 100) if total_stream_annual > 0 else 0
     # ARR mix: recurring revenue as a % of total annual revenue (target ARR_TARGET_PCT)
     arr_pct = (arr_usd / total_stream_annual * 100) if total_stream_annual > 0 else 0
+    # ARR as-at-date: recurring share of revenue ACTUALLY EARNED YTD (vs same 50% target)
+    recurring_ytd_usd = sum(r['ytd_actual'] for r in revenues if r.get('recurring'))
+    arr_asat_pct = (recurring_ytd_usd / ytd_actual_revenue_usd * 100) if ytd_actual_revenue_usd > 0 else 0
     # Count active streams (those with annual target > 0)
     active_streams = len([r for r in revenues if r['annual_usd'] > 0])
     fundability_ratio = (annual_revenue_target_usd / budget_usd * 100) if budget_usd > 0 else 0
@@ -769,10 +772,10 @@ tbody tr:hover{{background:transparent!important}}
 <div class="kpi-change">Actual earned vs full-year target</div>
 </div>
 <div class="kpi-card">
-<div class="kpi-label">YTD Achievement ({ytd_label})</div>
-<div class="kpi-value {'negative' if ytd_achievement_rate < 20 else ''}">{ytd_achievement_rate:.0f}%</div>
-<div class="kpi-secondary">{fmt_usd(ytd_actual_revenue_usd)} of {fmt_usd(total_stream_annual)} pipeline</div>
-<div class="kpi-change">{active_streams} of {len(revenues)} streams active {ytd_label}</div>
+<div class="kpi-label">ARR As At {last_month_name} 2026</div>
+<div class="kpi-value {'negative' if arr_asat_pct < ARR_TARGET_PCT else ''}">{arr_asat_pct:.0f}%</div>
+<div class="kpi-secondary">Target {ARR_TARGET_PCT}% &middot; {'▼ ' + format(ARR_TARGET_PCT - arr_asat_pct, '.0f') + 'pts below' if arr_asat_pct < ARR_TARGET_PCT else '▲ on/above target'}</div>
+<div class="kpi-change">{fmt_usd(recurring_ytd_usd)} recurring of {fmt_usd(ytd_actual_revenue_usd)} earned {ytd_label}</div>
 </div>
 <div class="kpi-card">
 <div class="kpi-label">Budget Fundability Score</div>
