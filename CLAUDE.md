@@ -39,7 +39,7 @@ Before pushing any change:
 
 ### 4. Don't Break the Column Convention
 
-The Google Sheet column layout (M=Jan through X=Dec, Y=Deficit, Z=Surplus) is the single most fragile part of this system. If Finance changes the sheet structure:
+The Google Sheet column layout (N=Jan through Y=Dec, Z=Deficit, AA=Surplus — these shift whenever Finance inserts a column) is the single most fragile part of this system. If Finance changes the sheet structure:
 - Update the column mappings in ALL affected generator files
 - Update the "Excel Column Mapping" section in this document
 - Add a CHANGELOG entry explaining the old vs new mapping
@@ -158,19 +158,23 @@ seamfix-dashboard/
 | A | S/N (serial number — parent deals have this) |
 | B | Deal name |
 | C | Rail / category |
-| D | Start date |
-| E | Annual revenue target (USD) |
-| K | Status (On Track / At Risk / Off Track / Closed) |
-| L | Comments (free text from finance) |
-| M | January actual (USD) |
-| N | February actual (USD) |
-| O | March actual (USD) |
-| P | April actual (USD) |
-| Q–X | May–December actual (USD) — added by Finance in April 2026 |
-| Y | Deficit (USD) |
-| Z | Surplus (USD) |
+| D | Recurring / Not Recurring (added June 2026) |
+| E | Revenue Start Date |
+| F | 2026 Annual Revenue (USD) |
+| G–K | Monthly/Weekly/Daily Revenue, Unit Price, No. of Daily Applications (not read by generators) |
+| L | Status (On Track / At Risk / Off Track / Closed) |
+| M | Comments (free text from finance) |
+| N | January actual (USD) |
+| O | February actual (USD) |
+| P | March actual (USD) |
+| Q–Y | April–December actual (USD) |
+| Z | Deficit (USD) |
+| AA | Surplus (USD) |
+| AB | Gap (USD) |
 
-**IMPORTANT**: In March 2026, Finance added monthly columns for Apr–Dec (Q through X). This shifted the Deficit column from P→Y and Surplus from Q→Z. If Finance adds more columns in future, these will shift again — search for `cells.get('Y')` and `cells.get('Z')` to update.
+**IMPORTANT — column history**: In March 2026 Finance added monthly columns Apr–Dec. In **June 2026 Finance inserted a new column D ("Recurring/Not Recurring")**, which shifted *every* column after C one to the right: Annual Revenue E→**F**, Start Date D→**E**, Status K→**L**, Comments L→**M**, monthly actuals M–X→**N–Y**, Deficit Y→**Z**, Surplus Z→**AA**. If Finance shifts columns again, update `MONTH_COLUMNS` plus `cells.get('F')` (annual), `cells.get('E')` (start), `cells.get('L')` (status), `cells.get('D')` (recurring), `cells.get('Z')`/`cells.get('AA')` (deficit/surplus) in `generate_revenue_dashboard.py`, and the matching `d.get('F'/'L'/'M')` refs in `generate_pipeline_dashboard.py`.
+
+**ARR card**: The Revenue & Fundability dashboard shows an **ARR (Annual Recurring Revenue)** KPI = sum of column F for deals where column D == "Recurring". Computed in `generate_revenue_dashboard.py` as `arr_usd`.
 
 ### Cash Report Files (`Cash Report as at *.xlsx`)
 
@@ -363,7 +367,7 @@ Users can click "🔄 Regenerate Dashboards" in the sidebar (under ⚙️ Data &
 Just click "Regenerate Dashboards" in the sidebar or wait for the 24-hour auto-refresh.
 
 ### If Finance Adds More Columns to the Excel
-The monthly revenue columns (M=Jan through X=Dec) are read dynamically. However, Deficit (column Y) and Surplus (column Z) are still hardcoded positional references. If Finance inserts columns that shift Y/Z, search for `cells.get('Y')` and `cells.get('Z')` in both `generate_revenue_dashboard.py` and `generate_pipeline_dashboard.py` to update them.
+The monthly revenue columns (N=Jan through Y=Dec) are read dynamically *within* their range, but the range itself plus all single-column refs (annual=F, start=E, status=L, comments=M, recurring=D, Deficit=Z, Surplus=AA) are hardcoded positional references. If Finance inserts/shifts columns, update `MONTH_COLUMNS` and those `cells.get(...)`/`d.get(...)` refs in both `generate_revenue_dashboard.py` and `generate_pipeline_dashboard.py`. (June 2026: a new col D "Recurring/Not Recurring" shifted everything after C right by one — see Excel Column Mapping above.)
 
 ---
 
@@ -383,7 +387,7 @@ The monthly revenue columns (M=Jan through X=Dec) are read dynamically. However,
 - The header row is **row 3** (rows 1–2 hold the title and USD rate). The generator's `find_header_row` locates it by scanning for `S/N`. Weekly update columns (`Update - 2nd Jan` … `Update 29th May`) are detected dynamically — adding a new week needs no code change.
 
 ### Excel Parsing Fragility
-- Column positions are hardcoded (A, B, C, E, K, L, M, N, O, P, Y, Z). If Finance restructures the sheet, all generators break.
+- Column positions are hardcoded (A, B, C, D, E, F, L, M, N–Y, Z, AA). If Finance restructures the sheet, all generators break. (A new column was inserted at D in June 2026 — see Excel Column Mapping.)
 - The `TOTAL` row is used as a stop marker. If someone removes it or adds data below it, unexpected rows get parsed.
 - Section headers (`ANCHOR DEALS`, `EXISTING CUSTOMERS`, etc.) are skipped by exact match. Case matters.
 - Date parsing from cash report filenames uses regex — non-standard filenames will be skipped silently.

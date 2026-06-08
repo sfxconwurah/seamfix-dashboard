@@ -16,7 +16,7 @@ FX_RATE = 1450  # $1 USD = ₦1,450 NGN
 SECTION_HEADERS = {"ANCHOR DEALS", "EXISTING CUSTOMERS", "DEALS FROM 2025", "NEW BUSINESS", "TOTAL"}
 
 # Monthly actual columns: M=Jan, N=Feb, ..., X=Dec (convention set by Finance)
-MONTH_COLUMNS = ['M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X']
+MONTH_COLUMNS = ['N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y']
 MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 MONTH_COLORS = [
     '#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ec4899', '#06b6d4',
@@ -115,11 +115,11 @@ def extract_revenue_data(filepath):
             current_parent_rail = str(d.get('C', '') or '').strip()
 
         rail = str(d.get('C', '') or '').strip() or current_parent_rail or 'Other'
-        annual = sf(d.get('E'))
-        status = str(d.get('K', '') or '').strip()
-        comment = str(d.get('L', '') or '').strip()
+        annual = sf(d.get('F'))  # annual revenue — col F (was E before col-D insert)
+        status = str(d.get('L', '') or '').strip()  # status — col L (was K)
+        comment = str(d.get('M', '') or '').strip()  # comments — col M (was L)
 
-        # Read all 12 month columns dynamically (M=Jan .. X=Dec)
+        # Read all 12 month columns dynamically (N=Jan .. Y=Dec)
         monthly = [sf(d.get(col)) for col in MONTH_COLUMNS]
         ytd = sum(monthly)
 

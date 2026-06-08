@@ -1,7 +1,22 @@
 # Changelog — Seamfix Financial Dashboard
 
-> **Rule**: Every code change must add an entry here. Format: date, type, description, files changed.  
+> **Rule**: Every code change must add an entry here. Format: date, type, description, files changed.
 > **Types**: `Fix`, `Feature`, `Update`, `Refactor`, `Docs`
+
+---
+
+## 2026-06-08 — Fix + Feature: Revenue sheet column shift (new col D) + ARR card
+
+**Why:** Finance inserted a new column **D ("Recurring/Not Recurring")** in the live "2026 Path to Revenue" sheet, which shifted every column after C one to the right. The generators were still reading the old positions, so the live Revenue & Fundability and Pipeline Intelligence dashboards were silently reading the **wrong columns** (annual revenue, status, monthly actuals, deficit/surplus all off by one). This corrects the mapping and adds the requested ARR card.
+
+**Column remap (old → new):** Annual Revenue E→**F**, Start Date D→**E**, Status K→**L**, Comments L→**M**, monthly actuals Jan–Dec M–X→**N–Y**, Deficit Y→**Z**, Surplus Z→**AA**. New col **D = Recurring/Not Recurring**.
+
+**Feature — ARR card:** Added an **ARR (Annual Recurring Revenue)** KPI to the Revenue & Fundability dashboard = sum of column F (2026 annual revenue) for deals flagged "Recurring" in column D (excludes Not-Recurring/one-time deals). Current value ≈ **$2.86M** across 17 recurring streams.
+
+**Tested:** Ran both generators locally against the refreshed sheet — 43 streams parsed; ARR $2.86M, YTD actual $2.12M, annual progress 26%, statuses parse correctly (14 On Track / 6 At Risk / 4 Off Track), data range "Jan – Jun 2026 (Jun partial)". Bobby's context is unaffected since it reuses `gen_pipe.extract_revenue_data()`.
+
+**Files**: `generate_revenue_dashboard.py`, `generate_pipeline_dashboard.py`, `CLAUDE.md`, `CHANGELOG.md`
+**Author**: Lilian Wilfred + Claude
 
 ---
 

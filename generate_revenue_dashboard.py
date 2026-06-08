@@ -16,7 +16,7 @@ from theme import get_base_css, get_toggle_html, get_theme_js
 FX_RATE = 1450  # $1 USD = ₦1,450 NGN
 
 # Monthly actual columns: M=Jan, N=Feb, ..., X=Dec (convention set by Finance)
-MONTH_COLUMNS = ['M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X']
+MONTH_COLUMNS = ['N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y']
 MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 
@@ -137,18 +137,21 @@ def extract_revenue_data(revenue_file):
         else:
             rail = 'Others'
 
-        # Get annual revenue (USD)
-        annual_usd = sf(cells.get('E'))
+        # Recurring / Not Recurring flag (col D — inserted Jun 2026, shifted later cols right)
+        recurring = str(cells.get('D') or '').strip().lower() == 'recurring'
 
-        # Get actuals to check if row has any data
-        has_actuals = any(sf(cells.get(col)) != 0 for col in ['M', 'N', 'O', 'P'])
+        # Get annual revenue (USD) — col F (was E before the col-D insert)
+        annual_usd = sf(cells.get('F'))
+
+        # Get actuals to check if row has any data (first 4 month cols N–Q)
+        has_actuals = any(sf(cells.get(col)) != 0 for col in ['N', 'O', 'P', 'Q'])
 
         # Include rows with annual target OR actual revenue data
         if annual_usd == 0 and not has_actuals:
             continue
 
-        # Get start date
-        start_date = cells.get('D')
+        # Get start date — col E (was D)
+        start_date = cells.get('E')
         if start_date:
             if hasattr(start_date, 'strftime'):
                 start_date_str = start_date.strftime('%d %b %Y')
@@ -157,16 +160,16 @@ def extract_revenue_data(revenue_file):
         else:
             start_date_str = 'N/A'
 
-        # Get status
-        status = cells.get('K')
+        # Get status — col L (was K)
+        status = cells.get('L')
         status = str(status).strip() if status else 'Unknown'
 
-        # Get monthly actuals (USD) — dynamically read all 12 months (M=Jan..X=Dec)
+        # Get monthly actuals (USD) — dynamically read all 12 months (N=Jan..Y=Dec)
         monthly = [sf(cells.get(col)) for col in MONTH_COLUMNS]
 
-        # Deficit=Y, Surplus=Z (Finance added Apr–Dec columns, shifting these right)
-        deficit = sf(cells.get('Y'))
-        surplus = sf(cells.get('Z'))
+        # Deficit=Z, Surplus=AA (shifted right by the col-D insert)
+        deficit = sf(cells.get('Z'))
+        surplus = sf(cells.get('AA'))
 
         ytd_actual = sum(monthly)  # will be refined after we detect which months have data globally
 
@@ -179,6 +182,7 @@ def extract_revenue_data(revenue_file):
             'start_date': start_date_str,
             'start_date_obj': start_date if hasattr(start_date, 'month') else None,
             'annual_usd': annual_usd,
+            'recurring': recurring,
             'status': status,
             'monthly': monthly,
             'ytd_actual': ytd_actual,
@@ -340,6 +344,10 @@ def generate_html(revenues, budget_ngn, revenue_file_path, budget_file_path, out
 
     # Calculate KPIs (all revenue in USD)
     deal_bucket_total_usd = sum(r['annual_usd'] for r in revenues)  # $10M optimistic bucket
+    # ARR = Annual Recurring Revenue: annual value (col F) of deals flagged
+    # "Recurring" in col D. Excludes one-time / Not Recurring deals.
+    arr_usd = sum(r['annual_usd'] for r in revenues if r.get('recurring'))
+    arr_deal_count = len([r for r in revenues if r.get('recurring')])
     annual_revenue_target_usd = 8_000_000  # $8M official company target
     ytd_actual_revenue_usd = sum(r['ytd_actual'] for r in revenues)
     # Achievement: actual vs full annual target (simple — what Finance expects)
@@ -731,6 +739,12 @@ tbody tr:hover{{background:transparent!important}}
 <div class="kpi-value">{fmt_usd(annual_revenue_target_usd)}</div>
 <div class="kpi-secondary">{fmt_naira(annual_revenue_target_usd * FX_RATE)}</div>
 <div class="kpi-change">{len(revenues)} streams across pipeline</div>
+</div>
+<div class="kpi-card">
+<div class="kpi-label">ARR (Annual Recurring Revenue)</div>
+<div class="kpi-value">{fmt_usd(arr_usd)}</div>
+<div class="kpi-secondary">{fmt_naira(arr_usd * FX_RATE)}</div>
+<div class="kpi-change">{arr_deal_count} recurring of {len(revenues)} streams</div>
 </div>
 <div class="kpi-card">
 <div class="kpi-label">YTD Actual Revenue</div>
