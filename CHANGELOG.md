@@ -5,6 +5,28 @@
 
 ---
 
+## 2026-06-08 — Feature: Group Financials dashboard (consolidated P&L + profitability vs targets)
+
+**Why:** Finance dropped the consolidated **Group Financial Report** (`Group Financial Report_Apr-26.xlsx`) into `data/` and the exec team needs it surfaced as a dashboard tab — highlighting **Net Profit Margin vs the 10% target** and **Gross Profit Margin vs the 70% target**, plus expense analysis and the other metrics leadership tracks.
+
+**What:** New generator `generate_financial_report_dashboard.py` + new **"Group Financials"** tab (🏦) in `app.py`'s `DASHBOARDS` dict (output `financial_report_dashboard.html`). Parses the **GROUP INCOME STATEMENT** block on the report's **`Summary`** tab. Renders:
+- KPI row: Total Revenue (+154% YoY), Gross Profit, EBITDA, Profit After Tax (loss→profit turnaround).
+- Two target cards with gauges: **Net Profit Margin 23.9% vs 10% target** (✓ +13.9pts) and **Gross Profit Margin 78.2% vs 70% target** (✓ +8.2pts).
+- Auto-generated Critical Insights (margins vs target, turnaround, ARR contraction, NIMC customer concentration ~71%, OpEx discipline).
+- Income Statement table (current vs prior YTD, NGN + USD, YoY), Expense Analysis (Payroll/COGS/Marketing/D&A/Other as % of revenue), Revenue by Vertical (doughnut + table)/Country/Top Customers, ARR + balance-sheet highlights.
+
+**Key design notes:**
+- Parsing is **label-driven** (scans column **K** of the `Summary` tab for line-item names) so it survives row insertions — same robustness lesson as the revenue sheet. GROUP columns: **K**=label, **L**=current NGN, **M**=prior NGN, **N**=current USD, **O**=prior USD.
+- Uses the **report's own USD columns** (period-average FX), NOT the dashboard-wide `FX_RATE=1450`.
+- **YoY uses magnitude growth** and flags loss↔profit sign flips as "↺ turnaround" — so cost lines that double read "▲100%" (red) instead of a misleading "-100%" (green).
+- Generator **fails safe**: if the file is missing or the Summary tab isn't recognisable, it writes a friendly placeholder HTML and exits 0 (never crashes the tab).
+- **DEPLOYMENT CAVEAT:** the report `.xlsx` is **local-only** (gitignored) and is **not** fetched from Google Drive/Sheets, so on Streamlit Cloud this tab will show the placeholder until the file is either (a) force-added to the repo or (b) wired into the Drive/Sheets fetch. Sensitive consolidated financials — do not commit without sign-off.
+
+**Files**: `generate_financial_report_dashboard.py` (new), `app.py`, `CLAUDE.md`, `CHANGELOG.md`
+**Author**: Lilian Wilfred + Claude
+
+---
+
 ## 2026-06-08 — Update: Remove "ARR Mix (% of Revenue)" card, keep only "ARR As At <month>"
 
 **Why:** Finance wanted only the actuals-based ARR percentage. The plan-based "ARR Mix (% of Revenue)" card (recurring share of annual *targets*, 36%) was redundant alongside "ARR As At <month>" (recurring share of revenue *actually earned* YTD, 19% vs 50% target).

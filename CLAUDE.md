@@ -133,6 +133,7 @@ seamfix-dashboard/
 ├── generate_revenue_dashboard.py   # Revenue & Fundability generator
 ├── generate_pipeline_dashboard.py  # Pipeline Intelligence generator
 ├── generate_collections_dashboard.py  # Collections Tracker generator
+├── generate_financial_report_dashboard.py  # Group Financials (consolidated P&L) generator
 ├── requirements.txt                # Python dependencies
 ├── runtime.txt                     # Python version hint (ignored by Streamlit Cloud)
 ├── .python-version                 # Python version hint (ignored by Streamlit Cloud)
@@ -142,7 +143,8 @@ seamfix-dashboard/
 ├── data/                           # Bundled xlsx files (fallback if Drive/Sheets unavailable)
 │   ├── Cash Report as at *.xlsx    # Weekly cash position reports
 │   ├── 2026 Path to Revenue (1).xlsx   # Revenue & pipeline tracker
-│   └── 2026 LEAN BUDGET.xlsx       # Annual budget breakdown
+│   ├── 2026 LEAN BUDGET.xlsx       # Annual budget breakdown
+│   └── Group Financial Report_*.xlsx  # Consolidated P&L (LOCAL-ONLY — not fetched online)
 └── generated/                      # Runtime working directory (gitignored)
     └── data_working/               # Merged data + generated HTML (ephemeral)
 ```
@@ -190,6 +192,29 @@ The date is extracted from the filename using regex: `(\d+)\w*\s+(Month)\s+(\d{4
 ### Budget File (`2026 LEAN BUDGET.xlsx` → "Budget Summary" tab)
 
 Contains the annual ₦5.1B budget broken into categories. Mapped against actual cash outflows using fuzzy matching in `generate_budget_dashboard.py`.
+
+### Group Financial Report (`Group Financial Report_*.xlsx` → "Summary" tab)
+
+Consolidated P&L / balance sheet produced by Finance (drives the **Group Financials** tab via `generate_financial_report_dashboard.py`). The `Summary` tab holds two side-by-side blocks: **NIGERIA** (cols C–H) and **GROUP** (cols K–P). We read the **GROUP** block:
+
+| Column | Content |
+|--------|---------|
+| K | Line-item label (e.g. "Total Revenue", "Gross Profit", "EBITDA", "Profit After Tax", "Gross Profit Margin", "ARR") |
+| L | Current-period YTD value (NGN) |
+| M | Prior-period YTD value (NGN) |
+| N | Current-period YTD value (USD — report's own period-average FX) |
+| O | Prior-period YTD value (USD) |
+| P | Variance % |
+
+**Parsing is label-driven** — the generator scans column K for line-item names rather than hardcoding rows, so it survives row insertions. It reads the income-statement region (everything above the `GROUP BALANCE SHEET` header), the ratios block (Gross/EBITDA/Net margins, OpEx/Payroll/Marketing % of revenue, ARR %), the three revenue breakdowns ("Revenue by Vertical/Customer/Country", each terminated by its own `Total` row), and a few balance-sheet highlights. USD figures come from the report's own N/O columns, **not** `FX_RATE=1450`.
+
+**Executive targets (hardcoded in the generator):** Net Profit Margin `NET_MARGIN_TARGET = 10` %, Gross Profit Margin `GROSS_MARGIN_TARGET = 70` %.
+
+**Gotchas:**
+- The report `.xlsx` is **local-only** (gitignored) and is **NOT** fetched from Google Drive/Sheets. On Streamlit Cloud the tab shows a placeholder until the file is force-added to the repo or wired into the Drive fetch. It is sensitive consolidated financial data — do not commit without sign-off.
+- The generator **fails safe**: missing file or unrecognisable Summary tab → writes a placeholder HTML and exits 0 (never crashes the tab).
+- YoY uses **magnitude growth** and flags loss↔profit sign flips as "↺ turnaround" (so a doubled cost line reads "▲100%" red, not a misleading "-100%" green).
+- Segment/customer/country breakdown totals (~₦1.48B) are **less than** P&L Total Revenue (~₦2.37B) — the breakdowns exclude Other Income and some items. Presented as their own tables; do not assume they reconcile to total revenue.
 
 ---
 

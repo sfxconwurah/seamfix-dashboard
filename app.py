@@ -82,6 +82,12 @@ DASHBOARDS = {
         "output": "collections_dashboard.html",
         "description": "Critical revenue inflows, weekly movement, payment status, and urgent collection actions"
     },
+    "Group Financials": {
+        "icon": "🏦",
+        "script": "generate_financial_report_dashboard.py",
+        "output": "financial_report_dashboard.html",
+        "description": "Consolidated P&L, profitability vs targets (net margin 10%, gross margin 70%), expense analysis, and revenue breakdowns"
+    },
 }
 
 
