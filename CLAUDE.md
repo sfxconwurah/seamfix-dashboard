@@ -143,7 +143,8 @@ seamfix-dashboard/
 ├── data/                           # Bundled xlsx files (fallback if Drive/Sheets unavailable)
 │   ├── Cash Report as at *.xlsx    # Weekly cash position reports
 │   ├── 2026 Path to Revenue (1).xlsx   # Revenue & pipeline tracker
-│   ├── 2026 LEAN BUDGET.xlsx       # Annual budget breakdown
+│   ├── 2026 LEAN BUDGET.xlsx       # Annual budget breakdown (legacy — no longer read by Budget tab)
+│   ├── budget_tracker_snapshot.json   # Budget vs Actual data (committed snapshot of Netlify tracker)
 │   └── Group Financial Report_*.xlsx  # Consolidated P&L (LOCAL-ONLY — not fetched online)
 └── generated/                      # Runtime working directory (gitignored)
     └── data_working/               # Merged data + generated HTML (ephemeral)
@@ -189,9 +190,18 @@ Each weekly cash report has a fixed structure parsed by `generate_dashboard.py`:
 
 The date is extracted from the filename using regex: `(\d+)\w*\s+(Month)\s+(\d{4})`.
 
-### Budget File (`2026 LEAN BUDGET.xlsx` → "Budget Summary" tab)
+### Budget vs Actual — Budget Tracker snapshot (`data/budget_tracker_snapshot.json`)
 
-Contains the annual ₦5.1B budget broken into categories. Mapped against actual cash outflows using fuzzy matching in `generate_budget_dashboard.py`.
+**As of 2026-06-11 the Budget vs Actual tab is driven by a committed JSON snapshot of the external Seamfix Budget Tracker (https://seamfix-budget-tracker.netlify.app/), NOT by `2026 LEAN BUDGET.xlsx` + cash-outflow fuzzy matching (that old approach was retired).**
+
+- **Why a snapshot, not a live fetch:** the Netlify tracker is a fully client-side page — its data lives in hardcoded JS objects (`BUDGET_DATA`, `C`, `ACT`, `EXC`), refreshed manually per "Run". There is no API. So we extract the data into `data/budget_tracker_snapshot.json` and commit it. It is a plain `.json` (not gitignored) so it ships to Streamlit Cloud. `app.py`'s `prepare_data_folder()` copies it into the working dir each run.
+- **To refresh:** re-extract the tracker's `BUDGET_DATA` (lean mode) + `C` (meta/FX) objects into the snapshot (the current snapshot was built from `Run_004`, 2026-05-30, actuals through Apr-2026). Bump `runId`/`runDate`/`lastActualsMonth`/`elapsedMonths` accordingly.
+- **Mode = lean.** The tracker has two modes: **lean** (Acumatica-loaded budget that carries actuals) and **full** (approved budget, **no actuals**). Only lean can drive a budget-vs-actual view, so the snapshot stores lean only.
+- **Currency = NGN, bottom-up.** Built so **Group = Σ entities = Σ departments**. NG dept budgets are already NGN; **UK budgets are GBP and UAE budgets are USD**, FX-converted to NGN using the tracker's lean FX (`GBP_NGN=2000`, `USD_NGN=1500`). **Actuals are already NGN for every entity** (do NOT FX-convert actuals). FY rollup reconciles exactly to the tracker's `groupFY_NGN` (₦5.10B). YTD actual reconciles bottom-up to ₦1.45B (the tracker's own headline `groupYTD_A_NGN` ₦1.47B is ~1.4% higher because it includes mapped transactions not allocated to a department head — we deliberately use the reconciling bottom-up figure).
+- **Three levels rendered:** GROUP KPIs + health; COMPANY-wide entity cards/table (NG/UK/UAE); DEPARTMENT-wide sortable table (11 depts: BGI=Commercial, OPS=Admin & Operations, SOL=Solutions, HRM=PPC, PDM=Products, FIN=Finance, LEG=Legal, MGT=Directors & Mgt, CAP=CAPEX, UK, UAE) with click-to-expand budget-head drill-down. Plus dept bar chart + group monthly budget-vs-actual line chart, and executive takeaways (over-pace / underspending depts, largest spend lines).
+- **Snapshot schema:** top-level meta (`fiscalYear`, `runId`, `runDate`, `lastActualsMonth`, `elapsedMonths`, `months[]`, `leanFX`, revenue context) + `departments[]` (each: `dept_code`, `dept_name`, `entity`, `currency`, `annual_total`, `months{Jan..Dec}` budget, `budget_heads[]` with `name`/`annual`/`months`/`actuals{jan..dec lowercase, NGN}`).
+- Generator **fails safe**: missing/unreadable snapshot or empty departments → placeholder HTML + exit 0.
+- `2026 LEAN BUDGET.xlsx` (the old source) is no longer read by this tab. `generate_budget_dashboard.py`'s `main()` now reads `budget_tracker_snapshot.json` and outputs `budget_dashboard.html`.
 
 ### Group Financial Report (`Group Financial Report_*.xlsx` → "Summary" tab)
 

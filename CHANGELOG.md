@@ -5,6 +5,26 @@
 
 ---
 
+## 2026-06-11 — Feature: Budget vs Actual rebuilt from Budget Tracker (group / company / department)
+
+**Why:** Finance maintains a richer, Acumatica-loaded budget-vs-actual view in the external **Seamfix Budget Tracker** (https://seamfix-budget-tracker.netlify.app/). The exec team wanted that surfaced in the dashboard's **Budget vs Actual** tab, broken out **group-wide, company-wide (per entity), and department-wide**. The old approach (fuzzy-matching cash-report outflows against `2026 LEAN BUDGET.xlsx`) was approximate and entity-blind; it has been retired.
+
+**What:** Rewrote `generate_budget_dashboard.py` to render three levels from a committed JSON snapshot:
+- **Group** KPIs (annual ₦5.10B, YTD budget ₦2.17B, YTD actual ₦1.45B, remaining, projected year-end) + budget-health takeaway.
+- **Company-wide** cards + table per entity — Nigeria, United Kingdom, United Arab Emirates — with % of annual vs the time-elapsed pace marker.
+- **Department-wide** sortable/searchable table (11 depts) with click-to-expand budget-head drill-down, a YTD-budget-vs-actual bar chart, a group monthly budget-vs-actual line chart, and executive takeaways (over-pace depts, underspenders, largest spend lines).
+
+**Key design notes:**
+- **Snapshot, not live fetch:** the Netlify tracker is fully client-side (hardcoded JS data, manual "Run" refresh, no API). Data extracted into `data/budget_tracker_snapshot.json` (plain `.json`, not gitignored → ships to Streamlit Cloud). `app.py`'s `prepare_data_folder()` now copies it into the working dir each run. Current snapshot = `Run_004` (2026-05-30), actuals through Apr-2026.
+- **Lean mode only:** the tracker's "lean" (Acumatica-loaded) budget carries actuals; "full" (approved) has none, so lean is the only basis for budget-vs-actual.
+- **NGN, bottom-up:** Group = Σ entities = Σ departments. NG budgets already NGN; **UK (GBP) and UAE (USD) budgets FX-converted** at lean FX (GBP=2000, USD=1500); **actuals are already NGN** for all entities. FY reconciles exactly to the tracker's ₦5.10B; YTD actual reconciles bottom-up to ₦1.45B (tracker headline ₦1.47B is ~1.4% higher — includes mapped txns not allocated to a dept head; we use the reconciling figure).
+- Generator **fails safe**: missing/unreadable snapshot → placeholder HTML, exit 0.
+
+**Files**: `generate_budget_dashboard.py` (rewritten), `data/budget_tracker_snapshot.json` (new), `app.py` (copy snapshot to working dir), `CLAUDE.md`, `CHANGELOG.md`
+**Author**: Lilian Wilfred + Claude
+
+---
+
 ## 2026-06-08 — Feature: Group Financials dashboard (consolidated P&L + profitability vs targets)
 
 **Why:** Finance dropped the consolidated **Group Financial Report** (`Group Financial Report_Apr-26.xlsx`) into `data/` and the exec team needs it surfaced as a dashboard tab — highlighting **Net Profit Margin vs the 10% target** and **Gross Profit Margin vs the 70% target**, plus expense analysis and the other metrics leadership tracks.

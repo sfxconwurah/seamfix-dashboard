@@ -837,6 +837,11 @@ def prepare_data_folder():
             dest = data_path / f.name
             if not dest.exists():
                 shutil.copy2(f, dest)
+        # Budget vs Actual tab reads a committed JSON snapshot of the Netlify
+        # budget tracker (no live API). Refresh it each run so repo updates show.
+        snap = DATA_DIR / "budget_tracker_snapshot.json"
+        if snap.exists():
+            shutil.copy2(snap, data_path / snap.name)
 
     if GOOGLE_DRIVE_FOLDER_ID:
         drive_files, drive_debug = fetch_drive_folder_files(GOOGLE_DRIVE_FOLDER_ID)
