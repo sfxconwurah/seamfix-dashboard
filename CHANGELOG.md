@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-06-17 — Update: Group Financials auto-selects the latest weekly report
+
+**Why:** Finance now drops a fresh `Group Financial Report_<Mon-YY>.xlsx` into `data/` weekly (May-26 added). `find_file()` returned `glob()[0]` (arbitrary order), so with multiple reports accumulating the tab could render a stale month. The dashboard already regenerates on each load / "Regenerate Dashboards" / 24h auto-refresh — the only gap was picking the newest report.
+
+**What:** `find_file()` now returns the **latest** matching report. New `_report_period_key()` parses `Mon-YY` from the filename (plus an optional `_vN` version suffix), ranking by (year, month, version, mtime); files with no recognisable period fall back to mtime so they never outrank a dated report. Verified May-26_v2 wins over Apr-26 and May-26 (v2 beats v1). No hook/watcher needed — dropping a newer-dated file is detected automatically on the next regenerate.
+
+**Note:** report `.xlsx` remains **local-only/gitignored** — to surface a new month on Streamlit Cloud it must still be force-added (`git add -f`) and the app rebooted/regenerated.
+
+**Files**: `generate_financial_report_dashboard.py`, `CLAUDE.md`, `CHANGELOG.md`
+**Author**: Lilian Wilfred + Claude
+
+---
+
 ## 2026-06-11 — Feature: Budget vs Actual rebuilt from Budget Tracker (group / company / department)
 
 **Why:** Finance maintains a richer, Acumatica-loaded budget-vs-actual view in the external **Seamfix Budget Tracker** (https://seamfix-budget-tracker.netlify.app/). The exec team wanted that surfaced in the dashboard's **Budget vs Actual** tab, broken out **group-wide, company-wide (per entity), and department-wide**. The old approach (fuzzy-matching cash-report outflows against `2026 LEAN BUDGET.xlsx`) was approximate and entity-blind; it has been retired.

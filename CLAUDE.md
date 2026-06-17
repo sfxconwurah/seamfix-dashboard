@@ -220,6 +220,8 @@ Consolidated P&L / balance sheet produced by Finance (drives the **Group Financi
 
 **Executive targets (hardcoded in the generator):** Net Profit Margin `NET_MARGIN_TARGET = 10` %, Gross Profit Margin `GROSS_MARGIN_TARGET = 70` %.
 
+**Auto-latest selection:** Finance drops a new `Group Financial Report_<Mon-YY>.xlsx` into `data/` each week. `find_file()` returns the **latest** report, not `glob()[0]`: `_report_period_key()` parses `Mon-YY` from the filename (+ optional `_vN` version suffix) and ranks by (year, month, version, mtime); unparseable names fall back to mtime so they never outrank a dated report. The dashboard regenerates on each load / "Regenerate Dashboards" / 24h refresh, so a newer-dated file is picked up automatically — no hook/watcher needed. Period label and all figures come from inside the chosen workbook, so they update with the file.
+
 **Gotchas:**
 - The report `.xlsx` is **local-only** (gitignored) and is **NOT** fetched from Google Drive/Sheets. On Streamlit Cloud the tab shows a placeholder until the file is force-added to the repo or wired into the Drive fetch. It is sensitive consolidated financial data — do not commit without sign-off.
 - The generator **fails safe**: missing file or unrecognisable Summary tab → writes a placeholder HTML and exits 0 (never crashes the tab).

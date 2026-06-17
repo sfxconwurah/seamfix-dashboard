@@ -87,10 +87,37 @@ def yoy_pct(cur, prior):
     return (cur - prior) / abs(prior) * 100.0
 
 
+_MONTHS = {'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
+           'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12}
+
+
+def _report_period_key(path):
+    """Sort key from a report filename so the LATEST period wins.
+
+    Parses 'Mon-YY' (e.g. 'May-26', 'Apr-26') plus an optional version suffix
+    ('_v2'). Returns (year, month, version, mtime). Files with no recognisable
+    period fall back to mtime only so they never outrank a dated report.
+    """
+    name = os.path.basename(path)
+    mtime = os.path.getmtime(path)
+    m = re.search(r'([A-Za-z]{3})[a-z]*[-_ ]?(\d{2,4})', name)
+    if not m or m.group(1).lower() not in _MONTHS:
+        return (-1, -1, -1, mtime)
+    month = _MONTHS[m.group(1).lower()]
+    yr = int(m.group(2))
+    year = yr + 2000 if yr < 100 else yr
+    v = re.search(r'[_-]v(\d+)', name, re.IGNORECASE)
+    version = int(v.group(1)) if v else 0
+    return (year, month, version, mtime)
+
+
 def find_file(folder, pattern):
+    """Return the LATEST matching report so weekly drops auto-update the tab."""
     files = glob.glob(os.path.join(folder, f"*{pattern}*"))
     files = [f for f in files if f.lower().endswith('.xlsx') and not os.path.basename(f).startswith('~$')]
-    return files[0] if files else None
+    if not files:
+        return None
+    return max(files, key=_report_period_key)
 
 
 def extract_financials(report_file):
