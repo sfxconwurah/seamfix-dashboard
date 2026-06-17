@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-06-17 — Fix: Group Financial report always refreshed in working dir (was serving stale month)
+
+**Why:** After committing the May report, the live tab still showed April. Root cause: `prepare_data_folder()` copies each `*.xlsx` only `if not dest.exists()`, and Streamlit Cloud's `generated/data_working/` persists within a running container. "Regenerate Dashboards" re-runs generators but does NOT re-copy already-present files or prune deleted ones, so the container kept serving the previously-copied report.
+
+**What:** `prepare_data_folder()` now **always overwrites** `Group Financial Report*.xlsx` into the working dir each run (like the budget snapshot) and **prunes** any report no longer in the repo. Combined with `find_file()`'s latest-period picker, the working dir can never serve a stale or retired month.
+
+**Note:** this is a code change → the live app must be **Rebooted** (share.streamlit.io → ⋮ → Reboot), not just "Regenerate Dashboards", to load it and pull the newly-committed report.
+
+**Files**: `app.py`, `CLAUDE.md`, `CHANGELOG.md`
+**Author**: Lilian Wilfred + Claude
+
+---
+
 ## 2026-06-17 — Update: Group Financials auto-selects the latest weekly report
 
 **Why:** Finance now drops a fresh `Group Financial Report_<Mon-YY>.xlsx` into `data/` weekly (May-26 added). `find_file()` returned `glob()[0]` (arbitrary order), so with multiple reports accumulating the tab could render a stale month. The dashboard already regenerates on each load / "Regenerate Dashboards" / 24h auto-refresh — the only gap was picking the newest report.

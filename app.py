@@ -837,6 +837,16 @@ def prepare_data_folder():
             dest = data_path / f.name
             if not dest.exists():
                 shutil.copy2(f, dest)
+        # Group Financials reads a local-only weekly report (not fetched from
+        # Drive). Finance drops a fresh "Group Financial Report_<Mon-YY>.xlsx"
+        # each week; always overwrite it (and prune older ones) so the working
+        # dir never serves a stale month from a persistent container.
+        repo_reports = {f.name for f in DATA_DIR.glob("Group Financial Report*.xlsx")}
+        for f in DATA_DIR.glob("Group Financial Report*.xlsx"):
+            shutil.copy2(f, data_path / f.name)
+        for stale in data_path.glob("Group Financial Report*.xlsx"):
+            if stale.name not in repo_reports:
+                stale.unlink()
         # Budget vs Actual tab reads a committed JSON snapshot of the Netlify
         # budget tracker (no live API). Refresh it each run so repo updates show.
         snap = DATA_DIR / "budget_tracker_snapshot.json"
