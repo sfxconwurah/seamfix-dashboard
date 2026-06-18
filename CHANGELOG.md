@@ -5,6 +5,22 @@
 
 ---
 
+## 2026-06-18 — Feature: Group Financials — ARR promoted to top KPI, Key Financial Ratios + EVA added
+
+**Why:** Exec request — ARR should sit among the headline KPI cards (not buried at the bottom), and the tab should surface the financial ratios critical to the business plus an **Economic Value Added (EVA)** measure.
+
+**What** (`generate_financial_report_dashboard.py`):
+- **ARR is now the 5th top KPI card** (USD headline, NGN + % of revenue, YoY badge). Removed the old bottom "Annual Recurring Revenue & Balance Sheet" block; that section is now a clean **Balance Sheet & Liquidity** table.
+- **New "Key Financial Ratios" section** — a 13-card grid grouped by theme: Profitability (gross/EBITDA/operating/net margin), Returns (annualised ROA), Efficiency (OpEx-, payroll-, marketing-to-revenue, effective tax rate), Liquidity (interest coverage, current ratio, cash ratio), Recurring (ARR % of revenue). Each card shows current value, prior/target, and is green/red/neutral vs its benchmark.
+- **New Economic Value Added (EVA) card** — `EVA = NOPAT − (Invested Capital × WACC)`. NOPAT = EBIT × (1 − effective tax rate); invested capital proxied by Total Assets; capital charge prorated to the YTD period. New `WACC_PCT = 20.0` assumption constant (documented; Nigeria cost of capital). Added a matching EVA insight card. May-26 EVA = −₦150.6M YTD (NOPAT ₦530.7M < ₦681.3M annualised capital charge on ₦8.18B assets) — returns not yet above cost of capital.
+
+**Note:** EVA depends on the `WACC_PCT` assumption and a Total-Assets capital proxy (the Summary tab has no clean debt+equity line) — both surfaced in the card text. Adjust `WACC_PCT` if Finance sets a board hurdle rate.
+
+**Files**: `generate_financial_report_dashboard.py`, `CLAUDE.md`, `CHANGELOG.md`
+**Author**: Lilian Wilfred + Claude
+
+---
+
 ## 2026-06-17 — Fix: Group Financial report always refreshed in working dir (was serving stale month)
 
 **Why:** After committing the May report, the live tab still showed April. Root cause: `prepare_data_folder()` copies each `*.xlsx` only `if not dest.exists()`, and Streamlit Cloud's `generated/data_working/` persists within a running container. "Regenerate Dashboards" re-runs generators but does NOT re-copy already-present files or prune deleted ones, so the container kept serving the previously-copied report.

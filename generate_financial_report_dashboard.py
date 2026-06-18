@@ -28,6 +28,14 @@ from theme import get_base_css, get_toggle_html, get_theme_js
 GROSS_MARGIN_TARGET = 70.0   # %
 NET_MARGIN_TARGET = 10.0     # %
 
+# Economic Value Added (EVA) assumption — weighted average cost of capital.
+# EVA = NOPAT - (Invested Capital x WACC). Nigeria's cost of capital is high
+# (CBN MPR + equity-risk premium); 20% is a conservative blended estimate.
+# Adjust here if Finance provides a board-approved hurdle rate. Invested
+# capital is proxied by Total Assets (the Summary tab has no clean
+# debt+equity capital line).
+WACC_PCT = 20.0              # %
+
 # GROUP income-statement columns on the Summary tab
 COL_LABEL = 11   # K
 COL_CUR_NGN = 12  # L
@@ -288,6 +296,40 @@ def build_html(m, report_file, output_path):
     pat = m['pat']
     pat_turnaround = pat['ngn'] > 0 and pat['ngn_prior'] < 0
 
+    # ── Critical financial ratios ──
+    # Cost lines (cogs/opex/da/interest/tax) are stored negative on the Summary
+    # tab; subtotals (ebit/ebitda/pbt/pat) are positive. Use abs() on costs.
+    rev_n = rev['ngn'] or 1
+    rev_np = rev['ngn_prior'] or 1
+    ebit_n = m['ebit']['ngn']
+    ebit_m = ebit_n / rev_n * 100.0                      # operating margin
+    ebit_m_prior = m['ebit']['ngn_prior'] / rev_np * 100.0
+    pbt_n = m['pbt']['ngn']
+    tax_n = abs(m['tax']['ngn'])
+    eff_tax = (tax_n / pbt_n * 100.0) if pbt_n > 0 else 0.0
+    eff_tax_prior = (abs(m['tax']['ngn_prior']) / m['pbt']['ngn_prior'] * 100.0) if m['pbt']['ngn_prior'] > 0 else 0.0
+    int_n = abs(m['interest']['ngn'])
+    int_cover = (ebit_n / int_n) if int_n > 0 else None   # interest coverage (x)
+
+    ta_n = m['total_assets']['ngn'] or 0
+
+    # Period length (YTD) — annualise period flows for ROA / EVA charge.
+    months_elapsed = cur_date.month if cur_date else 12
+    year_frac = max(months_elapsed, 1) / 12.0
+    roa = (pat['ngn'] / ta_n / year_frac * 100.0) if ta_n else 0.0   # annualised ROA
+
+    # ── Economic Value Added (EVA) ──
+    # EVA = NOPAT - capital charge. NOPAT = EBIT x (1 - effective tax rate).
+    # Capital charge = Invested Capital (≈ Total Assets) x WACC, prorated to the
+    # YTD period so it's comparable with period NOPAT.
+    nopat_n = ebit_n * (1 - eff_tax / 100.0)
+    nopat_u = m['ebit']['usd'] * (1 - eff_tax / 100.0)
+    capital_charge_n = ta_n * (WACC_PCT / 100.0) * year_frac
+    capital_charge_u = (m['total_assets']['usd'] or 0) * (WACC_PCT / 100.0) * year_frac
+    eva_n = nopat_n - capital_charge_n
+    eva_u = nopat_u - capital_charge_u
+    eva_positive = eva_n > 0
+
     # Pre-built label strings (Python 3.9 forbids backslashes inside f-string expressions)
     UP, DOWN = '\u25b2', '\u25bc'
     nm_delta_label = (f"{UP} {nm_delta:+.1f}pts above target" if nm >= NET_MARGIN_TARGET
@@ -378,6 +420,18 @@ def build_html(m, report_file, output_path):
                      f"(was {m['opex_ratio']['ngn_prior']*100:.0f}% in {prior_yr}). "
                      f"Payroll is {payroll_r:.0f}% and marketing {marketing_r:.0f}% of revenue."))
 
+    # Economic Value Added (value creation vs cost of capital)
+    if eva_positive:
+        insights.append(('GOOD', '\U0001F4B0', 'Creating economic value',
+                         f"After charging a <strong>{WACC_PCT:.0f}%</strong> cost of capital on "
+                         f"{fmt_naira(ta_n)} of assets, the group still generated <strong>{fmt_naira(eva_n)}</strong> "
+                         f"of Economic Value Added (EVA) YTD &mdash; returns are above the cost of capital."))
+    else:
+        insights.append(('RISK', '\u26a0\ufe0f', 'Returns below cost of capital',
+                         f"Economic Value Added is <strong>{fmt_naira(eva_n)}</strong> YTD: NOPAT of "
+                         f"{fmt_naira(nopat_n)} does not yet cover the {WACC_PCT:.0f}% capital charge "
+                         f"({fmt_naira(capital_charge_n)}) on {fmt_naira(ta_n)} of assets."))
+
     insight_cards = ""
     badge_colors = {'GOOD': ('var(--accent)', 'var(--accent-bg)'),
                     'RISK': ('var(--danger)', 'var(--danger-bg)')}
@@ -462,6 +516,46 @@ def build_html(m, report_file, output_path):
     v_labels = [i['name'] for i in v_sorted]
     v_values = [round(i['ngn']) for i in v_sorted]
 
+    # ── Key financial ratios grid ──
+    gpm_prior = m['gross_margin']['ngn_prior'] * 100.0
+    ebitda_prior = m['ebitda_margin']['ngn_prior'] * 100.0
+    nm_prior = m['net_margin']['ngn_prior'] * 100.0
+    opex_prior = m['opex_ratio']['ngn_prior'] * 100.0
+    payroll_prior = m['payroll_pct']['ngn_prior'] * 100.0
+    marketing_prior = m['marketing_pct']['ngn_prior'] * 100.0
+    cur_ratio = m['current_ratio']['ngn']
+    cash_ratio = m['cash_ratio']['ngn']
+    int_cover_str = f"{int_cover:.1f}x" if int_cover else "n/a"
+    int_cover_good = (int_cover >= 3) if int_cover else None
+
+    ratios = [
+        ('Profitability', 'Gross Margin', f"{gm:.1f}%", f"Target {GROSS_MARGIN_TARGET:.0f}% \u00b7 prior {gpm_prior:.1f}%", gm >= GROSS_MARGIN_TARGET),
+        ('Profitability', 'EBITDA Margin', f"{ebitda_m:.1f}%", f"Prior {ebitda_prior:.1f}%", ebitda_m > 0),
+        ('Profitability', 'Operating Margin (EBIT)', f"{ebit_m:.1f}%", f"Prior {ebit_m_prior:.1f}%", ebit_m > 0),
+        ('Profitability', 'Net Profit Margin', f"{nm:.1f}%", f"Target {NET_MARGIN_TARGET:.0f}% \u00b7 prior {nm_prior:.1f}%", nm >= NET_MARGIN_TARGET),
+        ('Returns', 'Return on Assets', f"{roa:.1f}%", "Annualised \u00b7 PAT \u00f7 total assets", roa > 0),
+        ('Efficiency', 'OpEx / Revenue', f"{opex_r:.0f}%", f"Prior {opex_prior:.0f}% \u00b7 lower is better", opex_r < 100),
+        ('Efficiency', 'Payroll / Revenue', f"{payroll_r:.0f}%", f"Prior {payroll_prior:.0f}%", None),
+        ('Efficiency', 'Marketing / Revenue', f"{marketing_r:.0f}%", f"Prior {marketing_prior:.0f}%", None),
+        ('Efficiency', 'Effective Tax Rate', f"{eff_tax:.0f}%", f"Prior {eff_tax_prior:.0f}%", None),
+        ('Liquidity', 'Interest Coverage', int_cover_str, "EBIT \u00f7 interest \u00b7 \u22653x healthy", int_cover_good),
+        ('Liquidity', 'Current Ratio', f"{cur_ratio:.2f}x", "\u22651.0x healthy", cur_ratio >= 1),
+        ('Liquidity', 'Cash Ratio', f"{cash_ratio:.2f}x", "Cash \u00f7 current liabilities", None),
+        ('Recurring', 'ARR % of Revenue', f"{arr_r:.0f}%", f"Prior {arr_r_prior:.0f}%", None),
+    ]
+    ratio_cards = ""
+    for cat, label, value, sub, good in ratios:
+        vcls = '' if good is None else ('ratio-good' if good else 'ratio-bad')
+        ratio_cards += (f'<div class="ratio-card"><div class="ratio-cat">{cat}</div>'
+                        f'<div class="ratio-label">{label}</div>'
+                        f'<div class="ratio-value {vcls}">{value}</div>'
+                        f'<div class="ratio-sub">{sub}</div></div>')
+
+    # ── EVA card text ──
+    eva_sub = (f"Economic profit after a {WACC_PCT:.0f}% cost of capital on "
+               f"{fmt_naira(ta_n)} invested capital (YTD {months_elapsed}mo, annualised charge)")
+    eva_break = f"NOPAT {fmt_naira(nopat_n)} &minus; capital charge {fmt_naira(capital_charge_n)}"
+
     theme_css = get_base_css()
     theme_toggle = get_toggle_html()
     theme_js = get_theme_js()
@@ -510,6 +604,21 @@ body{{font-family:'Inter',sans-serif;background:var(--bg-body);color:var(--text-
 .t-gauge-fill{{height:100%;border-radius:9px;transition:width .4s}}
 .t-gauge-marker{{position:absolute;top:-3px;width:3px;height:24px;background:var(--text-primary);opacity:.7}}
 .t-legend{{display:flex;justify-content:space-between;font-size:.72em;color:var(--text-tertiary)}}
+.ratio-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-bottom:20px}}
+.ratio-card{{background:var(--bg-card);border:1px solid var(--border-light);border-radius:10px;padding:16px}}
+.ratio-cat{{font-size:.62em;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-tertiary);margin-bottom:6px}}
+.ratio-label{{font-size:.8em;color:var(--text-secondary);margin-bottom:6px}}
+.ratio-value{{font-size:1.5em;font-weight:700;color:var(--text-heading);margin-bottom:4px}}
+.ratio-value.ratio-good{{color:var(--accent)}}
+.ratio-value.ratio-bad{{color:var(--danger)}}
+.ratio-sub{{font-size:.72em;color:var(--text-tertiary)}}
+.eva-card{{background:var(--bg-card);border:1px solid var(--border-accent);border-radius:12px;padding:24px;margin-bottom:28px;border-left:4px solid var(--accent)}}
+.eva-card.eva-neg{{border-left-color:var(--danger)}}
+.eva-card h3{{font-size:.85em;text-transform:uppercase;letter-spacing:1px;color:var(--text-secondary);margin-bottom:6px;font-weight:600}}
+.eva-big{{font-size:2.2em;font-weight:700;margin-bottom:2px}}
+.eva-big.good{{color:var(--accent)}}.eva-big.bad{{color:var(--danger)}}
+.eva-sub{{font-size:.85em;color:var(--text-tertiary);margin-bottom:8px}}
+.eva-break{{font-size:.82em;color:var(--text-secondary)}}
 .section{{background:var(--bg-card);border:1px solid var(--border-accent);border-radius:12px;padding:24px;margin-bottom:24px}}
 .section h2{{font-size:1.2em;margin-bottom:16px;color:var(--accent)}}
 .grid-2{{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start}}
@@ -578,6 +687,12 @@ tbody tr:hover{{background:var(--bg-table-hover)}}
 <div class="kpi-secondary">{fmt_usd(pat['usd'])}</div>
 <div class="kpi-change">{pat_change}</div>
 </div>
+<div class="kpi-card">
+<div class="kpi-label">Annual Recurring Revenue (ARR)</div>
+<div class="kpi-value {'negative' if (arr_yoy or 0) < 0 else ''}">{fmt_usd(m['arr']['usd'])}</div>
+<div class="kpi-secondary">{fmt_naira(m['arr']['ngn'])} &middot; {arr_r:.0f}% of revenue</div>
+<div class="kpi-change">{yoy_badge(m['arr'])} &middot; {prior_yr}: {fmt_usd(m['arr']['usd_prior'])}</div>
+</div>
 </div>
 
 <div class="target-grid">
@@ -595,6 +710,18 @@ tbody tr:hover{{background:var(--bg-table-hover)}}
 {gauge_html(gm, GROSS_MARGIN_TARGET)}
 <div class="t-legend"><span>0%</span><span>Target {GROSS_MARGIN_TARGET:.0f}%</span><span>100%</span></div>
 </div>
+</div>
+
+<div class="section">
+<h2>Key Financial Ratios &mdash; {period_label}</h2>
+<div class="ratio-grid">{ratio_cards}</div>
+</div>
+
+<div class="eva-card {'' if eva_positive else 'eva-neg'}">
+<h3>Economic Value Added (EVA) &middot; Value Creation</h3>
+<div class="eva-big {'good' if eva_positive else 'bad'}">{fmt_naira(eva_n)}</div>
+<div class="eva-sub">{fmt_usd(eva_u)} &middot; {eva_sub}</div>
+<div class="eva-break">{eva_break} &nbsp;|&nbsp; {'Returns exceed the cost of capital &mdash; value created.' if eva_positive else 'Returns do not yet cover the cost of capital &mdash; value eroded.'}</div>
 </div>
 
 <div class="takeaways-section">
@@ -653,26 +780,17 @@ tbody tr:hover{{background:var(--bg-table-hover)}}
 </div>
 
 <div class="section">
-<h2>Annual Recurring Revenue &amp; Balance Sheet</h2>
-<div class="grid-2">
-<div>
-<div class="kpi-label">Annual Recurring Revenue (ARR)</div>
-<div class="kpi-value {'negative' if (arr_yoy or 0) < 0 else ''}">{fmt_usd(m['arr']['usd'])}</div>
-<div class="kpi-secondary">{fmt_naira(m['arr']['ngn'])} &middot; {arr_r:.0f}% of total revenue</div>
-<div class="kpi-change">{prior_yr}: {fmt_usd(m['arr']['usd_prior'])} ({arr_r_prior:.0f}% of revenue) &middot; {arr_change}</div>
-</div>
-<div>
+<h2>Balance Sheet &amp; Liquidity</h2>
 <table>
+<thead><tr><th>Item</th><th class="num">NGN</th><th class="num">USD</th></tr></thead>
 <tbody>
 <tr><td>Cash &amp; Cash Equivalents</td><td class="num">{fmt_naira(m['cash']['ngn'])}</td><td class="num">{fmt_usd(m['cash']['usd'])}</td></tr>
 <tr><td>Account Receivables</td><td class="num">{fmt_naira(m['receivables']['ngn'])}</td><td class="num">{fmt_usd(m['receivables']['usd'])}</td></tr>
 <tr><td>Total Assets</td><td class="num">{fmt_naira(m['total_assets']['ngn'])}</td><td class="num">{fmt_usd(m['total_assets']['usd'])}</td></tr>
-<tr><td>Current Ratio</td><td class="num">{m['current_ratio']['ngn']:.2f}x</td><td class="num">&mdash;</td></tr>
-<tr><td>Cash Ratio</td><td class="num">{m['cash_ratio']['ngn']:.2f}x</td><td class="num">&mdash;</td></tr>
+<tr><td>Current Ratio</td><td class="num">{cur_ratio:.2f}x</td><td class="num">&mdash;</td></tr>
+<tr><td>Cash Ratio</td><td class="num">{cash_ratio:.2f}x</td><td class="num">&mdash;</td></tr>
 </tbody>
 </table>
-</div>
-</div>
 </div>
 
 </div>
