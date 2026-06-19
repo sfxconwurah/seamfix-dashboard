@@ -347,6 +347,10 @@ def build_html(m, report_file, output_path):
     eva_u = nopat_u - capital_charge_u
     eva_positive = eva_n > 0
 
+    # Return on Invested Capital — annualised NOPAT over invested capital. Value
+    # is created when ROIC exceeds WACC (consistent with EVA sign).
+    roic = (nopat_n / inv_cap_n / year_frac * 100.0) if inv_cap_n else 0.0
+
     # Pre-built label strings (Python 3.9 forbids backslashes inside f-string expressions)
     UP, DOWN = '\u25b2', '\u25bc'
     nm_delta_label = (f"{UP} {nm_delta:+.1f}pts above target" if nm >= NET_MARGIN_TARGET
@@ -551,6 +555,7 @@ def build_html(m, report_file, output_path):
         ('Profitability', 'Operating Margin (EBIT)', f"{ebit_m:.1f}%", f"Prior {ebit_m_prior:.1f}%", ebit_m > 0),
         ('Profitability', 'Net Profit Margin', f"{nm:.1f}%", f"Target {NET_MARGIN_TARGET:.0f}% \u00b7 prior {nm_prior:.1f}%", nm >= NET_MARGIN_TARGET),
         ('Returns', 'Return on Assets', f"{roa:.1f}%", "Annualised \u00b7 PAT \u00f7 total assets", roa > 0),
+        ('Returns', 'Return on Invested Capital', f"{roic:.1f}%", f"Annualised \u00b7 NOPAT \u00f7 invested capital \u00b7 vs {WACC_PCT:.0f}% WACC", roic >= WACC_PCT),
         ('Efficiency', 'OpEx / Revenue', f"{opex_r:.0f}%", f"Prior {opex_prior:.0f}% \u00b7 lower is better", opex_r < 100),
         ('Efficiency', 'Payroll / Revenue', f"{payroll_r:.0f}%", f"Prior {payroll_prior:.0f}%", None),
         ('Efficiency', 'Marketing / Revenue', f"{marketing_r:.0f}%", f"Prior {marketing_prior:.0f}%", None),

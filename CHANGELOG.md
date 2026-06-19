@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-06-19 — Feature: Group Financials — add Return on Invested Capital (ROIC) ratio card
+
+**Why:** Exec request — surface ROIC alongside the other return metrics so value creation vs cost of capital is visible at a glance.
+
+**What** (`generate_financial_report_dashboard.py`): added a "Return on Invested Capital" card to the Key Financial Ratios grid (now 14 cards). `ROIC = annualised NOPAT ÷ invested capital`, flagged green/red against the 37% WACC (consistent with EVA sign). May-26: 14.1% (< 37% WACC → red, value-eroding YTD).
+
+**Files**: `generate_financial_report_dashboard.py`, `CLAUDE.md`, `CHANGELOG.md`
+**Author**: Lilian Wilfred + Claude
+
+---
+
 ## 2026-06-19 — Update: EVA invested capital = CA − CL + net fixed assets (was Total Assets)
 
 **Why:** Finance's invested-capital definition is *Current Assets − Current Liabilities + Net Fixed Assets* (net working capital + net fixed assets), not gross Total Assets. The old Total-Assets proxy overstated the capital base (and the capital charge) by the amount of current liabilities.
