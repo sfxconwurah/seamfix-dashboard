@@ -106,14 +106,18 @@ _MONTHS = {'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
 def _report_period_key(path):
     """Sort key from a report filename so the LATEST period wins.
 
-    Parses 'Mon-YY' (e.g. 'May-26', 'Apr-26') plus an optional version suffix
-    ('_v2'). Returns (year, month, version, mtime). Files with no recognisable
-    period fall back to mtime only so they never outrank a dated report.
+    Parses a month token + 2/4-digit year anywhere in the name (e.g. 'May-26',
+    'Apr-26', '18th Jun-26', 'Jun 2026') plus an optional version suffix ('_v2').
+    Returns (year, month, version, mtime). The regex anchors on a real month
+    abbreviation (not just any 3 letters) so words like 'Report 18' don't get
+    mistaken for a period. Files with no recognisable period fall back to mtime
+    only so they never outrank a dated report.
     """
     name = os.path.basename(path)
     mtime = os.path.getmtime(path)
-    m = re.search(r'([A-Za-z]{3})[a-z]*[-_ ]?(\d{2,4})', name)
-    if not m or m.group(1).lower() not in _MONTHS:
+    month_alt = '|'.join(_MONTHS.keys())
+    m = re.search(rf'({month_alt})[a-z]*[-_ ]?(\d{{2,4}})', name, re.IGNORECASE)
+    if not m:
         return (-1, -1, -1, mtime)
     month = _MONTHS[m.group(1).lower()]
     yr = int(m.group(2))

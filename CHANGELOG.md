@@ -5,6 +5,22 @@
 
 ---
 
+## 2026-06-19 — Deploy: Group Financial Report 18-Jun-26; fix period parser to anchor on month token
+
+**Why:** New weekly report dropped (`Group Financial Report 18th Jun-26.xlsx`, YTD as at 30 Jun 2026). Its natural filename exposed a bug in `_report_period_key()`: the old regex grabbed the first 3-letters+digits ("Report 18"), failed the month check, and fell back to mtime — so it would have *lost* to a properly-named May file if both were present.
+
+**What:**
+- `_report_period_key()` now anchors on a real month abbreviation (`jan…dec`) found anywhere in the name, so `18th Jun-26`, `Jun-26`, and `Jun 2026` all resolve to (2026, 6).
+- Deployed the June report (force-added; `*.xlsx` gitignored) and removed the superseded `Group Financial Report_May-26_v2.xlsx` from the repo so the auto-latest picker stays unambiguous.
+- Jun-26 figures: Revenue ₦3.01B ($2.19M, +YoY), gross margin 78.0%, net margin 20.1%, PAT ₦606.0M. EVA ≈ −₦734M (NOPAT ₦504.3M − ₦1.24B charge on ₦6.69B invested capital, 6mo). ROIC 15.1% (< 37% WACC).
+
+**Action:** Reboot the live app (not just Regenerate) so the container pulls the new repo file.
+
+**Files**: `generate_financial_report_dashboard.py`, `data/Group Financial Report 18th Jun-26.xlsx` (added), `data/Group Financial Report_May-26_v2.xlsx` (removed), `CLAUDE.md`, `CHANGELOG.md`
+**Author**: Lilian Wilfred + Claude
+
+---
+
 ## 2026-06-19 — Feature: Group Financials — add Return on Invested Capital (ROIC) ratio card
 
 **Why:** Exec request — surface ROIC alongside the other return metrics so value creation vs cost of capital is visible at a glance.
