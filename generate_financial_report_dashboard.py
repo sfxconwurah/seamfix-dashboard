@@ -238,6 +238,10 @@ def extract_financials(report_file):
     metrics['cash'] = bs.get('cash & cash equivalents', {'ngn': 0, 'usd': 0})
     metrics['receivables'] = bs.get('account receivables', {'ngn': 0, 'usd': 0})
     metrics['total_assets'] = bs.get('total asset', {'ngn': 0, 'usd': 0})
+    # Components of invested capital (Current Assets - Current Liabilities + Net Fixed Assets)
+    metrics['current_assets'] = bs.get('total current asset', {'ngn': 0, 'usd': 0})
+    metrics['current_liabilities'] = bs.get('total current liabilities', {'ngn': 0, 'usd': 0})
+    metrics['net_fixed_assets'] = bs.get('total non current asset', {'ngn': 0, 'usd': 0})
     metrics['current_ratio'] = bs.get('current ratio', {'ngn': 0})
     metrics['cash_ratio'] = bs.get('cash ratio', {'ngn': 0})
 
@@ -320,6 +324,12 @@ def build_html(m, report_file, output_path):
 
     ta_n = m['total_assets']['ngn'] or 0
 
+    # Invested capital = Current Assets - Current Liabilities + Net Fixed Assets
+    # (i.e. net working capital + net fixed/non-current assets). Equivalent to
+    # Total Assets - Current Liabilities. Used as the EVA capital base.
+    inv_cap_n = m['current_assets']['ngn'] - m['current_liabilities']['ngn'] + m['net_fixed_assets']['ngn']
+    inv_cap_u = m['current_assets']['usd'] - m['current_liabilities']['usd'] + m['net_fixed_assets']['usd']
+
     # Period length (YTD) — annualise period flows for ROA / EVA charge.
     months_elapsed = cur_date.month if cur_date else 12
     year_frac = max(months_elapsed, 1) / 12.0
@@ -327,12 +337,12 @@ def build_html(m, report_file, output_path):
 
     # ── Economic Value Added (EVA) ──
     # EVA = NOPAT - capital charge. NOPAT = EBIT x (1 - effective tax rate).
-    # Capital charge = Invested Capital (≈ Total Assets) x WACC, prorated to the
-    # YTD period so it's comparable with period NOPAT.
+    # Capital charge = Invested Capital x WACC, prorated to the YTD period so it's
+    # comparable with period NOPAT.
     nopat_n = ebit_n * (1 - eff_tax / 100.0)
     nopat_u = m['ebit']['usd'] * (1 - eff_tax / 100.0)
-    capital_charge_n = ta_n * (WACC_PCT / 100.0) * year_frac
-    capital_charge_u = (m['total_assets']['usd'] or 0) * (WACC_PCT / 100.0) * year_frac
+    capital_charge_n = inv_cap_n * (WACC_PCT / 100.0) * year_frac
+    capital_charge_u = inv_cap_u * (WACC_PCT / 100.0) * year_frac
     eva_n = nopat_n - capital_charge_n
     eva_u = nopat_u - capital_charge_u
     eva_positive = eva_n > 0
@@ -560,7 +570,9 @@ def build_html(m, report_file, output_path):
 
     # ── EVA card text ──
     eva_sub = (f"Economic profit after a {WACC_PCT:.0f}% cost of capital on "
-               f"{fmt_naira(ta_n)} invested capital (YTD {months_elapsed}mo, annualised charge)")
+               f"{fmt_naira(inv_cap_n)} invested capital "
+               f"(current assets &minus; current liabilities + net fixed assets; "
+               f"YTD {months_elapsed}mo, annualised charge)")
     eva_break = (f"NOPAT {fmt_naira(nopat_n)} (EBIT after {eff_tax:.0f}% {tax_basis} tax) "
                  f"&minus; capital charge {fmt_naira(capital_charge_n)}")
 

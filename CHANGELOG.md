@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-06-19 — Update: EVA invested capital = CA − CL + net fixed assets (was Total Assets)
+
+**Why:** Finance's invested-capital definition is *Current Assets − Current Liabilities + Net Fixed Assets* (net working capital + net fixed assets), not gross Total Assets. The old Total-Assets proxy overstated the capital base (and the capital charge) by the amount of current liabilities.
+
+**What** (`generate_financial_report_dashboard.py`):
+- `extract_financials()` now parses `Total Current Asset`, `Total Current Liabilities`, and `Total Non Current Asset` from the Summary balance-sheet block.
+- EVA capital charge now uses `inv_cap = current_assets − current_liabilities + net_fixed_assets` (≡ Total Assets − Current Liabilities). May-26: ₦6.34B (was ₦8.18B). Capital charge ₦977.5M; **EVA ≈ −₦606M YTD** (was −₦885M). ROA still uses Total Assets (by definition). EVA card text states the formula.
+
+**Files**: `generate_financial_report_dashboard.py`, `CLAUDE.md`, `CHANGELOG.md`
+**Author**: Lilian Wilfred + Claude
+
+---
+
 ## 2026-06-19 — Update: EVA NOPAT uses 30% Nigeria statutory tax; WACC 37%
 
 **Why:** The May report books ₦0 tax YTD, so deriving the effective tax rate gave 0% — overstating NOPAT/EVA. Finance: use Nigeria's 30% statutory CIT. Also corrected WACC from the 20% placeholder to Finance's 37% board hurdle rate.
