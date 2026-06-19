@@ -302,20 +302,26 @@ def build_html(m, report_file, output_path):
     arr_r = m['arr_pct']['ngn'] * 100.0
     arr_r_prior = m['arr_pct']['ngn_prior'] * 100.0
 
-    # ARR KPI card — mirror the Revenue & Fundability dashboard's figure when
-    # available (recurring annual revenue from the Path to Revenue sheet);
-    # otherwise fall back to the report's own ARR line.
+    # ARR KPI card — mirror the Revenue & Fundability dashboard's "ARR As At"
+    # card: the recurring share of revenue actually EARNED YTD vs the 50% target.
+    # Falls back to the report's own ARR line if the revenue file is absent.
     arr_ext = m.get('arr_ext')
     if arr_ext:
-        arr_value_str = fmt_usd(arr_ext['usd'])
-        arr_secondary_str = f"{fmt_naira(arr_ext['ngn'])} &middot; {arr_ext['count']} recurring of {arr_ext['total']} streams"
-        arr_change_str = "Annual recurring revenue (Path to Revenue)"
-        arr_value_neg = arr_ext['usd'] < 0
+        _pct = arr_ext['pct']
+        _tgt = arr_ext['target_pct']
+        _below = _tgt - _pct
+        _delta = (f"\u25bc {_below:.0f}pts below target" if _pct < _tgt else "\u25b2 on/above target")
+        arr_value_str = f"{_pct:.0f}%"
+        arr_value_neg = _pct < _tgt
+        arr_secondary_str = f"Target {_tgt:.0f}% &middot; {_delta}"
+        arr_change_str = f"{fmt_usd(arr_ext['usd'])} recurring of {fmt_usd(arr_ext['rev_usd'])} earned YTD"
+        arr_kpi_label = f"ARR As At {arr_ext['last_month']} 2026"
     else:
         arr_value_str = fmt_usd(m['arr']['usd'])
         arr_secondary_str = f"{fmt_naira(m['arr']['ngn'])} &middot; {arr_r:.0f}% of revenue"
         arr_change_str = f"{prior_yr}: {fmt_usd(m['arr']['usd_prior'])}"
         arr_value_neg = False
+        arr_kpi_label = "Annual Recurring Revenue (ARR)"
 
     gm_delta = gm - GROSS_MARGIN_TARGET
     nm_delta = nm - NET_MARGIN_TARGET
@@ -731,7 +737,7 @@ tbody tr:hover{{background:var(--bg-table-hover)}}
 <div class="kpi-change">{pat_change}</div>
 </div>
 <div class="kpi-card">
-<div class="kpi-label">Annual Recurring Revenue (ARR)</div>
+<div class="kpi-label">{arr_kpi_label}</div>
 <div class="kpi-value {'negative' if arr_value_neg else ''}">{arr_value_str}</div>
 <div class="kpi-secondary">{arr_secondary_str}</div>
 <div class="kpi-change">{arr_change_str}</div>
@@ -906,23 +912,36 @@ def main():
                           "did not contain a recognisable GROUP income statement.")
         sys.exit(0)
 
-    # ARR sourced from the Revenue & Fundability dashboard's definition so both
-    # tabs show the SAME figure: annual USD of deals flagged "Recurring" in the
-    # Path to Revenue sheet (x FX_RATE for NGN). Falls back to the report's own
-    # ARR line if the revenue file isn't available.
+    # ARR sourced from the Revenue & Fundability dashboard's underlying data so
+    # both tabs read from the same place: the ACTUAL recurring revenue EARNED
+    # year-to-date (sum of monthly actuals, cols N-Y) for deals flagged
+    # "Recurring" in the Path to Revenue sheet (x FX_RATE for NGN). This is the
+    # actuals-based figure (not the planned/contracted annual target in col F).
+    # Falls back to the report's own ARR line if the revenue file isn't present.
     try:
         import generate_revenue_dashboard as gen_rev
         rev_file = gen_rev.find_file(folder, "Path to Revenue")
         if rev_file:
             revenues = gen_rev.extract_revenue_data(rev_file)
-            arr_usd = sum(r['annual_usd'] for r in revenues if r.get('recurring'))
+            recurring = [r for r in revenues if r.get('recurring')]
+            arr_actual_usd = sum(r['ytd_actual'] for r in recurring)
+            total_ytd_usd = sum(r['ytd_actual'] for r in revenues)
+            arr_pct = (arr_actual_usd / total_ytd_usd * 100.0) if total_ytd_usd > 0 else 0.0
+            monthly_totals = [sum(r['monthly'][i] for r in revenues) for i in range(12)]
+            with_data = [i for i, v in enumerate(monthly_totals) if v > 0]
+            last_m = max(with_data) if with_data else 0
             metrics['arr_ext'] = {
-                'usd': arr_usd,
-                'ngn': arr_usd * gen_rev.FX_RATE,
-                'count': len([r for r in revenues if r.get('recurring')]),
+                'usd': arr_actual_usd,
+                'ngn': arr_actual_usd * gen_rev.FX_RATE,
+                'rev_usd': total_ytd_usd,
+                'pct': arr_pct,
+                'target_pct': 50,  # mirrors ARR_TARGET_PCT in generate_revenue_dashboard
+                'last_month': gen_rev.MONTH_NAMES[last_m],
+                'count': len(recurring),
                 'total': len(revenues),
             }
-            print(f"  ARR (from Revenue & Fundability): {fmt_usd(arr_usd)} across {metrics['arr_ext']['count']} recurring streams")
+            print(f"  ARR As At {metrics['arr_ext']['last_month']} (recurring % of revenue, actual YTD): "
+                  f"{arr_pct:.0f}% vs 50% target ({fmt_usd(arr_actual_usd)} of {fmt_usd(total_ytd_usd)})")
     except Exception as e:
         print(f"  ARR sync skipped ({e}) — falling back to report ARR line")
 

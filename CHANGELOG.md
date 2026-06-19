@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-06-19 — Update: Group Financials ARR mirrors the "ARR As At" card (actual recurring % vs 50% target)
+
+**Why:** Clarified exec intent — the Group Financials ARR should mirror the Revenue & Fundability **"ARR As At"** card (the recurring share of revenue *actually earned* YTD vs the 50% target, e.g. 39% live), not the planned/contracted $2.86M annual figure.
+
+**What** (`generate_financial_report_dashboard.py`):
+- ARR KPI card now shows `pct = Σ ytd_actual(recurring) / Σ ytd_actual(all) × 100` (identical formula to `arr_asat_pct` in `generate_revenue_dashboard`), labelled **"ARR As At <month> 2026"**, red when below the **50% target**, with `Target 50% · ▼ Npts below` and `$X recurring of $Y earned YTD`. `metrics['arr_ext']` now carries `pct`, `target_pct`, `last_month`, and the recurring/total YTD USD.
+- By construction this equals whatever the Revenue & Fundability tab shows (same source + formula). Local fallback xlsx shows 19%; live Google-Sheet data shows ~39%.
+
+**Files**: `generate_financial_report_dashboard.py`, `CLAUDE.md`, `CHANGELOG.md`
+**Author**: Lilian Wilfred + Claude
+
+---
+
 ## 2026-06-19 — Update: Group Financials ARR now mirrors Revenue & Fundability; ARR ratio card removed
 
 **Why:** Exec request — the ARR shown on Group Financials should be the *same* number as the Revenue & Fundability dashboard (one source of truth for ARR), and the duplicate "ARR % of Revenue" card in the ratios grid should go.
