@@ -29,12 +29,10 @@ GROSS_MARGIN_TARGET = 70.0   # %
 NET_MARGIN_TARGET = 10.0     # %
 
 # Economic Value Added (EVA) assumption — weighted average cost of capital.
-# EVA = NOPAT - (Invested Capital x WACC). Nigeria's cost of capital is high
-# (CBN MPR + equity-risk premium); 20% is a conservative blended estimate.
-# Adjust here if Finance provides a board-approved hurdle rate. Invested
-# capital is proxied by Total Assets (the Summary tab has no clean
-# debt+equity capital line).
-WACC_PCT = 20.0              # %
+# EVA = NOPAT - (Invested Capital x WACC). Finance's board-approved hurdle rate.
+# Adjust here if it changes. Invested capital is proxied by Total Assets (the
+# Summary tab has no clean debt+equity capital line).
+WACC_PCT = 37.0              # %
 
 # GROUP income-statement columns on the Summary tab
 COL_LABEL = 11   # K

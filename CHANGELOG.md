@@ -12,9 +12,9 @@
 **What** (`generate_financial_report_dashboard.py`):
 - **ARR is now the 5th top KPI card** (USD headline, NGN + % of revenue, YoY badge). Removed the old bottom "Annual Recurring Revenue & Balance Sheet" block; that section is now a clean **Balance Sheet & Liquidity** table.
 - **New "Key Financial Ratios" section** — a 13-card grid grouped by theme: Profitability (gross/EBITDA/operating/net margin), Returns (annualised ROA), Efficiency (OpEx-, payroll-, marketing-to-revenue, effective tax rate), Liquidity (interest coverage, current ratio, cash ratio), Recurring (ARR % of revenue). Each card shows current value, prior/target, and is green/red/neutral vs its benchmark.
-- **New Economic Value Added (EVA) card** — `EVA = NOPAT − (Invested Capital × WACC)`. NOPAT = EBIT × (1 − effective tax rate); invested capital proxied by Total Assets; capital charge prorated to the YTD period. New `WACC_PCT = 20.0` assumption constant (documented; Nigeria cost of capital). Added a matching EVA insight card. May-26 EVA = −₦150.6M YTD (NOPAT ₦530.7M < ₦681.3M annualised capital charge on ₦8.18B assets) — returns not yet above cost of capital.
+- **New Economic Value Added (EVA) card** — `EVA = NOPAT − (Invested Capital × WACC)`. NOPAT = EBIT × (1 − effective tax rate); invested capital proxied by Total Assets; capital charge prorated to the YTD period. `WACC_PCT = 37.0` — Finance's board-approved hurdle rate. Added a matching EVA insight card. May-26 EVA ≈ −₦730M YTD (NOPAT ₦530.7M < ₦1.26B annualised capital charge on ₦8.18B assets) — returns not yet above cost of capital.
 
-**Note:** EVA depends on the `WACC_PCT` assumption and a Total-Assets capital proxy (the Summary tab has no clean debt+equity line) — both surfaced in the card text. Adjust `WACC_PCT` if Finance sets a board hurdle rate.
+**Note:** EVA depends on the `WACC_PCT` rate (37%) and a Total-Assets capital proxy (the Summary tab has no clean debt+equity line) — both surfaced in the card text. Adjust `WACC_PCT` if the board hurdle rate changes.
 
 **Files**: `generate_financial_report_dashboard.py`, `CLAUDE.md`, `CHANGELOG.md`
 **Author**: Lilian Wilfred + Claude
