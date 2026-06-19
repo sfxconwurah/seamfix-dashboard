@@ -5,6 +5,20 @@
 
 ---
 
+## 2026-06-19 — Update: Group Financials ARR now mirrors Revenue & Fundability; ARR ratio card removed
+
+**Why:** Exec request — the ARR shown on Group Financials should be the *same* number as the Revenue & Fundability dashboard (one source of truth for ARR), and the duplicate "ARR % of Revenue" card in the ratios grid should go.
+
+**What** (`generate_financial_report_dashboard.py`):
+- **ARR KPI card now sourced from Revenue & Fundability.** `main()` imports `generate_revenue_dashboard.extract_revenue_data()`, finds the Path to Revenue file in the same data folder, and computes ARR = Σ annual USD (col F) of deals flagged "Recurring" (col D); NGN = ARR × `FX_RATE` (1450). Stashed on `metrics['arr_ext']`. Card now reads **$2.86M · 17 recurring of 43 streams** (was the report's own ARR line). The report's `ARR`/`ARR (%)` Summary lines remain a **fallback** if the Path to Revenue file is missing.
+- **Removed the "ARR % of Revenue" card** from the Key Financial Ratios grid (now 13 cards).
+- **Guarded the report-based "Recurring revenue contracted" YoY insight** so it only fires in the fallback path — avoids showing a second, conflicting ARR figure when the synced ARR is in use.
+
+**Files**: `generate_financial_report_dashboard.py`, `CLAUDE.md`, `CHANGELOG.md`
+**Author**: Lilian Wilfred + Claude
+
+---
+
 ## 2026-06-19 — Deploy: Group Financial Report 18-Jun-26; fix period parser to anchor on month token
 
 **Why:** New weekly report dropped (`Group Financial Report 18th Jun-26.xlsx`, YTD as at 30 Jun 2026). Its natural filename exposed a bug in `_report_period_key()`: the old regex grabbed the first 3-letters+digits ("Report 18"), failed the month check, and fell back to mtime — so it would have *lost* to a properly-named May file if both were present.

@@ -302,6 +302,21 @@ def build_html(m, report_file, output_path):
     arr_r = m['arr_pct']['ngn'] * 100.0
     arr_r_prior = m['arr_pct']['ngn_prior'] * 100.0
 
+    # ARR KPI card — mirror the Revenue & Fundability dashboard's figure when
+    # available (recurring annual revenue from the Path to Revenue sheet);
+    # otherwise fall back to the report's own ARR line.
+    arr_ext = m.get('arr_ext')
+    if arr_ext:
+        arr_value_str = fmt_usd(arr_ext['usd'])
+        arr_secondary_str = f"{fmt_naira(arr_ext['ngn'])} &middot; {arr_ext['count']} recurring of {arr_ext['total']} streams"
+        arr_change_str = "Annual recurring revenue (Path to Revenue)"
+        arr_value_neg = arr_ext['usd'] < 0
+    else:
+        arr_value_str = fmt_usd(m['arr']['usd'])
+        arr_secondary_str = f"{fmt_naira(m['arr']['ngn'])} &middot; {arr_r:.0f}% of revenue"
+        arr_change_str = f"{prior_yr}: {fmt_usd(m['arr']['usd_prior'])}"
+        arr_value_neg = False
+
     gm_delta = gm - GROSS_MARGIN_TARGET
     nm_delta = nm - NET_MARGIN_TARGET
 
@@ -418,9 +433,11 @@ def build_html(m, report_file, output_path):
                          f"Revenue {'grew' if revenue_yoy >= 0 else 'fell'} <strong>{abs(revenue_yoy):.0f}%</strong> "
                          f"YoY to <strong>{fmt_naira(rev['ngn'])}</strong> ({fmt_usd(rev['usd'])}) vs {prior_yr}."))
 
-    # ARR drop
+    # ARR drop — only when falling back to the report's own ARR line. When ARR
+    # is sourced from the Revenue & Fundability sheet there is no prior-year
+    # basis, so we skip this to avoid showing a conflicting ARR figure.
     arr_yoy = yoy_pct(m['arr']['ngn'], m['arr']['ngn_prior'])
-    if arr_yoy is not None and arr_yoy < -10:
+    if not m.get('arr_ext') and arr_yoy is not None and arr_yoy < -10:
         insights.append(('RISK', '\u26a0\ufe0f', 'Recurring revenue contracted',
                          f"ARR fell <strong>{abs(arr_yoy):.0f}%</strong> YoY to {fmt_usd(m['arr']['usd'])} "
                          f"({fmt_naira(m['arr']['ngn'])}). Recurring revenue is now only <strong>{arr_r:.0f}%</strong> "
@@ -530,8 +547,6 @@ def build_html(m, report_file, output_path):
                     f'<td class="num">{ystr}</td></tr>')
         return out
 
-    arr_change = (f"{DOWN} {abs(arr_yoy):.0f}% YoY" if arr_yoy is not None else "")
-
     vertical_rows = breakdown_rows(m['by_vertical'])
     country_rows = breakdown_rows(m['by_country'])
     customer_rows = breakdown_rows(customers[:8])
@@ -567,7 +582,6 @@ def build_html(m, report_file, output_path):
         ('Liquidity', 'Interest Coverage', int_cover_str, "EBIT \u00f7 interest \u00b7 \u22653x healthy", int_cover_good),
         ('Liquidity', 'Current Ratio', f"{cur_ratio:.2f}x", "\u22651.0x healthy", cur_ratio >= 1),
         ('Liquidity', 'Cash Ratio', f"{cash_ratio:.2f}x", "Cash \u00f7 current liabilities", None),
-        ('Recurring', 'ARR % of Revenue', f"{arr_r:.0f}%", f"Prior {arr_r_prior:.0f}%", None),
     ]
     ratio_cards = ""
     for cat, label, value, sub, good in ratios:
@@ -718,9 +732,9 @@ tbody tr:hover{{background:var(--bg-table-hover)}}
 </div>
 <div class="kpi-card">
 <div class="kpi-label">Annual Recurring Revenue (ARR)</div>
-<div class="kpi-value {'negative' if (arr_yoy or 0) < 0 else ''}">{fmt_usd(m['arr']['usd'])}</div>
-<div class="kpi-secondary">{fmt_naira(m['arr']['ngn'])} &middot; {arr_r:.0f}% of revenue</div>
-<div class="kpi-change">{yoy_badge(m['arr'])} &middot; {prior_yr}: {fmt_usd(m['arr']['usd_prior'])}</div>
+<div class="kpi-value {'negative' if arr_value_neg else ''}">{arr_value_str}</div>
+<div class="kpi-secondary">{arr_secondary_str}</div>
+<div class="kpi-change">{arr_change_str}</div>
 </div>
 </div>
 
@@ -891,6 +905,26 @@ def main():
                           "The Group Financial Report was found but its <strong>Summary</strong> tab "
                           "did not contain a recognisable GROUP income statement.")
         sys.exit(0)
+
+    # ARR sourced from the Revenue & Fundability dashboard's definition so both
+    # tabs show the SAME figure: annual USD of deals flagged "Recurring" in the
+    # Path to Revenue sheet (x FX_RATE for NGN). Falls back to the report's own
+    # ARR line if the revenue file isn't available.
+    try:
+        import generate_revenue_dashboard as gen_rev
+        rev_file = gen_rev.find_file(folder, "Path to Revenue")
+        if rev_file:
+            revenues = gen_rev.extract_revenue_data(rev_file)
+            arr_usd = sum(r['annual_usd'] for r in revenues if r.get('recurring'))
+            metrics['arr_ext'] = {
+                'usd': arr_usd,
+                'ngn': arr_usd * gen_rev.FX_RATE,
+                'count': len([r for r in revenues if r.get('recurring')]),
+                'total': len(revenues),
+            }
+            print(f"  ARR (from Revenue & Fundability): {fmt_usd(arr_usd)} across {metrics['arr_ext']['count']} recurring streams")
+    except Exception as e:
+        print(f"  ARR sync skipped ({e}) — falling back to report ARR line")
 
     build_html(metrics, report_file, output_path)
     print(f"Generated: {output_path}")
