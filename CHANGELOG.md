@@ -5,6 +5,20 @@
 
 ---
 
+## 2026-06-19 — Update: EVA NOPAT uses 30% Nigeria statutory tax; WACC 37%
+
+**Why:** The May report books ₦0 tax YTD, so deriving the effective tax rate gave 0% — overstating NOPAT/EVA. Finance: use Nigeria's 30% statutory CIT. Also corrected WACC from the 20% placeholder to Finance's 37% board hurdle rate.
+
+**What** (`generate_financial_report_dashboard.py`):
+- `TAX_RATE = 30.0` constant. NOPAT now uses the booked effective rate **only if tax is actually booked**, else falls back to 30% (`eff_tax = eff_tax_booked if eff_tax_booked > 0 else TAX_RATE`). "Effective Tax Rate" ratio card and EVA card text state the basis ("Nigeria statutory CIT" vs "booked effective").
+- `WACC_PCT = 37.0` (was 20.0).
+- Net effect (May-26): NOPAT ₦371.5M (EBIT ₦530.7M × 70%); capital charge ₦1.26B (₦8.18B × 37% × 5/12); EVA ≈ −₦885M YTD.
+
+**Files**: `generate_financial_report_dashboard.py`, `CLAUDE.md`, `CHANGELOG.md`
+**Author**: Lilian Wilfred + Claude
+
+---
+
 ## 2026-06-18 — Feature: Group Financials — ARR promoted to top KPI, Key Financial Ratios + EVA added
 
 **Why:** Exec request — ARR should sit among the headline KPI cards (not buried at the bottom), and the tab should surface the financial ratios critical to the business plus an **Economic Value Added (EVA)** measure.

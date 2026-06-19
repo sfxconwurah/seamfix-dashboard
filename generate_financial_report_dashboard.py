@@ -34,6 +34,12 @@ NET_MARGIN_TARGET = 10.0     # %
 # Summary tab has no clean debt+equity capital line).
 WACC_PCT = 37.0              # %
 
+# Nigeria statutory company income tax rate. Used to normalise NOPAT for EVA
+# when the report books little/no tax YTD (a 0% booked rate would overstate
+# economic profit). If the report books a real effective rate, that is used
+# instead (see eff_tax below).
+TAX_RATE = 30.0              # %
+
 # GROUP income-statement columns on the Summary tab
 COL_LABEL = 11   # K
 COL_CUR_NGN = 12  # L
@@ -304,8 +310,11 @@ def build_html(m, report_file, output_path):
     ebit_m_prior = m['ebit']['ngn_prior'] / rev_np * 100.0
     pbt_n = m['pbt']['ngn']
     tax_n = abs(m['tax']['ngn'])
-    eff_tax = (tax_n / pbt_n * 100.0) if pbt_n > 0 else 0.0
-    eff_tax_prior = (abs(m['tax']['ngn_prior']) / m['pbt']['ngn_prior'] * 100.0) if m['pbt']['ngn_prior'] > 0 else 0.0
+    # Booked effective rate; fall back to the 30% statutory rate when no tax is
+    # booked (else NOPAT/EVA would overstate economic profit).
+    eff_tax_booked = (tax_n / pbt_n * 100.0) if (pbt_n > 0 and tax_n > 0) else 0.0
+    eff_tax = eff_tax_booked if eff_tax_booked > 0 else TAX_RATE
+    tax_basis = "booked effective" if eff_tax_booked > 0 else "Nigeria statutory CIT"
     int_n = abs(m['interest']['ngn'])
     int_cover = (ebit_n / int_n) if int_n > 0 else None   # interest coverage (x)
 
@@ -535,7 +544,7 @@ def build_html(m, report_file, output_path):
         ('Efficiency', 'OpEx / Revenue', f"{opex_r:.0f}%", f"Prior {opex_prior:.0f}% \u00b7 lower is better", opex_r < 100),
         ('Efficiency', 'Payroll / Revenue', f"{payroll_r:.0f}%", f"Prior {payroll_prior:.0f}%", None),
         ('Efficiency', 'Marketing / Revenue', f"{marketing_r:.0f}%", f"Prior {marketing_prior:.0f}%", None),
-        ('Efficiency', 'Effective Tax Rate', f"{eff_tax:.0f}%", f"Prior {eff_tax_prior:.0f}%", None),
+        ('Efficiency', 'Effective Tax Rate', f"{eff_tax:.0f}%", tax_basis, None),
         ('Liquidity', 'Interest Coverage', int_cover_str, "EBIT \u00f7 interest \u00b7 \u22653x healthy", int_cover_good),
         ('Liquidity', 'Current Ratio', f"{cur_ratio:.2f}x", "\u22651.0x healthy", cur_ratio >= 1),
         ('Liquidity', 'Cash Ratio', f"{cash_ratio:.2f}x", "Cash \u00f7 current liabilities", None),
@@ -552,7 +561,8 @@ def build_html(m, report_file, output_path):
     # ── EVA card text ──
     eva_sub = (f"Economic profit after a {WACC_PCT:.0f}% cost of capital on "
                f"{fmt_naira(ta_n)} invested capital (YTD {months_elapsed}mo, annualised charge)")
-    eva_break = f"NOPAT {fmt_naira(nopat_n)} &minus; capital charge {fmt_naira(capital_charge_n)}"
+    eva_break = (f"NOPAT {fmt_naira(nopat_n)} (EBIT after {eff_tax:.0f}% {tax_basis} tax) "
+                 f"&minus; capital charge {fmt_naira(capital_charge_n)}")
 
     theme_css = get_base_css()
     theme_toggle = get_toggle_html()
