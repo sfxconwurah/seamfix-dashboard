@@ -5,6 +5,21 @@
 
 ---
 
+## 2026-06-20 — Fix: Expense & Vendor "Total YTD Expenses" now sums full outflows, not just payment batches
+
+**Why:** The "Total YTD Expenses" KPI was understated. `calculate_kpis()` computed `total_ytd` by summing only the **"BREAKDOWN OF PAYMENT BATCH"** vendor amounts (col H) — the disbursement detail — which omits all the other OUTFLOWS categories (salaries, taxes, software, bank charges, etc.). The headline therefore showed far less than the true cash that left the business.
+
+**What** (`generate_expense_dashboard.py`):
+- `calculate_kpis()` now takes `all_categories_by_week` and computes `total_ytd` as the sum of **all OUTFLOWS categories across all weeks, excluding "Investment Outflows"** (asset transfers, not operating spend — same exclusion already used for the pie-chart / takeaways denominator). This is the full operational cash outflow.
+- `avg_burn` (Avg Weekly Burn Rate) now derives from this corrected total, so it reflects true weekly operating burn.
+- Updated the `calculate_kpis(...)` call site to pass `all_categories_by_week`.
+- Local 11-week sample now reports **Total YTD Expenses ₦953.3M** (was the vendor-batch-only subset). Note: local `data/` only carries cash reports through March 2026; the live figure tracks newer Apr–Jun reports fetched from Google Drive.
+
+**Files**: `generate_expense_dashboard.py`, `CLAUDE.md`, `CHANGELOG.md`
+**Author**: Lilian Wilfred + Claude
+
+---
+
 ## 2026-06-19 — Update: Group Financials ARR mirrors the "ARR As At" card (actual recurring % vs 50% target)
 
 **Why:** Clarified exec intent — the Group Financials ARR should mirror the Revenue & Fundability **"ARR As At"** card (the recurring share of revenue *actually earned* YTD vs the 50% target, e.g. 39% live), not the planned/contracted $2.86M annual figure.

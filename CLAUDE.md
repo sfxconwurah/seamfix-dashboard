@@ -307,6 +307,9 @@ The Cash Overview KPI row shows three position cards:
 
 NGN balance + (USD balance × report FX) reconciles to Total Position (GBP, usually ~0, is the only other component). **Operational Runway** = `total position / average operational burn`. The numerator includes investments, so the sub-label reads "at operational burn rate" — do NOT re-add "excl. investments" (the burn rate excludes investment *outflows*, but the runway position does not exclude investments).
 
+### Expense Dashboard — Total YTD Expenses & Avg Weekly Burn
+`generate_expense_dashboard.py`'s `calculate_kpis()` derives **Total YTD Expenses** from the **full OUTFLOWS section** of every weekly cash report (all categories in `all_categories_by_week`), **excluding "Investment Outflows"** (asset transfers, not operating spend — same exclusion as the pie-chart / takeaways denominator). It must NOT be summed from the "BREAKDOWN OF PAYMENT BATCH" vendor amounts alone — those are only the disbursement detail and omit salaries, taxes, software, bank charges, etc., which undercounts the headline. **Avg Weekly Burn Rate** = `total_ytd / weeks` off this corrected total. The payment-batch vendors still drive only the vendor ledger / concentration / largest-payment metrics. (Fixed 2026-06-20 — the old code summed vendor batches only.)
+
 ---
 
 ## Authentication

@@ -209,12 +209,18 @@ def process_all_files(folder_path):
     return all_weekly_data, all_vendors, all_categories_by_week
 
 
-def calculate_kpis(all_weekly_data, all_vendors):
+def calculate_kpis(all_weekly_data, all_vendors, all_categories_by_week):
     """Calculate key performance indicators."""
+    # Total YTD Expenses = full operational cash outflows across all weeks,
+    # summed from the OUTFLOWS section (all categories), NOT just the payment-batch
+    # vendors (which are only the disbursement detail and undercount the true total).
+    # Exclude "Investment Outflows" — these are asset transfers, not operating expenses
+    # (consistent with the pie-chart / takeaways denominator below).
     total_ytd = 0
-    for report_date, categories, vendors in all_weekly_data:
-        for vendor_payment in vendors:
-            total_ytd += vendor_payment["amount"]
+    for week_categories in all_categories_by_week.values():
+        for cat, amount in week_categories.items():
+            if cat != "Investment Outflows":
+                total_ytd += amount
 
     unique_vendors = len(all_vendors)
 
@@ -1371,7 +1377,7 @@ def main():
 
     print(f"Found {len(all_weekly_data)} weeks of data")
 
-    kpis = calculate_kpis(all_weekly_data, all_vendors)
+    kpis = calculate_kpis(all_weekly_data, all_vendors, all_categories_by_week)
     print(f"\nKPI Summary:")
     print(f"  Total YTD Expenses: {format_naira(kpis['total_ytd'])}")
     print(f"  Unique Vendors: {kpis['unique_vendors']}")
