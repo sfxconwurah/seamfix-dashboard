@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-06-22 — Feature: Group Financials monthly trend chart + "Profit After Tax" renamed to "Net Profit"
+
+**Why:** Execs wanted to see performance momentum across previous months (not just YTD vs prior-year), and preferred the simpler "Net Profit" nomenclature over "Profit After Tax".
+
+**What** (`generate_financial_report_dashboard.py`):
+- **Monthly Performance Trend chart.** New `extract_monthly_trend()` reads the report's **"MoM"** tab (month-end date headers in row 1, line-item labels in col C) and builds a month-by-month series for **Revenue, Gross Profit, EBITDA, and Net Profit** (NGN). Parsing is label-driven (matches `total revenue` / `gross margin` / `ebitda` / `pat`) and date-driven (only real-date columns, so the `FY 25`/`FY 26` summary columns are skipped); months with no revenue are dropped so future/empty months don't show. Rendered as a Chart.js line chart in a new section placed right after the margin gauges, before Key Financial Ratios. **Limited to the current fiscal year** (the latest year with revenue data — auto-advances each year), so the current report shows Jan 26 → May 26. `main()` stashes it on `metrics['trend']`; fails safe to no chart if the MoM tab is absent.
+- **"Profit After Tax" → "Net Profit"** across all display surfaces: the KPI card, the income-statement row, the profitability insight, and the ROA ratio sub-label ("Net Profit ÷ total assets"). The parser key `get('profit after tax')` (which matches the Summary tab's own label) is unchanged.
+
+**Files**: `generate_financial_report_dashboard.py`, `CLAUDE.md`, `CHANGELOG.md`
+**Author**: Lilian Wilfred + Claude
+
+---
+
 ## 2026-06-20 — Fix: Expense & Vendor "Total YTD Expenses" now sums full outflows, not just payment batches
 
 **Why:** The "Total YTD Expenses" KPI was understated. `calculate_kpis()` computed `total_ytd` by summing only the **"BREAKDOWN OF PAYMENT BATCH"** vendor amounts (col H) — the disbursement detail — which omits all the other OUTFLOWS categories (salaries, taxes, software, bank charges, etc.). The headline therefore showed far less than the true cash that left the business.

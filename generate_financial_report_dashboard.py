@@ -263,6 +263,63 @@ def extract_financials(report_file):
     return metrics
 
 
+def extract_monthly_trend(report_file):
+    """Read the 'MoM' tab to build a month-by-month trend of the key P&L lines.
+
+    Row 1 holds month-end date headers (real dates only — the 'FY 25'/'FY 26'
+    summary columns are skipped because they aren't datetimes); column C holds
+    the line-item labels. Parsing is label-driven so it survives row/column
+    shifts. Limited to the CURRENT fiscal year (the latest year with data) so the
+    trend tracks this year's months. Returns {'months':[...], 'revenue':[...],
+    'gross_profit':[...], 'ebitda':[...], 'net_profit':[...]} (NGN, one entry per
+    month with data), or None if the tab is absent/unreadable.
+    """
+    try:
+        wb = load_workbook(report_file, data_only=True)
+        if 'MoM' not in wb.sheetnames:
+            return None
+        ws = wb['MoM']
+    except Exception:
+        return None
+
+    # Month columns = those whose row-1 header is a real date (skips FY totals/blanks).
+    month_cols = [(c, ws.cell(1, c).value) for c in range(1, ws.max_column + 1)
+                  if isinstance(ws.cell(1, c).value, datetime)]
+    if not month_cols:
+        return None
+
+    # Locate each metric row by scanning column C labels (first match wins).
+    want = {'total revenue': 'revenue', 'gross margin': 'gross_profit',
+            'ebitda': 'ebitda', 'pat': 'net_profit'}
+    row_for = {}
+    for r in range(1, ws.max_row + 1):
+        label = norm(ws.cell(r, 3).value)
+        if label in want and want[label] not in row_for:
+            row_for[want[label]] = r
+    if 'revenue' not in row_for:
+        return None
+
+    rev_r = row_for['revenue']
+    # Months that actually have revenue reported.
+    live = [(c, dt) for c, dt in month_cols if sf(ws.cell(rev_r, c).value) != 0]
+    if not live:
+        return None
+    # Restrict to the current fiscal year (the latest year with data) so the
+    # trend shows this year's months only (auto-advances each year).
+    cur_year = max(dt.year for _, dt in live)
+    live = [(c, dt) for c, dt in live if dt.year == cur_year]
+
+    months = []
+    series = {k: [] for k in ('revenue', 'gross_profit', 'ebitda', 'net_profit')}
+    for c, dt in live:
+        months.append(dt.strftime('%b %y'))
+        for key in series:
+            series[key].append(round(sf(ws.cell(row_for[key], c).value)) if key in row_for else 0)
+    if not months:
+        return None
+    return {'months': months, **series}
+
+
 def gauge_html(actual_pct, target_pct, good_above=True):
     """Render a 0-100% gauge with the actual fill and a target marker tick."""
     fill = max(0.0, min(actual_pct, 100.0))
@@ -421,7 +478,7 @@ def build_html(m, report_file, output_path):
         insights.append(('GOOD', '\u2705', 'Profitability above target',
                          f"Net profit margin is <strong>{nm:.1f}%</strong>, "
                          f"<strong>{nm_delta:+.1f}pts</strong> above the 10% profitability target "
-                         f"(PAT {fmt_naira(pat['ngn'])} / {fmt_usd(pat['usd'])})."))
+                         f"(Net Profit {fmt_naira(pat['ngn'])} / {fmt_usd(pat['usd'])})."))
     else:
         insights.append(('RISK', '\u26a0\ufe0f', 'Profitability below target',
                          f"Net profit margin is <strong>{nm:.1f}%</strong>, "
@@ -516,7 +573,7 @@ def build_html(m, report_file, output_path):
         pl_row('Interest Expense', 'interest', indent=True, positive_is_good=False),
         pl_row('Profit Before Tax', 'pbt', bold=True),
         pl_row('Tax Expense', 'tax', indent=True, positive_is_good=False),
-        pl_row('Profit After Tax', 'pat', bold=True),
+        pl_row('Net Profit', 'pat', bold=True),
     ])
 
     # ── Expense breakdown table ──
@@ -562,6 +619,40 @@ def build_html(m, report_file, output_path):
     v_labels = [i['name'] for i in v_sorted]
     v_values = [round(i['ngn']) for i in v_sorted]
 
+    # ── Monthly performance trend (from the MoM tab) ──
+    trend = m.get('trend')
+    if trend and trend['months']:
+        t_months = trend['months']
+        t_rev = [round(v / 1e6, 1) for v in trend['revenue']]
+        t_gp = [round(v / 1e6, 1) for v in trend['gross_profit']]
+        t_eb = [round(v / 1e6, 1) for v in trend['ebitda']]
+        t_np = [round(v / 1e6, 1) for v in trend['net_profit']]
+        trend_section = (
+            '<div class="chart-box" style="margin-bottom:28px">'
+            f'<h3>Monthly Performance Trend &mdash; {t_months[0]} to {t_months[-1]} (NGN millions)</h3>'
+            '<div style="position:relative;height:340px"><canvas id="trendChart"></canvas></div>'
+            '</div>')
+        trend_js = f"""
+new Chart(document.getElementById('trendChart'), {{
+  type:'line',
+  data:{{labels:{t_months!r}, datasets:[
+    {{label:'Revenue', data:{t_rev!r}, borderColor:'#009E7E', backgroundColor:'rgba(0,158,126,.08)', borderWidth:2, tension:.3, fill:true, pointRadius:2}},
+    {{label:'Gross Profit', data:{t_gp!r}, borderColor:'#00D4AA', borderWidth:2, tension:.3, pointRadius:2}},
+    {{label:'EBITDA', data:{t_eb!r}, borderColor:'#FFB020', borderWidth:2, tension:.3, pointRadius:2}},
+    {{label:'Net Profit', data:{t_np!r}, borderColor:'#FF6B6B', borderWidth:2, tension:.3, pointRadius:2}}
+  ]}},
+  options:{{responsive:true, maintainAspectRatio:false,
+    interaction:{{mode:'index', intersect:false}},
+    plugins:{{legend:{{position:'top', labels:{{color:'#475569', font:{{size:11}}, usePointStyle:true}}}},
+      tooltip:{{callbacks:{{label:function(c){{return c.dataset.label+': \u20a6'+c.parsed.y.toFixed(0)+'M';}}}}}}}},
+    scales:{{y:{{ticks:{{color:'#94a3b8', callback:function(v){{return '\u20a6'+v+'M';}}}}, grid:{{color:'rgba(148,163,184,.12)'}}}},
+      x:{{ticks:{{color:'#94a3b8'}}, grid:{{display:false}}}}}}
+  }}
+}});"""
+    else:
+        trend_section = ''
+        trend_js = ''
+
     # ── Key financial ratios grid ──
     gpm_prior = m['gross_margin']['ngn_prior'] * 100.0
     ebitda_prior = m['ebitda_margin']['ngn_prior'] * 100.0
@@ -579,7 +670,7 @@ def build_html(m, report_file, output_path):
         ('Profitability', 'EBITDA Margin', f"{ebitda_m:.1f}%", f"Prior {ebitda_prior:.1f}%", ebitda_m > 0),
         ('Profitability', 'Operating Margin (EBIT)', f"{ebit_m:.1f}%", f"Prior {ebit_m_prior:.1f}%", ebit_m > 0),
         ('Profitability', 'Net Profit Margin', f"{nm:.1f}%", f"Target {NET_MARGIN_TARGET:.0f}% \u00b7 prior {nm_prior:.1f}%", nm >= NET_MARGIN_TARGET),
-        ('Returns', 'Return on Assets', f"{roa:.1f}%", "Annualised \u00b7 PAT \u00f7 total assets", roa > 0),
+        ('Returns', 'Return on Assets', f"{roa:.1f}%", "Annualised \u00b7 Net Profit \u00f7 total assets", roa > 0),
         ('Returns', 'Return on Invested Capital', f"{roic:.1f}%", f"Annualised \u00b7 NOPAT \u00f7 invested capital \u00b7 vs {WACC_PCT:.0f}% WACC", roic >= WACC_PCT),
         ('Efficiency', 'OpEx / Revenue', f"{opex_r:.0f}%", f"Prior {opex_prior:.0f}% \u00b7 lower is better", opex_r < 100),
         ('Efficiency', 'Payroll / Revenue', f"{payroll_r:.0f}%", f"Prior {payroll_prior:.0f}%", None),
@@ -731,7 +822,7 @@ tbody tr:hover{{background:var(--bg-table-hover)}}
 <div class="kpi-change">{ebitda_m:.1f}% margin {yoy_badge(m['ebitda'])}</div>
 </div>
 <div class="kpi-card">
-<div class="kpi-label">Profit After Tax</div>
+<div class="kpi-label">Net Profit</div>
 <div class="kpi-value {'negative' if pat['ngn'] < 0 else ''}">{fmt_naira(pat['ngn'])}</div>
 <div class="kpi-secondary">{fmt_usd(pat['usd'])}</div>
 <div class="kpi-change">{pat_change}</div>
@@ -760,6 +851,8 @@ tbody tr:hover{{background:var(--bg-table-hover)}}
 <div class="t-legend"><span>0%</span><span>Target {GROSS_MARGIN_TARGET:.0f}%</span><span>100%</span></div>
 </div>
 </div>
+
+{trend_section}
 
 <div class="section">
 <h2>Key Financial Ratios &mdash; {period_label}</h2>
@@ -851,6 +944,7 @@ new Chart(document.getElementById('verticalChart'), {{
   data: {{labels: vData.labels, datasets: [{{data: vData.values, backgroundColor: palette, borderWidth: 0}}]}},
   options: {{responsive:true, maintainAspectRatio:false, plugins:{{legend:{{position:'right', labels:{{color:'#475569', font:{{size:11}}}}}}, tooltip:{{callbacks:{{label: function(c){{var t=c.dataset.data.reduce((a,b)=>a+b,0); var p=t?(c.parsed/t*100).toFixed(0):0; return c.label+': \u20a6'+(c.parsed/1e6).toFixed(0)+'M ('+p+'%)';}}}}}}}}}}
 }});
+{trend_js}
 {theme_js}
 </script>
 <div class="dashboard-footer">
@@ -944,6 +1038,16 @@ def main():
                   f"{arr_pct:.0f}% vs 50% target ({fmt_usd(arr_actual_usd)} of {fmt_usd(total_ytd_usd)})")
     except Exception as e:
         print(f"  ARR sync skipped ({e}) — falling back to report ARR line")
+
+    # Month-by-month trend (from the 'MoM' tab) for the trend chart.
+    try:
+        metrics['trend'] = extract_monthly_trend(report_file)
+        if metrics['trend']:
+            print(f"  Monthly trend: {len(metrics['trend']['months'])} months "
+                  f"({metrics['trend']['months'][0]} \u2192 {metrics['trend']['months'][-1]})")
+    except Exception as e:
+        metrics['trend'] = None
+        print(f"  Monthly trend skipped ({e})")
 
     build_html(metrics, report_file, output_path)
     print(f"Generated: {output_path}")
