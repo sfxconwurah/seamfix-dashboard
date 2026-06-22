@@ -5,6 +5,20 @@
 
 ---
 
+## 2026-06-22 — Fix: Cash Overview USD investment omitted the "Other Dollar Investment" block
+
+**Why:** The "USD Balance (incl. Investments)" KPI's investment component read the working **"Cash Report"** tab's `TOTAL INVESTMENT (USD)` line (col H), which only covers the AIF mutual-fund block. It **omitted the separate "Other Dollar Investment"** (e.g. the $41,652.57 FBNQuest holding earmarked for MinIo/Glo licenses) that Finance itemises on the **"Cash Balance Summary"** sheet. The Cash Report tab's AIF total also disagrees with the summary's.
+
+**What** (`generate_dashboard.py`):
+- New `extract_cash_summary(wb)` parses the authoritative **"Cash Balance Summary"** sheet (col B=label, C=Principal/Naira, D=Interest/USD, E=Total). It sums each investment block by section header — **AIF Investment Fund** (USD) + **Other Dollar Investment** (USD) → `usd_invest`; **Other Naira Investments** → `ngn_invest` — skipping MTN shares (listed equity, not cash-equivalent). Fails safe to `None` if the sheet is absent.
+- `extract_report()` now **overrides `investment_usd_raw`** with the summary's `usd_invest` when present, so the USD investment = AIF + Other Dollar (19-Jun: $1,314,034.38 + $41,652.57 = **$1,355,686.95**, vs the old $1,411,914.93 which both omitted the Other Dollar line and overstated AIF).
+- **NGN investment is deliberately left on the Cash Report tab.** The summary's "Other Naira" block is incomplete in older reports (it omits the large NGN fixed deposits the Cash Report tab carries), so changing it would regress the NGN figure / trend.
+- Source-of-truth chosen by Finance: use the Cash Balance Summary sheet for the USD investment.
+
+**Files:** `generate_dashboard.py`.
+
+---
+
 ## 2026-06-22 — Fix: Cash Overview "USD Balance" showed the OPENING USD position, not the closing
 
 **Why:** The "USD Balance (incl. Investments)" KPI was reading column **D** of the "TOTAL CASH (USD)" row, which is the **OPENING** balance (header "OPENING BALANCE" — equal to the prior week's closing), not the current closing. So the card always lagged a week behind the actual USD cash position.

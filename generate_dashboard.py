@@ -106,6 +106,65 @@ def fmt_usd(val):
         return f"{sign}${v:,.0f}"
 
 
+def extract_cash_summary(wb):
+    """Parse the report's authoritative 'Cash Balance Summary' sheet, the clean
+    executive breakdown Finance prepares. It itemises operational cash (NGN/USD)
+    and every investment block — including the 'OTHER DOLLAR INVESTMENT' line that
+    the working 'Cash Report' tab omits. Layout (col B=label, C=Principal/Naira,
+    D=Interest/USD, E=Total): a cash section with a 'TOTAL' row (C=NGN, D=USD), and
+    investment sections headed 'BREAKDOWN OF AIF INVESTMENT FUND' (USD),
+    'BREAKDOWN OF OTHER DOLLAR INVESTMENT' (USD) and 'BREAKDOWN OF ... NAIRA
+    INVESTMENTS' (NGN) — each fund's current value is col E. MTN shares are
+    excluded (listed equity, not cash-equivalent). Returns None if the sheet is
+    absent/unparseable so callers fall back to the 'Cash Report' tab."""
+    sheet = None
+    for name in wb.sheetnames:
+        if 'cash balance summary' in name.strip().lower():
+            sheet = wb[name]
+            break
+    if sheet is None:
+        return None
+
+    ngn_cash = usd_cash = fx = usd_invest = ngn_invest = 0.0
+    section = None  # 'cash' | 'usd' | 'ngn' | 'skip'
+    for r in range(1, sheet.max_row + 1):
+        b = sheet.cell(r, 2).value
+        bs = str(b).strip().lower() if b is not None else ''
+        if bs.startswith('breakdown of') or bs.startswith('market value'):
+            if 'cash balance' in bs:
+                section = 'cash'
+            elif 'mtn' in bs or 'market value' in bs:
+                section = 'skip'
+            elif 'naira' in bs:
+                section = 'ngn'
+            else:
+                section = 'usd'  # AIF fund + Other Dollar are both USD
+            continue
+        if section == 'cash':
+            if bs == 'total':
+                ngn_cash = sf(sheet.cell(r, 3).value)
+                usd_cash = sf(sheet.cell(r, 4).value)
+            elif 'operational a/c balances (usd)' in bs:
+                fx = sf(sheet.cell(r, 5).value)
+        elif section in ('usd', 'ngn'):
+            # Sum each fund's current value (col E). Skip the column header and
+            # the section's own 'Total ...' / unlabeled total row.
+            if not bs or bs == 'investment house' or bs.startswith('total'):
+                continue
+            amt = sf(sheet.cell(r, 5).value)
+            if section == 'usd':
+                usd_invest += amt
+            else:
+                ngn_invest += amt
+
+    if usd_cash <= 0 and ngn_cash <= 0:
+        return None
+    return {
+        'ngn_cash': ngn_cash, 'usd_cash': usd_cash, 'fx': fx,
+        'usd_invest': usd_invest, 'ngn_invest': ngn_invest,
+    }
+
+
 def extract_report(filepath):
     fn = os.path.basename(filepath)
     dt = parse_date(fn)
@@ -171,6 +230,17 @@ def extract_report(filepath):
     # report's own FX rate. Matches the report's "CASH BALANCE" summary-block USD
     # row. (Col D on the USD cash row is the OPENING balance — see note above.)
     rec['usd_raw'] = (rec.get('usd_closing_ngn', 0) / rec['fx_rate']) if rec.get('fx_rate') else 0.0
+
+    # Override the USD investment from the authoritative "Cash Balance Summary"
+    # sheet when present (per Finance): the working "Cash Report" tab omits the
+    # "Other Dollar Investment" block (e.g. the $41,652 FBNQuest earmarked for
+    # MinIo/Glo) and its AIF total disagrees with the summary. The summary figure
+    # = AIF + Other Dollar. NGN investment is left on the Cash Report tab — the
+    # summary's "Other Naira" block is incomplete in older reports (it omits the
+    # large NGN fixed deposits the Cash Report tab carries), so it stays consistent.
+    summary = extract_cash_summary(wb)
+    if summary and summary['usd_invest'] > 0:
+        rec['investment_usd_raw'] = summary['usd_invest']
 
     # USD investments converted to NGN (FX rate must be resolved first)
     rec['investment_usd_ngn'] = rec.get('investment_usd_raw', 0) * rec.get('fx_rate', 1)
