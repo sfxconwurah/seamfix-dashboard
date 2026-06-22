@@ -307,7 +307,7 @@ Cash dashboard separates operational flows from investment movements using keywo
 The Cash Overview KPI row shows three position cards:
 - **Total Position (incl. Investments)** = `total_cash_ngn` (NGN equivalent of everything).
 - **NGN Balance (incl. Investments)** = `ngn_closing + investment_ngn`, displayed in ₦ via `fmt_naira()`.
-- **USD Balance (incl. Investments)** = `usd_raw + investment_usd_raw`, displayed in actual dollars via `fmt_usd()` (NOT NGN-equivalent).
+- **USD Balance (incl. Investments)** = `usd_raw + investment_usd_raw`, displayed in actual dollars via `fmt_usd()` (NOT NGN-equivalent). **`usd_raw` is the CLOSING USD cash, DERIVED as `usd_closing_ngn / fx_rate`** (col J of the "TOTAL CASH (USD)" row ÷ the report's own FX). It is NOT read from col D of that row — col D is the **OPENING** balance (header "OPENING BALANCE", = prior week's closing) and was the source of a bug where the KPI lagged a week (fixed 2026-06-22). The derived value reconciles exactly to the report's own "CASH BALANCE" summary-block USD row. `investment_usd_raw` is col H of the "TOTAL INVESTMENT (USD)" row (already a closing figure).
 
 NGN balance + (USD balance × report FX) reconciles to Total Position (GBP, usually ~0, is the only other component). **Operational Runway** = `total position / average operational burn`. The numerator includes investments, so the sub-label reads "at operational burn rate" — do NOT re-add "excl. investments" (the burn rate excludes investment *outflows*, but the runway position does not exclude investments).
 

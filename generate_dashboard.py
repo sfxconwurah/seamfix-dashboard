@@ -133,7 +133,12 @@ def extract_report(filepath):
             rec['usd_opening_ngn'] = sf(cells.get('F'))
             rec['usd_inflow'] = sf(cells.get('G'))
             rec['usd_outflow'] = sf(cells.get('H'))
-            rec['usd_raw'] = sf(cells.get('D'))
+            # NOTE: column D on this row is the OPENING USD balance (header
+            # "OPENING BALANCE"), not the closing. The closing USD position is
+            # derived from the closing NGN (col J) / FX rate below — matching the
+            # report's own "CASH BALANCE" summary block (USD row). Reading col D
+            # here showed the prior week's closing (this week's opening).
+            rec['usd_opening_raw'] = sf(cells.get('D'))
 
         if 'TOTAL INVESTMENT' in b_str:
             if 'USD' in b_str.upper():
@@ -161,6 +166,11 @@ def extract_report(filepath):
         if 'POUND' in c_str.upper():
             rec['gbp_closing_ngn'] = sf(cells.get('J'))
             break
+
+    # Closing USD cash position, derived from the closing NGN (col J) at the
+    # report's own FX rate. Matches the report's "CASH BALANCE" summary-block USD
+    # row. (Col D on the USD cash row is the OPENING balance — see note above.)
+    rec['usd_raw'] = (rec.get('usd_closing_ngn', 0) / rec['fx_rate']) if rec.get('fx_rate') else 0.0
 
     # USD investments converted to NGN (FX rate must be resolved first)
     rec['investment_usd_ngn'] = rec.get('investment_usd_raw', 0) * rec.get('fx_rate', 1)

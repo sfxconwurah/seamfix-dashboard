@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-06-22 — Fix: Cash Overview "USD Balance" showed the OPENING USD position, not the closing
+
+**Why:** The "USD Balance (incl. Investments)" KPI was reading column **D** of the "TOTAL CASH (USD)" row, which is the **OPENING** balance (header "OPENING BALANCE" — equal to the prior week's closing), not the current closing. So the card always lagged a week behind the actual USD cash position.
+
+**What** (`generate_dashboard.py`):
+- The USD cash row's col D is now stored as `usd_opening_raw` (documented as the opening balance), and `usd_raw` (the closing USD position that feeds the KPI) is now **derived from the closing NGN (col J) at the report's own FX rate**: `usd_raw = usd_closing_ngn / fx_rate`.
+- This exactly reconciles to the report's authoritative **"CASH BALANCE" summary block** USD row in all 12 reports (e.g. 20-Mar: derived = **$357,336.67** = summary value, vs the old col-D opening $354,445.97).
+- Investment USD (col H of the "TOTAL INVESTMENT (USD)" row) was already correct — unchanged.
+
+**Files:** `generate_dashboard.py`.
+
+---
+
 ## 2026-06-22 — Feature: Group Financials monthly trend chart + "Profit After Tax" renamed to "Net Profit"
 
 **Why:** Execs wanted to see performance momentum across previous months (not just YTD vs prior-year), and preferred the simpler "Net Profit" nomenclature over "Profit After Tax".
