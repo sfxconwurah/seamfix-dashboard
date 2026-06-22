@@ -106,6 +106,36 @@ def fmt_usd(val):
         return f"{sign}${v:,.0f}"
 
 
+def fmt_naira_precise(val):
+    """Like fmt_naira but with 2-decimal precision on the B/M/K suffix
+    (e.g. \u20A62.12B, \u20A6100.50M) so the exact magnitude is visible."""
+    v = abs(val)
+    sign = '-' if val < 0 else ''
+    if v >= 1_000_000_000:
+        return f"{sign}\u20A6{v/1_000_000_000:.2f}B"
+    elif v >= 1_000_000:
+        return f"{sign}\u20A6{v/1_000_000:.2f}M"
+    elif v >= 1_000:
+        return f"{sign}\u20A6{v/1_000:.2f}K"
+    else:
+        return f"{sign}\u20A6{v:,.2f}"
+
+
+def fmt_usd_precise(val):
+    """Like fmt_usd but with 2-decimal precision on the B/M/K suffix
+    (e.g. $1.49M) so the exact magnitude is visible."""
+    v = abs(val)
+    sign = '-' if val < 0 else ''
+    if v >= 1_000_000_000:
+        return f"{sign}${v/1_000_000_000:.2f}B"
+    elif v >= 1_000_000:
+        return f"{sign}${v/1_000_000:.2f}M"
+    elif v >= 1_000:
+        return f"{sign}${v/1_000:.2f}K"
+    else:
+        return f"{sign}${v:,.2f}"
+
+
 def extract_cash_summary(wb):
     """Parse the report's authoritative 'Cash Balance Summary' sheet, the clean
     executive breakdown Finance prepares. It itemises operational cash (NGN/USD)
@@ -125,16 +155,16 @@ def extract_cash_summary(wb):
     if sheet is None:
         return None
 
-    ngn_cash = usd_cash = fx = usd_invest = ngn_invest = 0.0
-    section = None  # 'cash' | 'usd' | 'ngn' | 'skip'
+    ngn_cash = usd_cash = fx = usd_invest = ngn_invest = mtn_shares = 0.0
+    section = None  # 'cash' | 'usd' | 'ngn' | 'mtn' | 'skip'
     for r in range(1, sheet.max_row + 1):
         b = sheet.cell(r, 2).value
         bs = str(b).strip().lower() if b is not None else ''
-        if bs.startswith('breakdown of') or bs.startswith('market value'):
+        if bs.startswith('breakdown of') or bs.startswith('market value of'):
             if 'cash balance' in bs:
                 section = 'cash'
-            elif 'mtn' in bs or 'market value' in bs:
-                section = 'skip'
+            elif 'mtn' in bs or 'shares' in bs:
+                section = 'mtn'
             elif 'naira' in bs:
                 section = 'ngn'
             else:
@@ -156,12 +186,24 @@ def extract_cash_summary(wb):
                 usd_invest += amt
             else:
                 ngn_invest += amt
+        elif section == 'mtn':
+            # MTN holding (NGN). The section lists prior + current "Market value
+            # as at <date>" rows; take the latest (last one wins). The figure
+            # column shifts (F or G) between report layouts, so take the last
+            # numeric cell on the row.
+            if bs.startswith('market value as at'):
+                for ci in range(7, 2, -1):  # scan G..C, take rightmost number
+                    v = sheet.cell(r, ci).value
+                    if isinstance(v, (int, float)) and v > 0:
+                        mtn_shares = float(v)
+                        break
 
     if usd_cash <= 0 and ngn_cash <= 0:
         return None
     return {
         'ngn_cash': ngn_cash, 'usd_cash': usd_cash, 'fx': fx,
         'usd_invest': usd_invest, 'ngn_invest': ngn_invest,
+        'mtn_shares': mtn_shares,
     }
 
 
@@ -241,6 +283,9 @@ def extract_report(filepath):
     summary = extract_cash_summary(wb)
     if summary and summary['usd_invest'] > 0:
         rec['investment_usd_raw'] = summary['usd_invest']
+    # MTN shares market value (NGN, listed equity) — shown as its own card, NOT
+    # rolled into total_cash_ngn (not a cash-equivalent).
+    rec['mtn_shares_ngn'] = summary['mtn_shares'] if summary else 0.0
 
     # USD investments converted to NGN (FX rate must be resolved first)
     rec['investment_usd_ngn'] = rec.get('investment_usd_raw', 0) * rec.get('fx_rate', 1)
@@ -882,6 +927,11 @@ def generate_html(reports, anomalies, insights, takeaways, output_path, data_war
     ngn_bal_chg = ((ngn_balance - prev_ngn_balance) / prev_ngn_balance * 100) if prev_ngn_balance else 0
     usd_bal_chg = ((usd_balance - prev_usd_balance) / prev_usd_balance * 100) if prev_usd_balance else 0
 
+    # MTN shares (listed equity, NGN) — held separately from cash & cash-equivalents
+    mtn_shares = latest.get('mtn_shares_ngn', 0)
+    prev_mtn_shares = prev.get('mtn_shares_ngn', 0)
+    mtn_chg = ((mtn_shares - prev_mtn_shares) / prev_mtn_shares * 100) if prev_mtn_shares else 0
+
     latest_in = inflows[-1]
     prev_in = inflows[-2] if len(inflows) > 1 else latest_in
     in_chg = ((latest_in - prev_in) / prev_in * 100) if prev_in else 0
@@ -1055,6 +1105,19 @@ def generate_html(reports, anomalies, insights, takeaways, output_path, data_war
             f"</div>"
         )
 
+    # MTN shares card — only shown when the report carries a market value
+    mtn_card_html = ""
+    if mtn_shares > 0:
+        mtn_arrow = '&#9650;' if mtn_chg >= 0 else '&#9660;'
+        mtn_dir = 'positive' if mtn_chg >= 0 else 'negative'
+        mtn_card_html = (
+            f'<div class="kpi-card">'
+            f'<div class="kpi-label">MTN Shares (Market Value)</div>'
+            f'<div class="kpi-value">{fmt_naira_precise(mtn_shares)}</div>'
+            f'<div class="kpi-change {mtn_dir}">{mtn_arrow} {abs(mtn_chg):.1f}% vs prior week · listed equity, excl. cash position</div>'
+            f'</div>'
+        )
+
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1210,19 +1273,20 @@ tbody tr:hover{{background:transparent!important}}
 <div class="kpi-grid">
 <div class="kpi-card">
 <div class="kpi-label">Total Position (incl. Investments)</div>
-<div class="kpi-value">{fmt_naira(latest_cash)}</div>
+<div class="kpi-value">{fmt_naira_precise(latest_cash)}</div>
 <div class="kpi-change {'positive' if cash_chg >= 0 else 'negative'}">{'&#9650;' if cash_chg >= 0 else '&#9660;'} {abs(cash_chg):.1f}% vs prior week</div>
 </div>
 <div class="kpi-card">
 <div class="kpi-label">NGN Balance (incl. Investments)</div>
-<div class="kpi-value">{fmt_naira(ngn_balance)}</div>
+<div class="kpi-value">{fmt_naira_precise(ngn_balance)}</div>
 <div class="kpi-change {'positive' if ngn_bal_chg >= 0 else 'negative'}">{'&#9650;' if ngn_bal_chg >= 0 else '&#9660;'} {abs(ngn_bal_chg):.1f}% vs prior week</div>
 </div>
 <div class="kpi-card">
 <div class="kpi-label">USD Balance (incl. Investments)</div>
-<div class="kpi-value">{fmt_usd(usd_balance)}</div>
+<div class="kpi-value">{fmt_usd_precise(usd_balance)}</div>
 <div class="kpi-change {'positive' if usd_bal_chg >= 0 else 'negative'}">{'&#9650;' if usd_bal_chg >= 0 else '&#9660;'} {abs(usd_bal_chg):.1f}% vs prior week</div>
 </div>
+{mtn_card_html}
 <div class="kpi-card">
 <div class="kpi-label">Weekly Inflow</div>
 <div class="kpi-value">{fmt_naira(latest_in)}</div>

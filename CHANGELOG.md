@@ -5,6 +5,18 @@
 
 ---
 
+## 2026-06-22 — Update: Cash Overview balances shown to 2 decimals + separate MTN Shares card
+
+**Why:** Finance wanted the position balances displayed in full to the kobo/cent (not abbreviated B/M/K), and the MTN equity holding surfaced as its own KPI rather than hidden.
+
+**What** (`generate_dashboard.py`):
+- New `fmt_naira_precise()` / `fmt_usd_precise()` — same B/M/K suffix as `fmt_naira()`/`fmt_usd()` but **2 decimals across all magnitudes** so the exact figure shows. The three balance cards now use them: **Total Position** (₦2.12B), **NGN Balance** (₦100.50M), **USD Balance** ($1.49M). Flow cards (inflow/outflow/net/forecast) keep the original compact format (1 dp on M, 0 dp on K).
+- New **"MTN Shares (Market Value)"** KPI card (19-Jun ₦96.00M, with WoW change), placed after the USD Balance card. `extract_cash_summary()` now also reads the **"MARKET VALUE OF MTN SHARES"** section of the Cash Balance Summary sheet (latest "Market value as at …" row; figure column shifts F↔G across layouts, so it takes the rightmost numeric). MTN is **excluded from Total Position / cash positions** — it's listed equity, not a cash-equivalent — and the card label says so. Card only renders when a value is present (fails safe).
+
+**Files:** `generate_dashboard.py`.
+
+---
+
 ## 2026-06-22 — Fix: Cash Overview USD investment omitted the "Other Dollar Investment" block
 
 **Why:** The "USD Balance (incl. Investments)" KPI's investment component read the working **"Cash Report"** tab's `TOTAL INVESTMENT (USD)` line (col H), which only covers the AIF mutual-fund block. It **omitted the separate "Other Dollar Investment"** (e.g. the $41,652.57 FBNQuest holding earmarked for MinIo/Glo licenses) that Finance itemises on the **"Cash Balance Summary"** sheet. The Cash Report tab's AIF total also disagrees with the summary's.
