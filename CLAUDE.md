@@ -134,6 +134,8 @@ seamfix-dashboard/
 ├── generate_pipeline_dashboard.py  # Pipeline Intelligence generator
 ├── generate_collections_dashboard.py  # Collections Tracker generator
 ├── generate_financial_report_dashboard.py  # Group Financials (consolidated P&L) generator
+├── generate_glossary_dashboard.py  # Glossary & Definitions generator (single source → HTML tab + GLOSSARY.md)
+├── GLOSSARY.md                     # Generated glossary doc (DO NOT hand-edit — edit the generator)
 ├── requirements.txt                # Python dependencies
 ├── runtime.txt                     # Python version hint (ignored by Streamlit Cloud)
 ├── .python-version                 # Python version hint (ignored by Streamlit Cloud)

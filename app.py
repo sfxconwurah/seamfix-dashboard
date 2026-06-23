@@ -88,6 +88,12 @@ DASHBOARDS = {
         "output": "financial_report_dashboard.html",
         "description": "Consolidated P&L, profitability vs targets (net margin 10%, gross margin 70%), expense analysis, and revenue breakdowns"
     },
+    "Glossary & Definitions": {
+        "icon": "📖",
+        "script": "generate_glossary_dashboard.py",
+        "output": "glossary_dashboard.html",
+        "description": "Plain-language reference for every metric across the suite and how each applies to Seamfix"
+    },
 }
 
 

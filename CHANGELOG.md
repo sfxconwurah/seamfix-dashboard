@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-06-23 — Feature: Glossary & Definitions tab + GLOSSARY.md (single source)
+
+**Why:** Finance wanted a plain-language reference for every metric across the suite — and how each one applies to Seamfix — to read alongside the dashboards each week so the numbers are interpreted consistently.
+
+**What** (`generate_glossary_dashboard.py`, new):
+- New generator holds all glossary content as one `GLOSSARY` data structure (8 areas: General & Cross-Cutting, Cash Overview, Expense & Vendor Analysis, Budget vs Actual, Revenue & Fundability, Pipeline Intelligence, Collections Tracker, Group Financials; 66 terms). Each term has a plain **Definition** plus an **At Seamfix** note.
+- Emits **two** outputs from the one source so they never drift: `glossary_dashboard.html` (the in-app tab — themed via `theme.py`, with a live search box, category nav chips, and a responsive term-card grid) and `GLOSSARY.md` (the repo doc, written with `--markdown`). No new dependency (markdown rendered by hand).
+- Wired a **"Glossary & Definitions"** tab (📖) into `app.py`'s `DASHBOARDS` dict, last. Takes no live data, so it always renders.
+
+**Files:** `generate_glossary_dashboard.py` (new), `GLOSSARY.md` (new), `app.py` (DASHBOARDS dict), `CLAUDE.md`, `CHANGELOG.md`. Tested locally: HTML + markdown both generate; previewed light/dark + search filter.
+
+---
+
 ## 2026-06-23 — Fix: Bobby chat crashed ("no attribute 'BUDGET_CATEGORIES'") + now covers every dashboard
 
 **Why:** Ask Bobby returned a "Data Load Failure — module 'generate_budget_dashboard' has no attribute 'BUDGET_CATEGORIES'" message and could not answer any question. The Budget vs Actual dashboard was rewritten on 2026-06-11 to read the committed JSON snapshot, which removed `BUDGET_CATEGORIES` / `map_expense_to_budget` / `is_investment_outflow` — but `build_chat_context()` still referenced them, so building Bobby's context raised and the error went into the context itself. Finance also asked that Bobby be able to speak to the *entire* executive dashboard.
