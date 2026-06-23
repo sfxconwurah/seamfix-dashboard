@@ -289,8 +289,15 @@ def extract_monthly_trend(report_file):
         return None
 
     # Locate each metric row by scanning column C labels (first match wins).
+    # NOTE: EBITDA is DERIVED using the SAME formula as the Summary tab —
+    # EBITDA = Gross Profit + Other Income - Total Operating Expenses — NOT read
+    # from the MoM 'EBITDA' row, which is corrupt in the source workbook (wrong
+    # sign/magnitude, e.g. Jan-26 shows -193.7M when true EBITDA is +188.5M). The
+    # derived value reconciles exactly to PAT every month. So we read the gross
+    # margin, other income and operating-expense rows here.
     want = {'total revenue': 'revenue', 'gross margin': 'gross_profit',
-            'ebitda': 'ebitda', 'pat': 'net_profit'}
+            'other income': 'other_income', 'total operating expenses': 'opex',
+            'pat': 'net_profit'}
     row_for = {}
     for r in range(1, ws.max_row + 1):
         label = norm(ws.cell(r, 3).value)
@@ -313,8 +320,15 @@ def extract_monthly_trend(report_file):
     series = {k: [] for k in ('revenue', 'gross_profit', 'ebitda', 'net_profit')}
     for c, dt in live:
         months.append(dt.strftime('%b %y'))
-        for key in series:
-            series[key].append(round(sf(ws.cell(row_for[key], c).value)) if key in row_for else 0)
+        gp = sf(ws.cell(row_for['gross_profit'], c).value) if 'gross_profit' in row_for else 0
+        oth = sf(ws.cell(row_for['other_income'], c).value) if 'other_income' in row_for else 0
+        opex = sf(ws.cell(row_for['opex'], c).value) if 'opex' in row_for else 0
+        series['revenue'].append(round(sf(ws.cell(row_for['revenue'], c).value)) if 'revenue' in row_for else 0)
+        series['gross_profit'].append(round(gp))
+        # EBITDA = Gross Profit + Other Income - OpEx (Summary-tab formula);
+        # the MoM 'EBITDA' row is corrupt so it is never read.
+        series['ebitda'].append(round(gp + oth - opex))
+        series['net_profit'].append(round(sf(ws.cell(row_for['net_profit'], c).value)) if 'net_profit' in row_for else 0)
     if not months:
         return None
     return {'months': months, **series}

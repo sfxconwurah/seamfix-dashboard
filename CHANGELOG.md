@@ -5,6 +5,16 @@
 
 ---
 
+## 2026-06-23 — Fix: Group Financials trend chart showed negative EBITDA above positive Net Profit
+
+**Why:** The Monthly Performance Trend chart plotted EBITDA below zero while Net Profit was positive — impossible, since Net Profit sits below EBITDA in the P&L. Root cause: `extract_monthly_trend()` read the `MoM` tab's `EBITDA` row directly, but that row is corrupt in the source workbook (wrong sign/magnitude — e.g. Jan-26 showed −₦193.7M when true EBITDA is +₦188.5M).
+
+**What** (`generate_financial_report_dashboard.py`, `extract_monthly_trend`):
+- Stopped reading the broken MoM `EBITDA` row. EBITDA is now **derived using the Summary tab's own formula**: `EBITDA = Gross Profit + Other Income − Total Operating Expenses` (reads the MoM `Gross Margin`, `Other Income` and `TOTAL OPERATING EXPENSES` rows). This reconciles exactly to PAT every month (Jan +188.5 → PAT +181.2, Feb +281.2 → +290.9, … May −53.7 → −154.9).
+- Note: the Summary YTD EBITDA (₦783.1M, Jan–Jun) does not equal the MoM monthly sum (₦493.4M, Jan–May) because the MoM tab lags one month — both are correct for their period.
+
+---
+
 ## 2026-06-23 — Feature: Glossary & Definitions tab + GLOSSARY.md (single source)
 
 **Why:** Finance wanted a plain-language reference for every metric across the suite — and how each one applies to Seamfix — to read alongside the dashboards each week so the numbers are interpreted consistently.
