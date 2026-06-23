@@ -105,7 +105,10 @@ def build_chat_context(data_folder):
     """
     Build a structured text summary of all financial data for the chatbot.
     Imports generator parsing functions to avoid duplicating xlsx logic.
-    Returns a plain-text string (~6-8k tokens) covering all 5 data sources.
+    Returns a plain-text string covering every dashboard: Cash Overview,
+    Budget vs Actual, Pipeline Intelligence, Expense & Vendor, Collections
+    Tracker and Group Financials. Each section guards on its own data source,
+    so a missing file or module degrades that section only — never the whole context.
     """
     data_path = Path(data_folder)
     parts = []
@@ -122,6 +125,17 @@ def build_chat_context(data_folder):
         gen_budget = _import_generator("generate_budget_dashboard")
     except Exception as e:
         return f"Error loading financial data modules: {e}"
+
+    # The remaining dashboards are imported individually so a single bad module
+    # never blanks Bobby's whole context — each section guards on its own import.
+    def _try_import(name):
+        try:
+            return _import_generator(name)
+        except Exception:
+            return None
+    gen_exp  = _try_import("generate_expense_dashboard")
+    gen_coll = _try_import("generate_collections_dashboard")
+    gen_fin  = _try_import("generate_financial_report_dashboard")
 
     fmt = gen_dash.fmt_naira  # shorthand
 
@@ -188,87 +202,71 @@ def build_chat_context(data_folder):
             )
 
     # ── SECTION 2: BUDGET vs ACTUAL ─────────────────────────────────
-    budget_file = data_path / BUDGET_FILENAME
-    if budget_file.exists() and reports:
-        parts.append(f"\n--- BUDGET vs ACTUAL ---")
+    # Driven by the committed Budget Tracker snapshot (lean mode, all NGN) — the
+    # same source as the Budget vs Actual dashboard (rewritten 2026-06-11). The old
+    # LEAN-BUDGET + cash-outflow fuzzy-matching approach (and gen_budget.BUDGET_CATEGORIES)
+    # was retired, so Bobby reads the snapshot via gen_budget.compute() here.
+    snapshot_file = data_path / gen_budget.SNAPSHOT_NAME
+    if snapshot_file.exists():
+        departments = []
+        try:
+            with open(snapshot_file, "r", encoding="utf-8") as fh:
+                snapshot = json.load(fh)
+            departments, entities, group, elapsed = gen_budget.compute(snapshot)
+        except Exception as e:
+            parts.append(f"\n--- BUDGET vs ACTUAL ---")
+            parts.append(f"(Budget snapshot could not be read: {e})")
 
-        start_of_year  = datetime(2026, 1, 1)
-        weeks_elapsed  = max(1, (reports[-1]["date"] - start_of_year).days // 7 + 1)
+        if departments:
+            bfmt = gen_budget.fmt_naira
+            fy           = snapshot.get("fiscalYear", "")
+            last_actuals = snapshot.get("lastActualsMonth", "")
+            run_date     = snapshot.get("runDate", "")
 
-        BUDGET_CATEGORIES = gen_budget.BUDGET_CATEGORIES
-        category_actual   = {cat: 0 for cat in BUDGET_CATEGORIES}
-        all_expense_lines = []
-        unbudgeted_lines  = []
-
-        for r in reports:
-            for expense_name, amount in r.get("outflow_items", {}).items():
-                if amount <= 0:
-                    continue
-                budget_cat = gen_budget.map_expense_to_budget(expense_name, r.get("outflow_items", {}))
-                if budget_cat:
-                    category_actual[budget_cat] += amount
-                    all_expense_lines.append({
-                        "date": r["date_str"], "item": expense_name,
-                        "amount": amount, "category": budget_cat,
-                    })
-                elif not gen_budget.is_investment_outflow(expense_name):
-                    unbudgeted_lines.append({
-                        "date": r["date_str"], "item": expense_name, "amount": amount,
-                    })
-
-        total_budget     = sum(BUDGET_CATEGORIES.values())
-        total_actual     = sum(category_actual.values())
-        ytd_budget_pace  = total_budget * weeks_elapsed / 52
-        variance_pct     = (ytd_budget_pace - total_actual) / ytd_budget_pace * 100 if ytd_budget_pace > 0 else 0
-        projected_yr_end = total_actual / weeks_elapsed * 52 if weeks_elapsed > 0 else 0
-        health           = "HEALTHY" if variance_pct > 10 else "CAUTION" if variance_pct < -10 else "ON TRACK"
-
-        parts.append(f"Annual Budget: {fmt(total_budget)}")
-        parts.append(f"YTD Actual (week {weeks_elapsed} of 52): {fmt(total_actual)}")
-        parts.append(f"YTD Budget Pace: {fmt(ytd_budget_pace)}")
-        parts.append(
-            f"Variance: {fmt(abs(ytd_budget_pace - total_actual))} "
-            f"{'UNDER' if variance_pct > 0 else 'OVER'} pace ({abs(variance_pct):.1f}%) — Status: {health}"
-        )
-        parts.append(f"Year-End Projection at current run rate: {fmt(projected_yr_end)} (budget: {fmt(total_budget)})")
-
-        parts.append(f"\nAll budget categories (week {weeks_elapsed}/52 elapsed):")
-        parts.append(f"  {'Category':<45} | {'Annual Budget':>14} | {'YTD Actual':>12} | {'Annual Used':>11} | {'Remaining':>14} | Status")
-        for cat in sorted(BUDGET_CATEGORIES.keys()):
-            ab       = BUDGET_CATEGORIES[cat]
-            ya       = category_actual[cat]
-            ytd_pace = ab * weeks_elapsed / 52
-            pct_ann  = ya / ab * 100 if ab > 0 else 0
-            remain   = ab - ya
-            status   = "OVER PACE" if ya > ytd_pace else "under pace"
+            parts.append(f"\n--- BUDGET vs ACTUAL ---")
             parts.append(
-                f"  {cat:<45} | {fmt(ab):>14} | {fmt(ya):>12} | "
-                f"{pct_ann:>10.1f}% | {fmt(remain):>14} | {status}"
+                f"Source: Seamfix Budget Tracker snapshot (lean mode, all figures NGN). "
+                f"FY {fy}, actuals through {last_actuals} ({elapsed} of 12 months elapsed), "
+                f"snapshot dated {run_date}."
             )
-
-        if unbudgeted_lines:
-            total_unbud = sum(x["amount"] for x in unbudgeted_lines)
-            unbudgeted_lines.sort(key=lambda x: -x["amount"])
+            parts.append(f"Group Annual Budget: {bfmt(group['annual_budget'])}")
+            parts.append(f"Group YTD Actual: {bfmt(group['ytd_actual'])}")
+            parts.append(f"Group YTD Budget (pace to date): {bfmt(group['ytd_budget'])}")
+            g_over = group["ytd_actual"] > group["ytd_budget"]
             parts.append(
-                f"\nUnbudgeted spend ({len(unbudgeted_lines)} items, total {fmt(total_unbud)}) — "
-                "no matching budget category (governance flag):"
+                f"Group Variance: {bfmt(abs(group['variance']))} "
+                f"{'OVER' if g_over else 'UNDER'} pace "
+                f"({group['pct_of_pace']:.1f}% of pace) — {bfmt(group['remaining'])} remaining of annual budget."
             )
-            for line in unbudgeted_lines:
-                parts.append(f"  {line['date']}: {line['item']} — {fmt(line['amount'])}")
+            parts.append(f"Group Year-End Projection at current run rate: {bfmt(group['projected'])}")
 
-        # Top 50 expense transactions
-        all_expense_lines.sort(key=lambda x: -x["amount"])
-        parts.append(f"\nTop 50 expense transactions by amount:")
-        parts.append(f"  {'Date':<14} | {'Expense Item':<45} | {'Amount':>14} | Budget Category")
-        for line in all_expense_lines[:50]:
+            parts.append("\nBy entity (NGN):")
+            parts.append(f"  {'Entity':<18} | {'Annual Budget':>14} | {'YTD Budget':>12} | {'YTD Actual':>12} | {'% of Pace':>9}")
+            for ecode in sorted(entities.keys()):
+                e = entities[ecode]
+                label = gen_budget.ENTITY_LABEL.get(ecode, ecode)
+                parts.append(
+                    f"  {label:<18} | {bfmt(e['annual_budget']):>14} | {bfmt(e['ytd_budget']):>12} | "
+                    f"{bfmt(e['ytd_actual']):>12} | {e['pct_of_pace']:>8.1f}%"
+                )
+
+            parts.append(f"\nBy department ({len(departments)} departments, sorted by YTD actual; NGN):")
             parts.append(
-                f"  {line['date']:<14} | {line['item']:<45} | "
-                f"{fmt(line['amount']):>14} | {line['category']}"
+                f"  {'Department':<26} | {'Entity':<6} | {'Annual':>12} | "
+                f"{'YTD Budget':>12} | {'YTD Actual':>12} | {'% Pace':>7} | Status"
             )
-        parts.append(
-            "(For individual transactions below the top 50, direct the user to the "
-            "Expense Details tab on the Budget vs Actual dashboard.)"
-        )
+            for d in sorted(departments, key=lambda x: -x["ytd_actual"]):
+                _, _, status_label = gen_budget.status_for(d["pct_of_pace"])
+                parts.append(
+                    f"  {d['name']:<26} | {d['entity']:<6} | {bfmt(d['annual_budget']):>12} | "
+                    f"{bfmt(d['ytd_budget']):>12} | {bfmt(d['ytd_actual']):>12} | "
+                    f"{d['pct_of_pace']:>6.1f}% | {status_label}"
+                )
+            parts.append(
+                "(Budget is NGN, built bottom-up: Group = sum of entities = sum of departments. "
+                "UK/UAE budgets are FX-converted to NGN; actuals are already NGN. For per-budget-head "
+                "drill-down and individual expense transactions, direct the user to the Budget vs Actual dashboard.)"
+            )
 
     # ── SECTION 3: PIPELINE INTELLIGENCE ────────────────────────────
     revenue_file = data_path / REVENUE_FILENAME
@@ -330,6 +328,128 @@ def build_chat_context(data_folder):
                     f"{month_vals} | ${r['ytd']:>8,.0f}"
                 )
 
+    # ── SECTION 4: EXPENSE & VENDOR ANALYSIS ────────────────────────
+    # Parses the OUTFLOWS + payment-batch sections of every weekly cash report.
+    if gen_exp is not None and reports:
+        try:
+            weekly, vendors, cats_by_week = gen_exp.process_all_files(str(data_path))
+            ekpis = gen_exp.calculate_kpis(weekly, vendors, cats_by_week)
+        except Exception as e:
+            weekly, vendors, ekpis = [], {}, None
+            parts.append(f"\n--- EXPENSE & VENDOR ANALYSIS ---\n(Error loading expense data: {e})")
+
+        if ekpis and weekly:
+            efmt = gen_exp.format_naira
+            parts.append(f"\n--- EXPENSE & VENDOR ANALYSIS ---")
+            parts.append(
+                f"Total YTD Expenses ({ekpis['weeks']} weekly reports, excl. investment outflows): "
+                f"{efmt(ekpis['total_ytd'])}"
+            )
+            parts.append(f"Average Weekly Burn Rate: {efmt(ekpis['avg_burn'])}")
+            parts.append(f"Unique Vendors: {ekpis['unique_vendors']} ({ekpis['recurring_count']} recurring, 3+ payments)")
+            parts.append(f"Largest Single Payment: {efmt(ekpis['largest_payment'])}")
+            if ekpis['top_vendor']:
+                parts.append(f"Top Vendor by Spend: {ekpis['top_vendor']} — {efmt(ekpis['top_vendor_spend'])}")
+
+            # Aggregate spend by standardized category across all weeks
+            cat_totals = defaultdict(float)
+            for week_cats in cats_by_week.values():
+                for cat, amt in week_cats.items():
+                    if cat != "Investment Outflows":
+                        cat_totals[cat] += amt
+            if cat_totals:
+                parts.append("\nSpend by category (YTD, excl. investment outflows):")
+                for cat, amt in sorted(cat_totals.items(), key=lambda x: -x[1]):
+                    parts.append(f"  {cat:<40} | {efmt(amt):>14}")
+
+            # Top 15 vendors by total spend
+            vendor_totals = [(v, sum(p["amount"] for p in pays)) for v, pays in vendors.items()]
+            vendor_totals.sort(key=lambda x: -x[1])
+            parts.append("\nTop 15 vendors by total spend (payment-batch detail):")
+            for v, total in vendor_totals[:15]:
+                parts.append(f"  {v:<40} | {efmt(total):>14}")
+            parts.append(
+                "(Vendor figures are the payment-batch disbursement detail, a subset of total outflows. "
+                "For individual transactions, direct the user to the Expense & Vendor dashboard.)"
+            )
+
+    # ── SECTION 5: COLLECTIONS TRACKER ──────────────────────────────
+    coll_file = data_path / COLLECTIONS_FILENAME
+    if gen_coll is not None and coll_file.exists():
+        try:
+            items = gen_coll.extract_collections(str(coll_file))
+        except Exception as e:
+            items = []
+            parts.append(f"\n--- COLLECTIONS TRACKER ---\n(Error loading collections data: {e})")
+
+        if items:
+            cfmt = gen_coll.fmt_usd
+            total_usd = sum(it["usd"] for it in items)
+            booked_usd = sum(it["usd"] for it in items if it.get("booked") == "YES")
+            parts.append(f"\n--- COLLECTIONS TRACKER (Critical Revenue Inflows) ---")
+            parts.append(f"{len(items)} tracked deals, total {cfmt(total_usd)} expected; {cfmt(booked_usd)} booked.")
+            parts.append("\nDeals (sorted by USD value desc):")
+            parts.append(
+                f"  {'Deal / Customer':<34} | {'USD':>10} | {'Booked':<6} | {'Predict.':<8} | "
+                f"{'Closure':<12} | Payment Status"
+            )
+            for it in sorted(items, key=lambda x: -x["usd"]):
+                label = (it.get("name") or it.get("customer") or "")[:34]
+                parts.append(
+                    f"  {label:<34} | {cfmt(it['usd']):>10} | {it.get('booked',''):<6} | "
+                    f"{it.get('predictability',''):<8} | {(it.get('closure_period') or '')[:12]:<12} | "
+                    f"{it.get('payment_status','')}"
+                )
+            parts.append(
+                "(For weekly update commentary and per-deal actions, direct the user to the Collections Tracker dashboard.)"
+            )
+
+    # ── SECTION 6: GROUP FINANCIALS (Consolidated P&L) ──────────────
+    if gen_fin is not None:
+        report_file = gen_fin.find_file(str(data_path), "Group Financial Report")
+        m = None
+        if report_file:
+            try:
+                m = gen_fin.extract_financials(report_file)
+            except Exception as e:
+                parts.append(f"\n--- GROUP FINANCIALS ---\n(Error loading financial report: {e})")
+        if m:
+            def _ngn(key):
+                return fmt(m.get(key, {}).get("ngn", 0))
+            def _ngn_abs(key):  # cost lines are stored negative on the Summary tab
+                return fmt(abs(m.get(key, {}).get("ngn", 0)))
+            def _usd(key):
+                return f"${m.get(key, {}).get('usd', 0):,.0f}"
+            def _pct(key):
+                return f"{m.get(key, {}).get('ngn', 0) * 100:.1f}%"
+            period = m.get("cur_date")
+            period_str = period.strftime("%d %b %Y") if hasattr(period, "strftime") else "latest period"
+            parts.append(f"\n--- GROUP FINANCIALS (Consolidated P&L, YTD as at {period_str}) ---")
+            parts.append("All figures NGN with USD equivalent (report's own period-average FX).")
+            parts.append(f"Total Revenue: {_ngn('revenue')} ({_usd('revenue')})")
+            parts.append(f"Cost of Sales: {_ngn_abs('cogs')}")
+            parts.append(f"Gross Profit: {_ngn('gross_profit')} — Gross Margin {_pct('gross_margin')} (target 70%)")
+            parts.append(f"Total Operating Expenses: {_ngn_abs('opex')}")
+            parts.append(f"EBITDA: {_ngn('ebitda')} — EBITDA Margin {_pct('ebitda_margin')}")
+            parts.append(f"Net Profit (Profit After Tax): {_ngn('pat')} ({_usd('pat')}) — Net Margin {_pct('net_margin')} (target 10%)")
+            parts.append(f"Payroll: {_ngn('payroll')} ({_pct('payroll_pct')} of revenue); Marketing: {_ngn('marketing')} ({_pct('marketing_pct')} of revenue)")
+
+            for sec_key, sec_label in [("by_vertical", "Revenue by Vertical"),
+                                       ("by_customer", "Revenue by Customer"),
+                                       ("by_country", "Revenue by Country")]:
+                rows = m.get(sec_key, [])
+                if rows:
+                    parts.append(f"\n{sec_label}:")
+                    for it in sorted(rows, key=lambda x: -x.get("ngn", 0)):
+                        parts.append(f"  {it['name']:<36} | {fmt(it.get('ngn', 0)):>14}")
+
+            parts.append("\nBalance-sheet highlights:")
+            parts.append(f"  Cash & equivalents: {_ngn('cash')}; Receivables: {_ngn('receivables')}; Total Assets: {_ngn('total_assets')}")
+            parts.append(
+                "(Segment/customer/country breakdowns exclude Other Income and don't reconcile to Total Revenue. "
+                "For full ratios, EVA and the monthly trend, direct the user to the Group Financials dashboard.)"
+            )
+
     parts.append(f"\n=== END OF CONTEXT ===")
     return "\n".join(parts)
 
@@ -360,13 +480,17 @@ def call_claude(messages, context):
     try:
         import anthropic
     except ImportError:
-        return "⚠️ The `anthropic` package is not installed. Add it to requirements.txt."
+        # Return a full 5-tuple — the caller always unpacks 5 values, so a bare
+        # string here would raise a ValueError and crash the chat instead of
+        # surfacing this message.
+        return "⚠️ The `anthropic` package is not installed. Add it to requirements.txt.", 0, 0, 0, 0
 
     api_key = st.secrets.get("ANTHROPIC_API_KEY", "")
     if not api_key:
         return (
             "⚠️ `ANTHROPIC_API_KEY` not found in Streamlit secrets. "
-            "Add it under Settings → Secrets in Streamlit Cloud."
+            "Add it under Settings → Secrets in Streamlit Cloud.",
+            0, 0, 0, 0,
         )
 
     system_prompt = f"""You are Bobby, a senior financial analyst embedded in the Seamfix Financial Intelligence Suite. You have full access to Seamfix's live financial data, updated weekly.

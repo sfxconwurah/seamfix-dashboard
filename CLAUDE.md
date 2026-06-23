@@ -383,10 +383,21 @@ Edit the `allowed_emails` list in Streamlit Cloud secrets. No code change needed
 Bobby is an AI financial analyst powered by Claude (Anthropic API). It lives in the sidebar.
 
 ### How It Works
-1. On first query, `build_chat_context()` compiles ALL financial data into a ~6-8K token text summary
+1. On first query, `build_chat_context()` compiles ALL financial data into a text summary
 2. This context is sent as the system prompt with `cache_control: ephemeral` (prompt caching — 90% cost reduction on follow-up messages)
 3. Uses `claude-sonnet-4-6` model
 4. All queries and responses are logged to a separate Google Sheet (`BOBBY_LOG_SHEET_ID`)
+
+### Chat context coverage (`build_chat_context` in `app.py`)
+Bobby's context covers **every dashboard**, each as its own section that **reuses the relevant generator's parsing functions** (so it never duplicates xlsx/snapshot logic and stays in sync as generators change):
+- **Cash Overview** — `gen_dash.extract_report()` per weekly cash report.
+- **Budget vs Actual** — reads `budget_tracker_snapshot.json` via `gen_budget.compute()` (group/entity/department YTD budget-vs-actual, all NGN). **This replaced the retired `BUDGET_CATEGORIES` + cash-outflow fuzzy-matching code** — referencing the old attribute is what crashed Bobby on 2026-06-23 ("module 'generate_budget_dashboard' has no attribute 'BUDGET_CATEGORIES'") after the 2026-06-11 budget rewrite. **If you ever rename/remove a generator function, update the matching section here too.**
+- **Pipeline Intelligence** — `gen_pipe.extract_revenue_data()` (status-weighted projection, gap, per-deal monthly).
+- **Expense & Vendor** — `gen_exp.process_all_files()` + `calculate_kpis()` (YTD spend excl. investment outflows, weekly burn, spend-by-category, top vendors).
+- **Collections Tracker** — `gen_coll.extract_collections()` (tracked deals, booked vs expected, payment status).
+- **Group Financials** — `gen_fin.find_file()` + `extract_financials()` (consolidated P&L, margins vs target, revenue breakdowns, balance-sheet highlights).
+
+The three later generators (`gen_exp`/`gen_coll`/`gen_fin`) are imported defensively via a local `_try_import` helper, and **every section guards on its own data source** (file existence / module present / its own try-except), so a missing file or one bad module degrades only that section — never the whole context. The Pipeline and Collections sections only render where their live data (Google Sheet) is present, so they typically appear on Streamlit Cloud but not in a bare local checkout. `call_claude()`'s early returns (anthropic missing / no API key) return a full 5-tuple because the caller always unpacks 5 values.
 
 ### Usage Logging
 Bobby logs to Google Sheet `1c7QMZuV-YNDsmn1XYLJtx8pRyYi6g_wwdAHJ-D0cgtk`:

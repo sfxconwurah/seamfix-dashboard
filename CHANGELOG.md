@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-06-23 — Fix: Bobby chat crashed ("no attribute 'BUDGET_CATEGORIES'") + now covers every dashboard
+
+**Why:** Ask Bobby returned a "Data Load Failure — module 'generate_budget_dashboard' has no attribute 'BUDGET_CATEGORIES'" message and could not answer any question. The Budget vs Actual dashboard was rewritten on 2026-06-11 to read the committed JSON snapshot, which removed `BUDGET_CATEGORIES` / `map_expense_to_budget` / `is_investment_outflow` — but `build_chat_context()` still referenced them, so building Bobby's context raised and the error went into the context itself. Finance also asked that Bobby be able to speak to the *entire* executive dashboard.
+
+**What** (`app.py`):
+- **Fix:** rewrote the Budget vs Actual section of `build_chat_context()` to read `budget_tracker_snapshot.json` via `generate_budget_dashboard.compute()` (group/entity/department YTD budget-vs-actual, all NGN) — the same source the dashboard uses. No more reference to the retired `BUDGET_CATEGORIES` API.
+- **Feature:** added three previously-missing sections so Bobby covers all dashboards — **Expense & Vendor** (YTD spend, weekly burn, spend-by-category, top vendors via `process_all_files`/`calculate_kpis`), **Collections Tracker** (`extract_collections` — tracked deals, booked vs expected, payment status), and **Group Financials** (`extract_financials` — consolidated P&L, margins vs target, revenue breakdowns, balance-sheet highlights). The three new generators are imported defensively (`_try_import`), and every section guards on its own data source so a missing file degrades only that section, never the whole context.
+- **Fix (robustness):** `call_claude()`'s two early returns (anthropic not installed / no API key) now return a full 5-tuple — the caller always unpacks 5 values, so a bare string there would have raised a `ValueError` and crashed the chat instead of showing the warning.
+
+**Files:** `app.py`. Tested locally: context builds with Cash, Budget, Expense and Group Financials sections (Pipeline/Collections only render where their live data is present); reconciles to known figures (budget group ₦5.10B annual / ₦1.45B YTD; Jun-26 P&L revenue ₦3.01B, net margin 20.1%).
+
+---
+
 ## 2026-06-22 — Update: Cash Overview balances shown to 2 decimals + separate MTN Shares card
 
 **Why:** Finance wanted the position balances displayed in full to the kobo/cent (not abbreviated B/M/K), and the MTN equity holding surfaced as its own KPI rather than hidden.
