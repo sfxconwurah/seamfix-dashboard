@@ -5,6 +5,18 @@
 
 ---
 
+## 2026-06-27 — Feature: Cash Overview now consolidates UK & UAE balances (group liquidity)
+
+**Why:** Starting with the 26-Jun-2026 cash report, Finance added two new sheets — `UK & UAE` and `Cash UK & UAE` — that consolidate every entity's cash into one ₦ view with an executive **encumbered vs. available** liquidity split. Previously the Cash Overview tab was Nigeria-only, so the group's UK & UAE cash (~₦79.8M) was invisible and the Total Position understated the group.
+
+**What** (`generate_dashboard.py`):
+- New `extract_group_balances(wb)` parser (after `extract_cash_summary`): label-driven read of the `Cash UK & UAE` sheet (col B=label, C=local ccy, D=FX, E=Amount ₦, F=Encumbered ₦, G=Available ₦). Returns per-entity rows, the `GRAND TOTAL` gross/encumbered/available figures, the AIF portfolio (₦ + $), and `uk_uae_ngn` (sum of UK & UAE entity NGN only). Returns `None` when the sheet is absent (older reports).
+- `extract_report` attaches `rec['group']` + `rec['uk_uae_ngn']` and **adds `uk_uae_ngn` to `total_cash_ngn`** (Nigeria cash is already counted via the legacy Cash Report tab, so only the incremental UK & UAE entity cash is added). `main()`'s total recompute updated to match. Total Position for 26-Jun reconciles to Finance's GRAND TOTAL ₦2.078B within 0.01% (FX/rounding noise between the two sheets).
+- UI: new **Available Liquidity (Group)** KPI card (conditional) showing available ₦ with an encumbered-of-gross sub-label; new **Group Cash by Entity** section — a per-entity table (Amount/Encumbered/Available ₦) with a GRAND TOTAL row mirroring Finance's exact headline figures, plus an AIF portfolio note.
+- **Backward compatible:** reports without the group sheet → `group=None`, `uk_uae_ngn=0`, no new cards — the Nigeria-only view is unchanged.
+
+---
+
 ## 2026-06-23 — Fix: Group Financials trend chart showed negative EBITDA above positive Net Profit
 
 **Why:** The Monthly Performance Trend chart plotted EBITDA below zero while Net Profit was positive — impossible, since Net Profit sits below EBITDA in the P&L. Root cause: `extract_monthly_trend()` read the `MoM` tab's `EBITDA` row directly, but that row is corrupt in the source workbook (wrong sign/magnitude — e.g. Jan-26 showed −₦193.7M when true EBITDA is +₦188.5M).

@@ -207,6 +207,71 @@ def extract_cash_summary(wb):
     }
 
 
+def extract_group_balances(wb):
+    """Parse the report's executive group-liquidity sheet ('Cash UK & UAE'),
+    introduced 26-Jun-2026. It consolidates EVERY entity's cash into one ₦ view
+    with an encumbered/available split that the Nigeria-only 'Cash Report' tab
+    never carried. Layout (col B=label, C=balance in local ccy, D=exch. rate,
+    E=Amount ₦, F=Encumbered ₦, G=Available ₦): a row per entity/account
+    (labels start with 'Seamfix …'), investment balance rows, an 'AIF Investment'
+    row, and a 'GRAND TOTAL …' row holding the gross/encumbered/available
+    headline figures. Returns None when the sheet is absent (older reports), so
+    the Cash Overview falls back to the Nigeria-only view unchanged.
+
+    NB: Nigeria's NGN+USD cash is ALSO carried by the legacy 'Cash Report' tab
+    (already in total_cash_ngn), so `uk_uae_ngn` deliberately sums ONLY the UK &
+    UAE entity rows — the incremental cash this sheet adds to the group position."""
+    sheet = None
+    for name in wb.sheetnames:
+        if 'cash uk' in name.strip().lower():
+            sheet = wb[name]
+            break
+    if sheet is None:
+        return None
+
+    entities = []
+    gross_ngn = encumbered_ngn = available_ngn = 0.0
+    aif_ngn = aif_usd = 0.0
+    uk_uae_ngn = 0.0
+    for r in range(1, sheet.max_row + 1):
+        b = sheet.cell(r, 2).value
+        bs = str(b).strip() if b is not None else ''
+        low = bs.lower()
+        if not low:
+            continue
+        if 'grand total' in low:
+            gross_ngn = sf(sheet.cell(r, 5).value)
+            encumbered_ngn = sf(sheet.cell(r, 6).value)
+            available_ngn = sf(sheet.cell(r, 7).value)
+        elif low.startswith('aif investment'):
+            aif_usd = sf(sheet.cell(r, 3).value)
+            aif_ngn = sf(sheet.cell(r, 5).value)
+        elif low.startswith('seamfix'):
+            ngn = sf(sheet.cell(r, 5).value)
+            ent = {
+                'name': bs,
+                'local': sf(sheet.cell(r, 3).value),
+                'fx': sf(sheet.cell(r, 4).value),
+                'ngn': ngn,
+                'encumbered': sf(sheet.cell(r, 6).value),
+                'available': sf(sheet.cell(r, 7).value),
+            }
+            entities.append(ent)
+            if 'uk' in low or 'uae' in low:
+                uk_uae_ngn += ngn
+
+    if not entities and gross_ngn <= 0:
+        return None
+    return {
+        'entities': entities,
+        'gross_ngn': gross_ngn,
+        'encumbered_ngn': encumbered_ngn,
+        'available_ngn': available_ngn,
+        'aif_ngn': aif_ngn, 'aif_usd': aif_usd,
+        'uk_uae_ngn': uk_uae_ngn,
+    }
+
+
 def extract_report(filepath):
     fn = os.path.basename(filepath)
     dt = parse_date(fn)
@@ -287,16 +352,26 @@ def extract_report(filepath):
     # rolled into total_cash_ngn (not a cash-equivalent).
     rec['mtn_shares_ngn'] = summary['mtn_shares'] if summary else 0.0
 
+    # Group liquidity (UK & UAE) — from the 26-Jun-2026+ 'Cash UK & UAE' sheet.
+    # The Nigeria cash is already counted via the Cash Report tab above, so we
+    # add ONLY the UK & UAE entity NGN (uk_uae_ngn) to the group position, and
+    # surface the executive encumbered/available split. Absent on older reports.
+    group = extract_group_balances(wb)
+    rec['group'] = group
+    rec['uk_uae_ngn'] = group['uk_uae_ngn'] if group else 0.0
+
     # USD investments converted to NGN (FX rate must be resolved first)
     rec['investment_usd_ngn'] = rec.get('investment_usd_raw', 0) * rec.get('fx_rate', 1)
 
-    # Total cash position in NGN equivalent (liquid cash + all investments)
+    # Total cash position in NGN equivalent (liquid cash + all investments +
+    # UK & UAE entity cash when the group sheet is present)
     rec['total_cash_ngn'] = (
         rec.get('ngn_closing', 0)
         + rec.get('usd_closing_ngn', 0)
         + rec.get('gbp_closing_ngn', 0)
         + rec.get('investment_ngn', 0)
         + rec.get('investment_usd_ngn', 0)
+        + rec.get('uk_uae_ngn', 0)
     )
     # Also keep a liquid-only view for reference
     rec['liquid_cash_ngn'] = rec.get('ngn_closing', 0) + rec.get('usd_closing_ngn', 0) + rec.get('gbp_closing_ngn', 0)
@@ -932,6 +1007,11 @@ def generate_html(reports, anomalies, insights, takeaways, output_path, data_war
     prev_mtn_shares = prev.get('mtn_shares_ngn', 0)
     mtn_chg = ((mtn_shares - prev_mtn_shares) / prev_mtn_shares * 100) if prev_mtn_shares else 0
 
+    # Group liquidity (UK & UAE sheet, 26-Jun-2026+). When present it gives the
+    # executive encumbered/available split across ALL entities; absent on older
+    # reports (group is None → no extra cards, Nigeria-only view unchanged).
+    group = latest.get('group')
+
     latest_in = inflows[-1]
     prev_in = inflows[-2] if len(inflows) > 1 else latest_in
     in_chg = ((latest_in - prev_in) / prev_in * 100) if prev_in else 0
@@ -1118,6 +1198,72 @@ def generate_html(reports, anomalies, insights, takeaways, output_path, data_war
             f'</div>'
         )
 
+    # Available Liquidity card + Group Cash by Entity table — only when the
+    # report carries the 'Cash UK & UAE' group sheet (26-Jun-2026+).
+    available_card_html = ""
+    group_breakdown_html = ""
+    if group and group.get('gross_ngn', 0) > 0:
+        avail = group.get('available_ngn', 0)
+        encumbered = abs(group.get('encumbered_ngn', 0))
+        gross = group.get('gross_ngn', 0)
+        enc_note = (
+            f'{fmt_naira_precise(encumbered)} encumbered of {fmt_naira_precise(gross)} gross'
+            if encumbered > 0 else 'no encumbered balances'
+        )
+        available_card_html = (
+            f'<div class="kpi-card">'
+            f'<div class="kpi-label">Available Liquidity (Group)</div>'
+            f'<div class="kpi-value">{fmt_naira_precise(avail)}</div>'
+            f'<div class="kpi-change neutral">{enc_note} · all entities &amp; portfolios</div>'
+            f'</div>'
+        )
+
+        # Per-entity breakdown table (NGN / Encumbered / Available), plus a
+        # GRAND TOTAL row mirroring Finance's own headline figures.
+        rows_html = ""
+        for ent in group.get('entities', []):
+            enc = abs(ent.get('encumbered', 0))
+            av = ent.get('available', 0)
+            rows_html += (
+                f'<tr>'
+                f'<td style="text-align:left">{ent.get("name", "")}</td>'
+                f'<td style="text-align:right">{fmt_naira_precise(ent.get("ngn", 0))}</td>'
+                f'<td style="text-align:right">{fmt_naira_precise(enc) if enc > 0 else "&#8212;"}</td>'
+                f'<td style="text-align:right">{fmt_naira_precise(av) if av > 0 else "&#8212;"}</td>'
+                f'</tr>'
+            )
+        aif_note = ""
+        if group.get('aif_ngn', 0) > 0:
+            aif_note = (
+                f'<p style="color:var(--text-secondary);font-size:0.85em;margin-top:12px">'
+                f'AIF Investment portfolio: {fmt_naira_precise(group["aif_ngn"])} '
+                f'(${group.get("aif_usd", 0):,.0f}), included in the group total.</p>'
+            )
+        group_breakdown_html = (
+            f'<div class="section">'
+            f'<h2>Group Cash by Entity</h2>'
+            f'<p style="color:var(--text-secondary);font-size:0.9em;margin-bottom:16px">'
+            f'Consolidated liquidity across Nigeria, UK &amp; UAE (₦), with the '
+            f'encumbered vs. available split. Source: report "Cash UK &amp; UAE" sheet.</p>'
+            f'<table style="width:100%;border-collapse:collapse;font-size:0.95em">'
+            f'<thead><tr style="border-bottom:2px solid var(--border-accent)">'
+            f'<th style="text-align:left;padding:8px">Entity / Account</th>'
+            f'<th style="text-align:right;padding:8px">Amount (₦)</th>'
+            f'<th style="text-align:right;padding:8px">Encumbered (₦)</th>'
+            f'<th style="text-align:right;padding:8px">Available (₦)</th>'
+            f'</tr></thead><tbody>'
+            f'{rows_html}'
+            f'<tr style="border-top:2px solid var(--border-accent);font-weight:700">'
+            f'<td style="text-align:left;padding:8px">GRAND TOTAL — All Entities &amp; Portfolios</td>'
+            f'<td style="text-align:right;padding:8px">{fmt_naira_precise(group.get("gross_ngn", 0))}</td>'
+            f'<td style="text-align:right;padding:8px">{fmt_naira_precise(abs(group.get("encumbered_ngn", 0)))}</td>'
+            f'<td style="text-align:right;padding:8px">{fmt_naira_precise(group.get("available_ngn", 0))}</td>'
+            f'</tr>'
+            f'</tbody></table>'
+            f'{aif_note}'
+            f'</div>'
+        )
+
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1287,6 +1433,7 @@ tbody tr:hover{{background:transparent!important}}
 <div class="kpi-change {'positive' if usd_bal_chg >= 0 else 'negative'}">{'&#9650;' if usd_bal_chg >= 0 else '&#9660;'} {abs(usd_bal_chg):.1f}% vs prior week</div>
 </div>
 {mtn_card_html}
+{available_card_html}
 <div class="kpi-card">
 <div class="kpi-label">Weekly Inflow</div>
 <div class="kpi-value">{fmt_naira(latest_in)}</div>
@@ -1319,6 +1466,8 @@ tbody tr:hover{{background:transparent!important}}
 <div style="margin-top:6px;font-size:0.78em;color:var(--text-secondary)">Floor if revenue stops: {fmt_naira(forecast_4w_floor)} ({forecast_4w_floor_chg_pct:.1f}%)</div>
 </div>
 </div>
+
+{group_breakdown_html}
 
 <div class="takeaways-section">
 <h2>\U0001F4CB Executive Takeaways</h2>
@@ -1523,7 +1672,7 @@ def main():
         # total_cash_ngn = liquid cash + NGN investments + USD investments (both closing balances
         # from the Cash Report sheet). net_inv_out is NOT added back here because the investment
         # portfolio closing balances already reflect any money transferred into them during the week.
-        r['total_cash_ngn'] = r.get('liquid_cash_ngn', 0) + r.get('investment_ngn', 0) + r.get('investment_usd_ngn', 0)
+        r['total_cash_ngn'] = r.get('liquid_cash_ngn', 0) + r.get('investment_ngn', 0) + r.get('investment_usd_ngn', 0) + r.get('uk_uae_ngn', 0)
 
     print(f"\nExtracted {len(reports)} weeks")
 
