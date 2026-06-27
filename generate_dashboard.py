@@ -229,6 +229,9 @@ def extract_group_balances(wb):
     if sheet is None:
         return None
 
+    # Capture EVERY line item (entities + investment-balance rows + AIF) so the
+    # table reconciles to the GRAND TOTAL — the Sub-Total and header rows are
+    # skipped. Each item's Amount ₦ is col E, Encumbered col F, Available col G.
     entities = []
     gross_ngn = encumbered_ngn = available_ngn = 0.0
     aif_ngn = aif_usd = 0.0
@@ -243,22 +246,29 @@ def extract_group_balances(wb):
             gross_ngn = sf(sheet.cell(r, 5).value)
             encumbered_ngn = sf(sheet.cell(r, 6).value)
             available_ngn = sf(sheet.cell(r, 7).value)
-        elif low.startswith('aif investment'):
-            aif_usd = sf(sheet.cell(r, 3).value)
-            aif_ngn = sf(sheet.cell(r, 5).value)
-        elif low.startswith('seamfix'):
-            ngn = sf(sheet.cell(r, 5).value)
-            ent = {
-                'name': bs,
-                'local': sf(sheet.cell(r, 3).value),
-                'fx': sf(sheet.cell(r, 4).value),
-                'ngn': ngn,
-                'encumbered': sf(sheet.cell(r, 6).value),
-                'available': sf(sheet.cell(r, 7).value),
-            }
-            entities.append(ent)
-            if 'uk' in low or 'uae' in low:
-                uk_uae_ngn += ngn
+            continue
+        # Skip subtotal and column-header rows (they would double-count / aren't data)
+        if 'sub-total' in low or 'subtotal' in low or ('entity' in low and 'account' in low):
+            continue
+        ngn = sf(sheet.cell(r, 5).value)
+        if ngn == 0:
+            continue
+        item = {
+            'name': bs,
+            'local': sf(sheet.cell(r, 3).value),
+            'fx': sf(sheet.cell(r, 4).value),
+            'ngn': ngn,
+            'encumbered': sf(sheet.cell(r, 6).value),
+            'available': sf(sheet.cell(r, 7).value),
+        }
+        entities.append(item)
+        if low.startswith('aif'):
+            aif_usd = item['local']
+            aif_ngn = ngn
+        # Only the UK & UAE operating-entity rows are incremental to the group
+        # position (Nigeria + all investments are already in total_cash_ngn).
+        if low.startswith('seamfix') and ('uk' in low or 'uae' in low):
+            uk_uae_ngn += ngn
 
     if not entities and gross_ngn <= 0:
         return None
@@ -1225,26 +1235,20 @@ def generate_html(reports, anomalies, insights, takeaways, output_path, data_war
             enc = abs(ent.get('encumbered', 0))
             av = ent.get('available', 0)
             rows_html += (
-                f'<tr>'
-                f'<td style="text-align:left">{ent.get("name", "")}</td>'
-                f'<td style="text-align:right">{fmt_naira_precise(ent.get("ngn", 0))}</td>'
-                f'<td style="text-align:right">{fmt_naira_precise(enc) if enc > 0 else "&#8212;"}</td>'
-                f'<td style="text-align:right">{fmt_naira_precise(av) if av > 0 else "&#8212;"}</td>'
+                f'<tr style="border-bottom:1px solid var(--border-accent)">'
+                f'<td style="text-align:left;padding:8px">{ent.get("name", "")}</td>'
+                f'<td style="text-align:right;padding:8px">{fmt_naira_precise(ent.get("ngn", 0))}</td>'
+                f'<td style="text-align:right;padding:8px">{fmt_naira_precise(enc) if enc > 0 else "&#8212;"}</td>'
+                f'<td style="text-align:right;padding:8px">{fmt_naira_precise(av) if av > 0 else "&#8212;"}</td>'
                 f'</tr>'
-            )
-        aif_note = ""
-        if group.get('aif_ngn', 0) > 0:
-            aif_note = (
-                f'<p style="color:var(--text-secondary);font-size:0.85em;margin-top:12px">'
-                f'AIF Investment portfolio: {fmt_naira_precise(group["aif_ngn"])} '
-                f'(${group.get("aif_usd", 0):,.0f}), included in the group total.</p>'
             )
         group_breakdown_html = (
             f'<div class="section">'
             f'<h2>Group Cash by Entity</h2>'
             f'<p style="color:var(--text-secondary);font-size:0.9em;margin-bottom:16px">'
-            f'Consolidated liquidity across Nigeria, UK &amp; UAE (₦), with the '
-            f'encumbered vs. available split. Source: report "Cash UK &amp; UAE" sheet.</p>'
+            f'Consolidated liquidity across Nigeria, UK &amp; UAE plus the investment '
+            f'portfolios (₦), with the encumbered vs. available split. '
+            f'Source: report "Cash UK &amp; UAE" sheet.</p>'
             f'<table style="width:100%;border-collapse:collapse;font-size:0.95em">'
             f'<thead><tr style="border-bottom:2px solid var(--border-accent)">'
             f'<th style="text-align:left;padding:8px">Entity / Account</th>'
@@ -1260,7 +1264,6 @@ def generate_html(reports, anomalies, insights, takeaways, output_path, data_war
             f'<td style="text-align:right;padding:8px">{fmt_naira_precise(group.get("available_ngn", 0))}</td>'
             f'</tr>'
             f'</tbody></table>'
-            f'{aif_note}'
             f'</div>'
         )
 
